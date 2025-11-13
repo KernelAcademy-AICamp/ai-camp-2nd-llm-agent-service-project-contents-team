@@ -1,24 +1,30 @@
-import logo from './logo.svg';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Layout from './components/Layout';
+import Dashboard from './pages/Dashboard';
+import ContentCreator from './pages/ContentCreator';
+import ContentList from './pages/ContentList';
+import Templates from './pages/Templates';
+import Schedule from './pages/Schedule';
+import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
 import './App.css';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Router>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/create" element={<ContentCreator />} />
+          <Route path="/contents" element={<ContentList />} />
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/schedule" element={<Schedule />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </Layout>
+    </Router>
   );
 }
 
