@@ -2,21 +2,31 @@
   "name": "contents_creator",
   "version": "0.1.0",
   "private": true,
+  "proxy": "http://localhost:5001",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.69.0",
     "@google/generative-ai": "^0.24.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "jimp": "^0.22.12",
+    "multer": "^2.0.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.9.5",
     "react-scripts": "5.0.1",
+    "sharp": "^0.34.5",
+    "text-to-image": "^8.0.1",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
+
     "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
     "start:frontend": "react-scripts start",
     "start:backend": "cd backend && python3 -m uvicorn app.main:app --reload --port 8000",
@@ -24,6 +34,9 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   },
   "eslintConfig": {
     "extends": [

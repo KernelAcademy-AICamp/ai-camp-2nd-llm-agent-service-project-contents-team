@@ -12,6 +12,7 @@ import Templates from './pages/Templates';
 import Schedule from './pages/Schedule';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import CardNews from './pages/CardNews';
 import './App.css';
 
 function App() {
@@ -24,8 +25,7 @@ function App() {
           <Route path="/oauth/callback" element={<OAuthCallback />} />
 
           {/* 보호된 라우트 */}
-          <Route
-            path="/"
+          <Route path="/"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -43,6 +43,17 @@ function App() {
                 </Layout>
               </ProtectedRoute>
             }
+          />
+              
+          <Route 
+            path="/cardnews" 
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <CardNews />
+                </Layout>
+              </ProtectedRoute>
+            } 
           />
           <Route
             path="/contents"
