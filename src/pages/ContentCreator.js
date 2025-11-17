@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import './ContentCreator.css';
+import BlogPostForm from '../components/BlogPostForm';
+import BlogPostResult from '../components/BlogPostResult';
+import { generateBlogPost } from '../services/geminiService';
 
 function ContentCreator() {
   const [contentType, setContentType] = useState('social');
   const [platform, setPlatform] = useState('instagram');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedBlogPost, setGeneratedBlogPost] = useState(null);
 
   const contentTypes = [
     { id: 'social', label: '소셜 미디어', icon: '📱' },
@@ -21,8 +26,32 @@ function ContentCreator() {
     email: ['Newsletter', 'Promotion', 'Announcement'],
   };
 
+  const handleGenerateBlogPost = async (formData) => {
+    setIsGenerating(true);
+    try {
+      const result = await generateBlogPost(formData);
+      setGeneratedBlogPost(result);
+      setTitle(result.title);
+      setContent(result.content);
+    } catch (error) {
+      alert('블로그 포스트 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
+      console.error('Error:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleEditBlogPost = () => {
+    setGeneratedBlogPost(null);
+  };
+
+  const handleSaveBlogPost = () => {
+    alert('콘텐츠가 저장되었습니다.');
+    // 추후 실제 저장 로직 구현
+  };
+
   const handleGenerate = () => {
-    // AI 콘텐츠 생성 로직 (추후 구현)
+    // 다른 콘텐츠 타입의 AI 생성 로직 (추후 구현)
     alert('AI 콘텐츠 생성 기능은 추후 구현 예정입니다.');
   };
 
@@ -50,100 +79,128 @@ function ContentCreator() {
         </div>
       </div>
 
-      <div className="creator-content">
-        <div className="creator-main">
-          <div className="section">
-            <h3>콘텐츠 유형</h3>
-            <div className="content-type-grid">
-              {contentTypes.map((type) => (
-                <button
-                  key={type.id}
-                  className={`type-card ${contentType === type.id ? 'active' : ''}`}
-                  onClick={() => setContentType(type.id)}
-                >
-                  <span className="type-icon">{type.icon}</span>
-                  <span className="type-label">{type.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="section">
-            <h3>플랫폼 선택</h3>
-            <select
-              className="platform-select"
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-            >
-              {platforms[contentType]?.map((p) => (
-                <option key={p} value={p.toLowerCase()}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="section">
-            <h3>제목</h3>
-            <input
-              type="text"
-              className="title-input"
-              placeholder="콘텐츠 제목을 입력하세요"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-
-          <div className="section">
-            <div className="section-header">
-              <h3>내용</h3>
-              <button className="btn-ai" onClick={handleGenerate}>
-                ✨ AI로 생성하기
+      <div className={`creator-content ${contentType === 'blog' ? 'blog-layout' : ''}`}>
+        {/* 콘텐츠 타입 선택 */}
+        <div className="section">
+          <h3>콘텐츠 유형</h3>
+          <div className="content-type-grid">
+            {contentTypes.map((type) => (
+              <button
+                key={type.id}
+                className={`type-card ${contentType === type.id ? 'active' : ''}`}
+                onClick={() => {
+                  setContentType(type.id);
+                  setGeneratedBlogPost(null);
+                }}
+              >
+                <span className="type-icon">{type.icon}</span>
+                <span className="type-label">{type.label}</span>
               </button>
-            </div>
-            <textarea
-              className="content-textarea"
-              placeholder="콘텐츠 내용을 입력하거나 AI로 생성하세요..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={12}
+            ))}
+          </div>
+        </div>
+
+        {/* 블로그 포스트 전용 UI */}
+        {contentType === 'blog' && (
+          <>
+            <BlogPostForm
+              onGenerate={handleGenerateBlogPost}
+              isGenerating={isGenerating}
             />
-          </div>
 
-          <div className="section">
-            <h3>이미지/미디어</h3>
-            <div className="media-upload">
-              <div className="upload-area">
-                <span className="upload-icon">📷</span>
-                <p>이미지를 드래그하거나 클릭하여 업로드</p>
-                <button className="btn-upload">파일 선택</button>
+            {/* 블로그 포스트 생성 결과 */}
+            {generatedBlogPost && (
+              <BlogPostResult
+                result={generatedBlogPost}
+                onEdit={handleEditBlogPost}
+                onSave={handleSaveBlogPost}
+              />
+            )}
+          </>
+        )}
+
+        {/* 다른 콘텐츠 타입 UI (기존) */}
+        {contentType !== 'blog' && (
+          <>
+            <div className="creator-main">
+              <div className="section">
+                <h3>플랫폼 선택</h3>
+                <select
+                  className="platform-select"
+                  value={platform}
+                  onChange={(e) => setPlatform(e.target.value)}
+                >
+                  {platforms[contentType]?.map((p) => (
+                    <option key={p} value={p.toLowerCase()}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="section">
+                <h3>제목</h3>
+                <input
+                  type="text"
+                  className="title-input"
+                  placeholder="콘텐츠 제목을 입력하세요"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </div>
+
+              <div className="section">
+                <div className="section-header">
+                  <h3>내용</h3>
+                  <button className="btn-ai" onClick={handleGenerate}>
+                    ✨ AI로 생성하기
+                  </button>
+                </div>
+                <textarea
+                  className="content-textarea"
+                  placeholder="콘텐츠 내용을 입력하거나 AI로 생성하세요..."
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  rows={12}
+                />
+              </div>
+
+              <div className="section">
+                <h3>이미지/미디어</h3>
+                <div className="media-upload">
+                  <div className="upload-area">
+                    <span className="upload-icon">📷</span>
+                    <p>이미지를 드래그하거나 클릭하여 업로드</p>
+                    <button className="btn-upload">파일 선택</button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="creator-sidebar">
-          <div className="preview-section">
-            <h3>미리보기</h3>
-            <div className="preview-box">
-              <div className="preview-platform">{platform}</div>
-              <div className="preview-content">
-                <h4>{title || '제목 미리보기'}</h4>
-                <p>{content || '내용이 여기에 표시됩니다...'}</p>
+            <div className="creator-sidebar">
+              <div className="preview-section">
+                <h3>미리보기</h3>
+                <div className="preview-box">
+                  <div className="preview-platform">{platform}</div>
+                  <div className="preview-content">
+                    <h4>{title || '제목 미리보기'}</h4>
+                    <p>{content || '내용이 여기에 표시됩니다...'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="tips-section">
+                <h3>💡 작성 팁</h3>
+                <ul className="tips-list">
+                  <li>명확하고 간결한 제목을 사용하세요</li>
+                  <li>타겟 고객을 고려한 톤을 유지하세요</li>
+                  <li>행동 유도 문구(CTA)를 포함하세요</li>
+                  <li>해시태그를 적절히 활용하세요</li>
+                </ul>
               </div>
             </div>
-          </div>
-
-          <div className="tips-section">
-            <h3>💡 작성 팁</h3>
-            <ul className="tips-list">
-              <li>명확하고 간결한 제목을 사용하세요</li>
-              <li>타겟 고객을 고려한 톤을 유지하세요</li>
-              <li>행동 유도 문구(CTA)를 포함하세요</li>
-              <li>해시태그를 적절히 활용하세요</li>
-            </ul>
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );
