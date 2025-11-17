@@ -21,3 +21,12 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Backend Python
+/backend/venv
+/backend/__pycache__
+/backend/*.pyc
+/backend/.env
+/backend/*.db
+/backend/*.sqlite
+/backend/*.sqlite3
