@@ -44,6 +44,14 @@
   gap: 24px;
 }
 
+.creator-content.blog-layout {
+  display: flex;
+  flex-direction: column;
+  max-width: 900px;
+  margin: 0 auto;
+  gap: 24px;
+}
+
 .creator-main {
   display: flex;
   flex-direction: column;

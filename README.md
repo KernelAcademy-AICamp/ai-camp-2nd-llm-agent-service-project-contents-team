@@ -38,11 +38,11 @@ _본 프로젝트는 1인 기업 및 소상공인을 위한 AI 기반 콘텐츠 
 | 구분 | 기술 |
 | :--- | :--- |
 | **Frontend** | React.js, React Router, CSS3 |
-| **Backend** | (추후 구현) FastAPI, Python, LangChain |
-| **Database** | (추후 구현) PostgreSQL, Vector DB |
-| **AI / ML** | (추후 구현) OpenAI API, Gemini API |
+| **Backend** | FastAPI, Python, SQLAlchemy, JWT Authentication |
+| **Database** | SQLite (PostgreSQL로 변경 가능) |
+| **AI / ML** | (추후 구현) OpenAI API, Gemini API, LangChain |
 | **External APIs** | (추후 구현) Instagram API, Facebook API, YouTube API |
-| **Infra / Tools** | Git, npm, Node.js |
+| **Infra / Tools** | Git, npm, Node.js, Python, uvicorn |
 
 ---
 
@@ -51,7 +51,8 @@ _본 프로젝트는 1인 기업 및 소상공인을 위한 AI 기반 콘텐츠 
 ### 4.1. 개발 환경
 - **Node.js 버전**: 16.x 이상
 - **npm 버전**: 8.x 이상
-- **주요 라이브러리**: `package.json` 참조
+- **Python 버전**: 3.8 이상
+- **주요 라이브러리**: `package.json`, `backend/requirements.txt` 참조
 
 ### 4.2. 설치 및 실행
 
@@ -61,18 +62,67 @@ _본 프로젝트는 1인 기업 및 소상공인을 위한 AI 기반 콘텐츠 
    cd ai-camp-2nd-llm-agent-service-project-contents-team
    ```
 
-2. **의존성 설치**
+2. **프론트엔드 의존성 설치**
    ```bash
    npm install
    ```
 
-3. **개발 서버 실행**
+3. **백엔드 설정 (최초 1회)**
+   ```bash
+   npm run setup:backend
+   ```
+
+4. **개발 서버 실행 (프론트엔드 + 백엔드 동시 실행)**
    ```bash
    npm start
    ```
-   브라우저에서 [http://localhost:3000](http://localhost:3000)으로 접속
+   - 프론트엔드: [http://localhost:3000](http://localhost:3000)
+   - 백엔드 API: [http://localhost:8000](http://localhost:8000)
+   - API 문서: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-4. **프로덕션 빌드**
+5. **개별 실행 (선택사항)**
+   ```bash
+   # 프론트엔드만 실행
+   npm run start:frontend
+
+   # 백엔드만 실행
+   npm run start:backend
+   ```
+
+5. **OAuth2.0 소셜 로그인 설정 (필수)**
+
+   로그인 기능을 사용하려면 OAuth 앱을 등록해야 합니다.
+
+   **상세한 설정 가이드**: `backend/OAUTH_SETUP.md` 참조
+
+   **지원 플랫폼**:
+   - ✅ **Google**: [Google Cloud Console](https://console.cloud.google.com/)에서 OAuth 2.0 클라이언트 ID 생성
+   - ✅ **Kakao**: [Kakao Developers](https://developers.kakao.com/)에서 REST API 키 발급
+   - ✅ **Facebook**: [Facebook Developers](https://developers.facebook.com/)에서 앱 ID 발급
+
+   발급받은 클라이언트 ID와 시크릿을 `backend/.env` 파일에 추가:
+   ```env
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+   GOOGLE_REDIRECT_URI=http://localhost:8000/api/oauth/google/callback
+
+   KAKAO_CLIENT_ID=your-kakao-rest-api-key
+   KAKAO_REDIRECT_URI=http://localhost:8000/api/oauth/kakao/callback
+
+   FACEBOOK_CLIENT_ID=your-facebook-app-id
+   FACEBOOK_CLIENT_SECRET=your-facebook-app-secret
+   FACEBOOK_REDIRECT_URI=http://localhost:8000/api/oauth/facebook/callback
+   ```
+
+6. **데이터베이스 초기화 (최초 1회)**
+
+   User 모델이 OAuth를 지원하도록 변경되었으므로 DB를 재생성해야 합니다:
+   ```bash
+   cd backend
+   bash migrate_db.sh
+   ```
+
+7. **프로덕션 빌드**
    ```bash
    npm run build
    ```
@@ -140,6 +190,8 @@ develop 브랜치에 Merge
 ## 7. 📱 주요 기능
 
 ### 7.1. 현재 구현된 기능
+
+#### 프론트엔드
 - ✅ **대시보드**: 통계 카드, 최근 콘텐츠, 빠른 작업 버튼
 - ✅ **콘텐츠 생성**: 다양한 콘텐츠 유형 및 플랫폼 선택, 에디터, 미리보기
 - ✅ **콘텐츠 관리**: 검색, 필터링, 테이블 뷰, 페이지네이션
@@ -147,13 +199,21 @@ develop 브랜치에 Merge
 - ✅ **설정**: 플랫폼 연동, 프로필 정보, 알림 설정
 - ✅ **반응형 디자인**: 모바일, 태블릿, 데스크톱 지원
 
+#### 백엔드
+- ✅ **OAuth2.0 소셜 로그인**: Google, Kakao, Facebook 지원
+- ✅ **JWT 기반 인증**: 토큰 기반 사용자 인증 시스템
+- ✅ **사용자 프로필**: 정보 조회 및 수정
+- ✅ **자동 회원가입**: 소셜 로그인 시 자동 계정 생성
+- ✅ **임시 이메일 생성**: 이메일 정보 없는 OAuth 제공자 지원
+- ✅ **API 문서**: Swagger UI 자동 생성 (http://localhost:8000/docs)
+- ✅ **CORS 설정**: 프론트엔드와 안전한 통신
+
 ### 7.2. 추후 구현 예정
 - 🔄 **AI 콘텐츠 생성**: OpenAI/Gemini API 연동
 - 🔄 **플랫폼 API 연동**: Instagram, Facebook, YouTube 자동 발행
 - 🔄 **스케줄링**: 예약 발행 시스템
 - 🔄 **분석 대시보드**: 실시간 성과 분석 및 인사이트
 - 🔄 **이미지 편집**: 이미지 업로드 및 편집 기능
-- 🔄 **백엔드 API**: FastAPI 기반 REST API
 
 ---
 

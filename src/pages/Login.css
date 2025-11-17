@@ -1,0 +1,125 @@
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.login-box {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  padding: 50px 40px;
+  width: 100%;
+  max-width: 420px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.login-header h1 {
+  font-size: 32px;
+  color: #333;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.login-header p {
+  color: #666;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.error-message {
+  background-color: #fee;
+  color: #c33;
+  padding: 14px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid #fcc;
+}
+
+/* 소셜 로그인 */
+.social-login {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.social-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  background: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.social-btn:hover {
+  background: #f8f8f8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.social-btn svg {
+  flex-shrink: 0;
+}
+
+.social-btn.google {
+  color: #333;
+  border-color: #dadce0;
+}
+
+.social-btn.google:hover {
+  border-color: #4285f4;
+  background: #f8f9fa;
+}
+
+.social-btn.kakao {
+  background: #FEE500;
+  border-color: #FEE500;
+  color: #000000;
+}
+
+.social-btn.kakao:hover {
+  background: #FDD835;
+  border-color: #FDD835;
+  box-shadow: 0 4px 12px rgba(254, 229, 0, 0.3);
+}
+
+.social-btn.facebook {
+  color: #1877F2;
+  border-color: #d0e1f9;
+}
+
+.social-btn.facebook:hover {
+  border-color: #1877F2;
+  background: #f0f5ff;
+}
+
+@media (max-width: 768px) {
+  .login-box {
+    padding: 30px 20px;
+  }
+
+  .login-header h1 {
+    font-size: 24px;
+  }
+
+  .social-btn {
+    font-size: 13px;
+    padding: 11px 14px;
+  }
+}
