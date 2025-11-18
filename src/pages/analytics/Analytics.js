@@ -1,5 +1,5 @@
 import React from 'react';
-import './Placeholder.css';
+import '../publishing/Placeholder.css';
 
 function Analytics() {
   return (

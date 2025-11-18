@@ -11,6 +11,7 @@ function Sidebar() {
     { path: '/contents', icon: '📝', label: '콘텐츠 관리' },
     { path: '/templates', icon: '📋', label: '템플릿' },
     { path: '/schedule', icon: '📅', label: '스케줄' },
+    { path: '/publish-history', icon: '📷', label: '발행 이력' },
     { path: '/analytics', icon: '📈', label: '분석' },
     { path: '/settings', icon: '⚙️', label: '설정' },
   ];

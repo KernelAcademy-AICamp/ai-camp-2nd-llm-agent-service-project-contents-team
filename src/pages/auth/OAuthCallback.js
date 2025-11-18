@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { authAPI } from '../services/api';
+import { authAPI } from '../../services/api';
 import './OAuthCallback.css';
 
 function OAuthCallback() {

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instagram 연동 중...</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #f9fafb;
+    }
+    .container {
+      text-align: center;
+      padding: 40px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #1967d2;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    h2 {
+      color: #1a1a1a;
+      margin: 0 0 10px 0;
+    }
+    p {
+      color: #6b7280;
+      margin: 0;
+    }
+    .error {
+      color: #dc2626;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="spinner"></div>
+    <h2>Instagram 연동 중...</h2>
+    <p id="message">잠시만 기다려주세요.</p>
+  </div>
+
+  <script>
+    function getHashParams() {
+      const hash = window.location.hash.substring(1);
+      const params = {};
+      hash.split('&').forEach(part => {
+        const [key, value] = part.split('=');
+        params[key] = decodeURIComponent(value);
+      });
+      return params;
+    }
+
+    function handleCallback() {
+      const params = getHashParams();
+      const messageEl = document.getElementById('message');
+
+      if (params.access_token) {
+        // 부모 창에 메시지 전송
+        if (window.opener) {
+          window.opener.postMessage({
+            type: 'INSTAGRAM_AUTH_SUCCESS',
+            accessToken: params.access_token
+          }, window.location.origin);
+
+          messageEl.textContent = '연동이 완료되었습니다. 창을 닫는 중...';
+
+          // 2초 후 창 닫기
+          setTimeout(() => {
+            window.close();
+          }, 2000);
+        } else {
+          messageEl.textContent = '부모 창을 찾을 수 없습니다.';
+          messageEl.className = 'error';
+        }
+      } else if (params.error) {
+        messageEl.textContent = `오류: ${params.error_description || params.error}`;
+        messageEl.className = 'error';
+
+        if (window.opener) {
+          window.opener.postMessage({
+            type: 'INSTAGRAM_AUTH_ERROR',
+            error: params.error,
+            errorDescription: params.error_description
+          }, window.location.origin);
+        }
+      } else {
+        messageEl.textContent = '인증 정보를 찾을 수 없습니다.';
+        messageEl.className = 'error';
+      }
+    }
+
+    // 페이지 로드 시 실행
+    handleCallback();
+  </script>
+</body>
+</html>

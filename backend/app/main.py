@@ -3,19 +3,35 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 import os
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
-from .routers import auth, oauth, image
+from .routers import auth, oauth, image, instagram
 from .database import engine, Base
+from .scheduler import start_scheduler, shutdown_scheduler
 
 load_dotenv()
 
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    애플리케이션 시작/종료 시 실행되는 코드
+    """
+    # 시작 시 스케줄러 시작
+    start_scheduler()
+    yield
+    # 종료 시 스케줄러 종료
+    shutdown_scheduler()
+
+
 app = FastAPI(
     title="Contents Creator API",
     description="AI 기반 콘텐츠 제작 및 자동화 서비스 API (OAuth2.0 소셜 로그인 전용)",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Session Middleware (OAuth에 필요)
@@ -39,6 +55,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(oauth.router)
 app.include_router(image.router)
+app.include_router(instagram.router)
 
 
 @app.get("/")

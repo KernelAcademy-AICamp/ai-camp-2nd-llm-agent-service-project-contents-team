@@ -77,4 +77,49 @@ export const authAPI = {
   },
 };
 
+// Instagram API
+export const instagramAPI = {
+  // Instagram 계정 연동
+  connectAccount: async (accessToken) => {
+    const response = await api.post('/api/instagram/connect', null, {
+      params: { access_token: accessToken }
+    });
+    return response.data;
+  },
+
+  // 연동된 계정 목록 조회
+  getAccounts: async () => {
+    const response = await api.get('/api/instagram/accounts');
+    return response.data;
+  },
+
+  // 게시물 발행
+  publishPost: async (postData) => {
+    const response = await api.post('/api/instagram/publish', postData);
+    return response.data;
+  },
+
+  // 발행 이력 조회
+  getPosts: async (skip = 0, limit = 20) => {
+    const response = await api.get('/api/instagram/posts', {
+      params: { skip, limit }
+    });
+    return response.data;
+  },
+
+  // 예약된 게시물 조회
+  getScheduledPosts: async (skip = 0, limit = 20) => {
+    const response = await api.get('/api/instagram/scheduled', {
+      params: { skip, limit }
+    });
+    return response.data;
+  },
+
+  // 계정 연동 해제
+  disconnectAccount: async (accountId) => {
+    const response = await api.delete(`/api/instagram/accounts/${accountId}`);
+    return response.data;
+  },
+};
+
 export default api;
