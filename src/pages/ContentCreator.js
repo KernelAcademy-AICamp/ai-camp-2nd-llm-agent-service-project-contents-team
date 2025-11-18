@@ -200,70 +200,15 @@ function ContentCreator() {
               isGenerating={isGenerating}
             />
 
-          {contentType === 'image' ? (
-            <>
-              <div className="section">
-                <h3>AI 모델 선택</h3>
-                <div className="ai-model-selection">
-                  {aiModels.map((model) => (
-                    <button
-                      key={model.id}
-                      className={`model-btn ${aiModel === model.id ? 'active' : ''}`}
-                      onClick={() => setAiModel(model.id)}
-                    >
-                      <span className="model-label">{model.label}</span>
-                      <span className="model-provider">{model.provider}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="section">
-                <div className="section-header">
-                  <h3>이미지 생성 프롬프트</h3>
-                  <button
-                    className="btn-ai"
-                    onClick={handleGenerateImage}
-                    disabled={isGenerating}
-                  >
-                    {isGenerating ? '🔄 생성 중...' : '🎨 이미지 생성하기'}
-                  </button>
-                </div>
-                <textarea
-                  className="content-textarea"
-                  placeholder="생성할 이미지를 설명하는 프롬프트를 입력하세요... 예: 'A beautiful sunset over the ocean with vibrant colors'"
-                  value={imagePrompt}
-                  onChange={(e) => setImagePrompt(e.target.value)}
-                  rows={6}
-                />
-              </div>
-
-              {generatedImage && (
-                <div className="section">
-                  <h3>생성된 이미지</h3>
-                  <div className="generated-image-container">
-                    <img src={generatedImage} alt="Generated" className="generated-image" />
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="section">
-              <div className="section-header">
-                <h3>내용</h3>
-                <button className="btn-ai" onClick={handleGenerate}>
-                  ✨ AI로 생성하기
-                </button>
-              </div>
-              <textarea
-                className="content-textarea"
-                placeholder="콘텐츠 내용을 입력하거나 AI로 생성하세요..."
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={12}
+            {generatedBlogPost && (
+              <BlogPostResult
+                blogPost={generatedBlogPost}
+                onEdit={handleEditBlogPost}
+                onSave={handleSaveBlogPost}
               />
-            </div>
-          )}
+            )}
+          </>
+        )}
 
         {/* 다른 콘텐츠 타입 UI (기존) */}
         {contentType !== 'blog' && (
@@ -310,8 +255,9 @@ function ContentCreator() {
                   rows={12}
                 />
               </div>
+            </div>
 
-        <div className="creator-sidebar">
+            <div className="creator-sidebar">
           <div className="preview-section">
             <h3>미리보기</h3>
             <div className="preview-box">
@@ -336,6 +282,7 @@ function ContentCreator() {
                 )}
               </div>
             </div>
+          </div>
 
           <div className="tips-section">
             <h3>💡 작성 팁</h3>
@@ -356,6 +303,8 @@ function ContentCreator() {
             )}
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );
