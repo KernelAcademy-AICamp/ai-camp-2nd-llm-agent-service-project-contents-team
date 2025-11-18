@@ -4,7 +4,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import os
 from dotenv import load_dotenv
 
-from .routers import auth, oauth
+from .routers import auth, oauth, image
 from .database import engine, Base
 
 load_dotenv()
@@ -38,6 +38,7 @@ app.add_middleware(
 # 라우터 등록
 app.include_router(auth.router)
 app.include_router(oauth.router)
+app.include_router(image.router)
 
 
 @app.get("/")
