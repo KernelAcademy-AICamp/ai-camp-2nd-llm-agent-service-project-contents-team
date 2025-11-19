@@ -18,6 +18,7 @@ function BlogPostForm({ onGenerate, isGenerating }) {
   const [keywordInput, setKeywordInput] = useState('');
   const [detailMode, setDetailMode] = useState('simple'); // 'simple' or 'detailed'
   const [simpleInput, setSimpleInput] = useState('');
+  const [uploadedImages, setUploadedImages] = useState([]);
 
   // 상세 입력 폼 데이터
   const [detailedFormData, setDetailedFormData] = useState({
@@ -135,6 +136,29 @@ function BlogPostForm({ onGenerate, isGenerating }) {
     });
   };
 
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length + uploadedImages.length > 5) {
+      alert('이미지는 최대 5개까지 업로드할 수 있습니다.');
+      return;
+    }
+
+    const newImages = files.map(file => ({
+      file,
+      preview: URL.createObjectURL(file),
+      name: file.name
+    }));
+
+    setUploadedImages([...uploadedImages, ...newImages]);
+  };
+
+  const handleRemoveImage = (index) => {
+    const newImages = uploadedImages.filter((_, i) => i !== index);
+    // 메모리 누수 방지를 위해 이전 URL 해제
+    URL.revokeObjectURL(uploadedImages[index].preview);
+    setUploadedImages(newImages);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
@@ -155,6 +179,8 @@ function BlogPostForm({ onGenerate, isGenerating }) {
       detailMode,
       simpleInput: detailMode === 'simple' ? simpleInput : null,
       detailedFormData: detailMode === 'detailed' ? detailedFormData : null,
+      uploadedImages: uploadedImages.map(img => img.file),
+      imagePreviewUrls: uploadedImages.map(img => img.preview),
     };
 
     console.log('Submitting data:', submitData);
@@ -667,6 +693,59 @@ function BlogPostForm({ onGenerate, isGenerating }) {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="form-section">
+        <div className="section-title-with-hint">
+          <h3>이미지 추가 (선택사항)</h3>
+          <span className="hint-text">최대 5개</span>
+        </div>
+        <p className="section-description">
+          블로그 포스트에 삽입할 이미지를 업로드하면, AI가 자동으로 적절한 위치에 배치합니다.
+        </p>
+
+        <div className="image-upload-area">
+          <input
+            type="file"
+            id="image-upload"
+            accept="image/*"
+            multiple
+            onChange={handleImageUpload}
+            style={{ display: 'none' }}
+            disabled={uploadedImages.length >= 5}
+          />
+          <label
+            htmlFor="image-upload"
+            className={`upload-label ${uploadedImages.length >= 5 ? 'disabled' : ''}`}
+          >
+            <span className="upload-icon">📷</span>
+            <span className="upload-text">
+              {uploadedImages.length >= 5
+                ? '최대 개수에 도달했습니다'
+                : '클릭하여 이미지 업로드'}
+            </span>
+          </label>
+        </div>
+
+        {uploadedImages.length > 0 && (
+          <div className="uploaded-images-list">
+            {uploadedImages.map((image, index) => (
+              <div key={index} className="uploaded-image-item">
+                <img src={image.preview} alt={image.name} />
+                <div className="image-info">
+                  <span className="image-name">{image.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(index)}
+                    className="remove-image-btn"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <button type="submit" className="generate-btn" disabled={isGenerating}>
