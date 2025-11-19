@@ -1,9 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-
+// Axios 인스턴스 생성
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -36,17 +35,37 @@ api.interceptors.response.use(
   }
 );
 
+// ==========================================
 // 인증 API
+// ==========================================
 export const authAPI = {
-  // 회원가입
+  // 현재 사용자 정보 조회
+  getCurrentUser: async () => {
+    const response = await api.get('/api/auth/me');
+    return response.data;
+  },
+
+  // 사용자 정보 업데이트
+  updateUser: async (userData) => {
+    const response = await api.put('/api/auth/me', userData);
+    return response.data;
+  },
+
+  // 로그아웃
+  logout: async () => {
+    const response = await api.post('/api/auth/logout');
+    return response.data;
+  },
+
+  // 회원가입 (현재 사용 안 함 - OAuth로 대체)
   register: async (userData) => {
     const response = await api.post('/api/auth/register', userData);
     return response.data;
   },
 
-  // 로그인
+  // 로그인 (현재 사용 안 함 - OAuth로 대체)
   login: async (username, password) => {
-    const formData = new FormData();
+    const formData = new URLSearchParams();
     formData.append('username', username);
     formData.append('password', password);
 
@@ -57,67 +76,15 @@ export const authAPI = {
     });
     return response.data;
   },
-
-  // 로그아웃
-  logout: async () => {
-    const response = await api.post('/api/auth/logout');
-    return response.data;
-  },
-
-  // 현재 사용자 정보 조회
-  getCurrentUser: async () => {
-    const response = await api.get('/api/auth/me');
-    return response.data;
-  },
-
-  // 사용자 정보 수정
-  updateUser: async (userData) => {
-    const response = await api.put('/api/auth/me', userData);
-    return response.data;
-  },
 };
 
-// Instagram API
-export const instagramAPI = {
-  // Instagram 계정 연동
-  connectAccount: async (accessToken) => {
-    const response = await api.post('/api/instagram/connect', null, {
-      params: { access_token: accessToken }
-    });
-    return response.data;
-  },
-
-  // 연동된 계정 목록 조회
-  getAccounts: async () => {
-    const response = await api.get('/api/instagram/accounts');
-    return response.data;
-  },
-
-  // 게시물 발행
-  publishPost: async (postData) => {
-    const response = await api.post('/api/instagram/publish', postData);
-    return response.data;
-  },
-
-  // 발행 이력 조회
-  getPosts: async (skip = 0, limit = 20) => {
-    const response = await api.get('/api/instagram/posts', {
-      params: { skip, limit }
-    });
-    return response.data;
-  },
-
-  // 예약된 게시물 조회
-  getScheduledPosts: async (skip = 0, limit = 20) => {
-    const response = await api.get('/api/instagram/scheduled', {
-      params: { skip, limit }
-    });
-    return response.data;
-  },
-
-  // 계정 연동 해제
-  disconnectAccount: async (accountId) => {
-    const response = await api.delete(`/api/instagram/accounts/${accountId}`);
+// ==========================================
+// 이미지 생성 API
+// ==========================================
+export const imageAPI = {
+  // AI 이미지 생성
+  generateImage: async (data) => {
+    const response = await api.post('/api/generate-image', data);
     return response.data;
   },
 };

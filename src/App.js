@@ -9,11 +9,9 @@ import Dashboard from './pages/dashboard/Dashboard';
 import ContentCreator from './pages/content/ContentCreator';
 import ContentList from './pages/content/ContentList';
 import Templates from './pages/content/Templates';
-import Schedule from './pages/publishing/Schedule';
 import Analytics from './pages/analytics/Analytics';
 import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
-import PublishHistory from './pages/publishing/PublishHistory';
 import './App.css';
 
 function App() {
@@ -46,15 +44,15 @@ function App() {
             }
           />
               
-          <Route 
-            path="/cardnews" 
+          <Route
+            path="/cardnews"
             element={
               <ProtectedRoute>
                 <Layout>
                   <CardNews />
                 </Layout>
               </ProtectedRoute>
-            } 
+            }
           />
           <Route
             path="/contents"
@@ -77,16 +75,6 @@ function App() {
             }
           />
           <Route
-            path="/schedule"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Schedule />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/analytics"
             element={
               <ProtectedRoute>
@@ -102,16 +90,6 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Settings />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/publish-history"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <PublishHistory />
                 </Layout>
               </ProtectedRoute>
             }

@@ -19,7 +19,6 @@ function Dashboard() {
     <div className="dashboard">
       <div className="dashboard-header">
         <h2>대시보드</h2>
-        <button className="btn-primary">새 콘텐츠 만들기</button>
       </div>
 
       <div className="stats-grid">

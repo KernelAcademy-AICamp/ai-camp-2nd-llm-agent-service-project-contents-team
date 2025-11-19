@@ -48,7 +48,8 @@ _본 프로젝트는 1인 기업 및 소상공인을 위한 AI 기반 콘텐츠 
 | **Framework** | FastAPI | 0.115.0 | RESTful API 서버 |
 | **Server** | Uvicorn | 0.32.0 | ASGI 서버 |
 | **ORM** | SQLAlchemy | 2.0.36 | 데이터베이스 ORM |
-| **Database** | SQLite | - | 개발용 DB (PostgreSQL로 변경 가능) |
+| **Database** | SQLite / PostgreSQL | - | SQLite (개발), PostgreSQL (프로덕션) |
+| **DB Driver** | psycopg2-binary | 2.9.9 | PostgreSQL 드라이버 |
 | **Authentication** | Python-JOSE | 3.3.0 | JWT 토큰 생성/검증 |
 | **OAuth** | Authlib | 1.3.2 | OAuth 2.0 클라이언트 |
 | **Validation** | Pydantic | 2.10.0 | 데이터 검증 및 직렬화 |
@@ -169,6 +170,102 @@ _본 프로젝트는 1인 기업 및 소상공인을 위한 AI 기반 콘텐츠 
 7. **프로덕션 빌드**
    ```bash
    npm run build
+   ```
+
+### 4.3. PostgreSQL 설정 (프로덕션 환경)
+
+개발 환경에서는 SQLite를 사용하지만, 프로덕션 환경에서는 PostgreSQL 사용을 권장합니다.
+
+#### PostgreSQL 설치 및 설정
+
+1. **PostgreSQL 설치**
+
+   **macOS (Homebrew)**:
+   ```bash
+   brew install postgresql@15
+   brew services start postgresql@15
+   ```
+
+   **Ubuntu/Debian**:
+   ```bash
+   sudo apt update
+   sudo apt install postgresql postgresql-contrib
+   sudo systemctl start postgresql
+   ```
+
+   **Windows**:
+   - [PostgreSQL 공식 사이트](https://www.postgresql.org/download/windows/)에서 설치
+
+2. **데이터베이스 생성**
+   ```bash
+   # PostgreSQL 접속
+   psql -U postgres
+
+   # 데이터베이스 생성
+   CREATE DATABASE contents_creator;
+
+   # 사용자 생성 (선택사항)
+   CREATE USER your_username WITH PASSWORD 'your_password';
+   GRANT ALL PRIVILEGES ON DATABASE contents_creator TO your_username;
+
+   # 종료
+   \q
+   ```
+
+3. **환경 변수 설정**
+
+   `.env` 파일에서 `DATABASE_URL`을 PostgreSQL로 변경:
+   ```env
+   # 개발 환경 (SQLite)
+   ENV=development
+   # DATABASE_URL=sqlite:///./app.db
+
+   # 프로덕션 환경 (PostgreSQL)
+   ENV=production
+   DATABASE_URL=postgresql://your_username:your_password@localhost:5432/contents_creator
+   ```
+
+4. **PostgreSQL 드라이버 설치**
+   ```bash
+   cd backend
+   pip install psycopg2-binary==2.9.9
+   ```
+
+5. **테이블 생성**
+
+   백엔드 서버를 시작하면 자동으로 테이블이 생성됩니다:
+   ```bash
+   npm run start:backend
+   ```
+
+   또는 Python으로 직접 생성:
+   ```bash
+   cd backend
+   python3 -c "from app.database import engine, Base; from app.models import *; Base.metadata.create_all(bind=engine)"
+   ```
+
+6. **연결 확인**
+
+   API 문서에서 헬스 체크:
+   ```bash
+   curl http://localhost:8000/health
+   ```
+
+#### 데이터베이스 전환 가이드
+
+SQLite에서 PostgreSQL로 데이터를 마이그레이션하려면:
+
+1. **데이터 백업** (SQLite):
+   ```bash
+   cd backend
+   cp app.db app.db.backup
+   ```
+
+2. **PostgreSQL 설정** (위 단계 참조)
+
+3. **마이그레이션 스크립트 실행**:
+   ```bash
+   bash migrate_db.sh
    ```
 
 ---
