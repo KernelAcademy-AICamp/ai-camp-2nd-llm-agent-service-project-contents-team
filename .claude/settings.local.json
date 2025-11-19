@@ -6,7 +6,9 @@
       "Bash(python3 -m pip install:*)",
       "Bash(cat:*)",
       "Bash(sqlite3:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nRefactor: Remove Instagram and scheduling features, add PostgreSQL support\n\n- Remove Instagram integration (tables, routers, scheduler)\n- Delete publishing pages (Schedule, PublishHistory, AutoPublisher)\n- Add PostgreSQL database support with connection pooling\n- Update database models to keep only User table\n- Simplify Settings page (remove Instagram connection UI)\n- Clean up Sidebar menu (remove deleted page routes)\n- Fix API service and imports after cleanup\n- Update README with PostgreSQL setup guide\n\nFocus shift: Prepare for AI video generation feature development\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push)"
     ],
     "deny": [],
     "ask": []
