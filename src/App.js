@@ -12,6 +12,7 @@ import Templates from './pages/content/Templates';
 import Analytics from './pages/analytics/Analytics';
 import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
+import VideoCreator from './pages/content/VideoCreator';
 import './App.css';
 
 function App() {
@@ -44,15 +45,25 @@ function App() {
             }
           />
               
-          <Route 
-            path="/cardnews" 
+          <Route
+            path="/cardnews"
             element={
               <ProtectedRoute>
                 <Layout>
                   <CardNews />
                 </Layout>
               </ProtectedRoute>
-            } 
+            }
+          />
+          <Route
+            path="/video"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <VideoCreator />
+                </Layout>
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/contents"

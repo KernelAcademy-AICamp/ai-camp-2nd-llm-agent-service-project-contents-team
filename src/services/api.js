@@ -1,9 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-
+// Axios 인스턴스 생성
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -36,17 +35,37 @@ api.interceptors.response.use(
   }
 );
 
+// ==========================================
 // 인증 API
+// ==========================================
 export const authAPI = {
-  // 회원가입
+  // 현재 사용자 정보 조회
+  getCurrentUser: async () => {
+    const response = await api.get('/api/auth/me');
+    return response.data;
+  },
+
+  // 사용자 정보 업데이트
+  updateUser: async (userData) => {
+    const response = await api.put('/api/auth/me', userData);
+    return response.data;
+  },
+
+  // 로그아웃
+  logout: async () => {
+    const response = await api.post('/api/auth/logout');
+    return response.data;
+  },
+
+  // 회원가입 (현재 사용 안 함 - OAuth로 대체)
   register: async (userData) => {
     const response = await api.post('/api/auth/register', userData);
     return response.data;
   },
 
-  // 로그인
+  // 로그인 (현재 사용 안 함 - OAuth로 대체)
   login: async (username, password) => {
-    const formData = new FormData();
+    const formData = new URLSearchParams();
     formData.append('username', username);
     formData.append('password', password);
 
@@ -57,22 +76,15 @@ export const authAPI = {
     });
     return response.data;
   },
+};
 
-  // 로그아웃
-  logout: async () => {
-    const response = await api.post('/api/auth/logout');
-    return response.data;
-  },
-
-  // 현재 사용자 정보 조회
-  getCurrentUser: async () => {
-    const response = await api.get('/api/auth/me');
-    return response.data;
-  },
-
-  // 사용자 정보 수정
-  updateUser: async (userData) => {
-    const response = await api.put('/api/auth/me', userData);
+// ==========================================
+// 이미지 생성 API
+// ==========================================
+export const imageAPI = {
+  // AI 이미지 생성
+  generateImage: async (data) => {
+    const response = await api.post('/api/generate-image', data);
     return response.data;
   },
 };
