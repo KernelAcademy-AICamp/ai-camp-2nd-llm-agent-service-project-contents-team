@@ -3,16 +3,16 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
-import Login from './pages/Login';
-import OAuthCallback from './pages/OAuthCallback';
-import Dashboard from './pages/Dashboard';
-import ContentCreator from './pages/ContentCreator';
-import ContentList from './pages/ContentList';
-import Templates from './pages/Templates';
+import Login from './pages/auth/Login';
+import OAuthCallback from './pages/auth/OAuthCallback';
+import Dashboard from './pages/dashboard/Dashboard';
+import ContentCreator from './pages/content/ContentCreator';
+import ContentList from './pages/content/ContentList';
+import Templates from './pages/content/Templates';
 import Schedule from './pages/Schedule';
-import Analytics from './pages/Analytics';
-import Settings from './pages/Settings';
-import CardNews from './pages/CardNews';
+import Analytics from './pages/analytics/Analytics';
+import Settings from './pages/settings/Settings';
+import CardNews from './pages/content/CardNews';
 import './App.css';
 
 function App() {
