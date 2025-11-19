@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './ContentCreator.css';
-import BlogPostForm from '../components/BlogPostForm';
-import BlogPostResult from '../components/BlogPostResult';
-import { generateBlogPost } from '../services/geminiService';
+import BlogPostForm from '../../components/BlogPostForm';
+import BlogPostResult from '../../components/BlogPostResult';
+import { generateBlogPost } from '../../services/geminiService';
 
 function ContentCreator() {
   const navigate = useNavigate();

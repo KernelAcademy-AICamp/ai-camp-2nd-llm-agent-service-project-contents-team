@@ -9,9 +9,8 @@ import Dashboard from './pages/dashboard/Dashboard';
 import ContentCreator from './pages/content/ContentCreator';
 import ContentList from './pages/content/ContentList';
 import Templates from './pages/content/Templates';
-import Schedule from './pages/utils/Schedule';
-import Analytics from './pages/utils/Analytics';
-import Settings from './pages/utils/Settings';
+import Analytics from './pages/analytics/Analytics';
+import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
 import './App.css';
 
@@ -71,16 +70,6 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Templates />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/schedule"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Schedule />
                 </Layout>
               </ProtectedRoute>
             }
