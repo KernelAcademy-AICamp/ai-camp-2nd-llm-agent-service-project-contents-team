@@ -202,7 +202,7 @@ function ContentCreator() {
 
             {generatedBlogPost && (
               <BlogPostResult
-                blogPost={generatedBlogPost}
+                result={generatedBlogPost}
                 onEdit={handleEditBlogPost}
                 onSave={handleSaveBlogPost}
               />

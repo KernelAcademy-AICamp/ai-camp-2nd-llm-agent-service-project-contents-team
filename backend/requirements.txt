@@ -13,3 +13,4 @@ anthropic==0.39.0
 Pillow==11.0.0
 psycopg2-binary==2.9.9
 replicate==0.34.1
+cloudinary==1.44.1

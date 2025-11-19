@@ -3,6 +3,20 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(API_KEY);
 
+// 파일을 base64로 변환하는 헬퍼 함수
+const fileToBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // data:image/jpeg;base64,... 형식에서 base64 부분만 추출
+      const base64String = reader.result.split(',')[1];
+      resolve(base64String);
+    };
+    reader.onerror = error => reject(error);
+  });
+};
+
 // 사용 가능한 모델 목록 확인
 export const listAvailableModels = async () => {
   try {
@@ -28,6 +42,8 @@ export const generateBlogPost = async ({
   detailMode,
   simpleInput,
   detailedFormData,
+  uploadedImages = [],
+  imagePreviewUrls = [],
 }) => {
   try {
     // API 키 확인
@@ -102,6 +118,17 @@ export const generateBlogPost = async ({
       }
     }
 
+    // 이미지 관련 지침 추가
+    const imageInstructions = uploadedImages.length > 0
+      ? `\n**이미지 활용:**
+- ${uploadedImages.length}개의 이미지가 제공되었습니다
+- 각 이미지를 분석하고, 블로그 포스트 내용의 적절한 위치에 자연스럽게 삽입하세요
+- 이미지는 마크다운 형식으로 ![이미지 설명](IMAGE_PLACEHOLDER_0), ![이미지 설명](IMAGE_PLACEHOLDER_1) 형식으로 표시하세요
+- 첫 번째 이미지는 IMAGE_PLACEHOLDER_0, 두 번째는 IMAGE_PLACEHOLDER_1 식으로 번호를 매기세요
+- 이미지 설명은 이미지 내용을 바탕으로 구체적이고 자연스럽게 작성하세요
+- 이미지 위치는 문맥의 흐름을 고려하여 가장 적절한 곳에 배치하세요\n`
+      : '';
+
     const prompt = `당신은 전문적인 블로그 콘텐츠 작가입니다. 다음 정보를 바탕으로 SEO 최적화된 고품질 블로그 포스트를 작성해주세요.
 
 **비즈니스 정보:**
@@ -113,7 +140,7 @@ export const generateBlogPost = async ({
 - 타겟 고객층: ${Array.isArray(targetAudience) ? targetAudience.join(', ') : targetAudience}
 - 핵심 키워드: ${keywords.join(', ')}
 - 톤앤 매너: ${tone}
-${detailsSection}
+${detailsSection}${imageInstructions}
 **작성 지침:**
 1. 제목은 클릭을 유도하면서도 검색 최적화가 되어야 합니다
 2. 본문은 구조화되고 읽기 쉬워야 합니다 (소제목, 문단 나누기 등)
@@ -135,6 +162,24 @@ ${detailsSection}
 
 위 형식으로 JSON만 응답해주세요.`;
 
+    // 이미지를 base64로 변환
+    let imageParts = [];
+    if (uploadedImages.length > 0) {
+      console.log(`Converting ${uploadedImages.length} images to base64...`);
+      imageParts = await Promise.all(
+        uploadedImages.map(async (file, index) => {
+          const base64Data = await fileToBase64(file);
+          return {
+            inlineData: {
+              data: base64Data,
+              mimeType: file.type
+            }
+          };
+        })
+      );
+      console.log('Images converted successfully');
+    }
+
     // SDK 사용 - 최신 모델 사용
     const modelNames = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash'];
 
@@ -145,7 +190,13 @@ ${detailsSection}
       try {
         console.log(`Trying SDK with model: ${modelName}...`);
         const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
+
+        // 이미지가 있으면 프롬프트와 함께 전달, 없으면 텍스트만
+        const contentParts = imageParts.length > 0
+          ? [prompt, ...imageParts]
+          : prompt;
+
+        const result = await model.generateContent(contentParts);
         const response = await result.response;
         text = response.text();
 
@@ -175,7 +226,12 @@ ${detailsSection}
 
     const parsedResponse = JSON.parse(jsonMatch[0]);
     console.log('Parsed response:', parsedResponse);
-    return parsedResponse;
+
+    // 업로드된 이미지의 미리보기 URL도 함께 반환
+    return {
+      ...parsedResponse,
+      imageUrls: imagePreviewUrls
+    };
   } catch (error) {
     console.error('Error generating blog post:', error);
     console.error('Error details:', {
