@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './ContentCreator.css';
 import BlogPostForm from '../../components/BlogPostForm';
 import BlogPostResult from '../../components/BlogPostResult';
+import AIContentGenerator from './AIContentGenerator';
 import { generateBlogPost } from '../../services/geminiService';
 
 function ContentCreator() {
@@ -18,6 +19,7 @@ function ContentCreator() {
   const [generatedBlogPost, setGeneratedBlogPost] = useState(null);
 
   const contentTypes = [
+    { id: 'ai', label: 'AI 글 생성', icon: '🤖' },
     { id: 'social', label: '소셜 미디어', icon: '📱' },
     { id: 'blog', label: '블로그 포스트', icon: '📝' },
     { id: 'video', label: '비디오 스크립트', icon: '🎥' },
@@ -161,17 +163,19 @@ function ContentCreator() {
     <div className="content-creator">
       <div className="creator-header">
         <h2>콘텐츠 생성</h2>
-        <div className="header-actions">
-          <button className="btn-secondary" onClick={handleSave}>
-            임시 저장
-          </button>
-          <button className="btn-primary" onClick={handleSchedule}>
-            저장 및 예약
-          </button>
-        </div>
+        {contentType !== 'ai' && (
+          <div className="header-actions">
+            <button className="btn-secondary" onClick={handleSave}>
+              임시 저장
+            </button>
+            <button className="btn-primary" onClick={handleSchedule}>
+              저장 및 예약
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className={`creator-content ${contentType === 'blog' ? 'blog-layout' : ''}`}>
+      <div className={`creator-content ${contentType === 'blog' || contentType === 'ai' ? 'blog-layout' : ''}`}>
         {/* 콘텐츠 타입 선택 */}
         <div className="section">
           <h3>콘텐츠 유형</h3>
@@ -192,6 +196,11 @@ function ContentCreator() {
           </div>
         </div>
 
+        {/* AI 글 생성 전용 UI */}
+        {contentType === 'ai' && (
+          <AIContentGenerator />
+        )}
+
         {/* 블로그 포스트 전용 UI */}
         {contentType === 'blog' && (
           <>
@@ -211,7 +220,7 @@ function ContentCreator() {
         )}
 
         {/* 다른 콘텐츠 타입 UI (기존) */}
-        {contentType !== 'blog' && (
+        {contentType !== 'blog' && contentType !== 'ai' && (
           <>
             <div className="creator-main">
               <div className="section">
