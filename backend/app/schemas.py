@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -10,6 +10,14 @@ class UserBase(BaseModel):
     full_name: Optional[str] = None
 
 
+class UserOnboardingUpdate(BaseModel):
+    """온보딩 정보 업데이트 스키마"""
+    brand_name: Optional[str] = None
+    business_type: Optional[str] = None
+    business_description: Optional[str] = None
+    target_audience: Optional[Dict[str, Any]] = None  # {"age_range": "20-30", "gender": "all", "interests": [...]}
+
+
 class User(UserBase):
     """사용자 응답 스키마"""
     id: int
@@ -17,6 +25,107 @@ class User(UserBase):
     is_superuser: bool
     oauth_provider: Optional[str] = None
     profile_image: Optional[str] = None
+    brand_name: Optional[str] = None
+    business_type: Optional[str] = None
+    business_description: Optional[str] = None
+    target_audience: Optional[Dict[str, Any]] = None
+    onboarding_completed: bool = False
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# 사용자 선호도 스키마
+class UserPreferenceBase(BaseModel):
+    """사용자 선호도 기본 스키마"""
+    text_style_sample: Optional[str] = None
+    text_tone: Optional[str] = None  # casual, professional, friendly, formal
+    image_style_description: Optional[str] = None
+    image_color_palette: Optional[List[str]] = None
+    video_style_description: Optional[str] = None
+    video_duration_preference: Optional[str] = None  # short, medium, long
+
+
+class UserPreferenceCreate(UserPreferenceBase):
+    """사용자 선호도 생성 스키마"""
+    pass
+
+
+class UserPreferenceUpdate(UserPreferenceBase):
+    """사용자 선호도 업데이트 스키마"""
+    pass
+
+
+class UserPreference(UserPreferenceBase):
+    """사용자 선호도 응답 스키마"""
+    id: int
+    user_id: int
+    image_style_sample_url: Optional[str] = None
+    video_style_sample_url: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserProfile(BaseModel):
+    """사용자 프로필 전체 응답 스키마 (마이페이지용)"""
+    user: User
+    preferences: Optional[UserPreference] = None
+
+    class Config:
+        from_attributes = True
+
+
+# 통합 콘텐츠 스키마
+class ContentBase(BaseModel):
+    """통합 콘텐츠 기본 스키마"""
+    title: str
+    goal: str
+    keywords: Optional[List[str]] = None
+    platforms: Optional[List[str]] = None  # ["instagram", "blog", "youtube"]
+
+
+class ContentCreate(ContentBase):
+    """통합 콘텐츠 생성 요청"""
+    generate_blog: bool = True
+    generate_images: bool = True
+    generate_video: bool = True
+    num_images: int = 3  # 생성할 이미지 개수
+
+
+class ContentUpdate(BaseModel):
+    """통합 콘텐츠 업데이트"""
+    title: Optional[str] = None
+    blog_content: Optional[str] = None
+    instagram_caption: Optional[str] = None
+    facebook_post: Optional[str] = None
+    youtube_description: Optional[str] = None
+    status: Optional[str] = None  # draft, published, scheduled
+
+
+class Content(ContentBase):
+    """통합 콘텐츠 응답 스키마"""
+    id: int
+    user_id: int
+    blog_content: Optional[str] = None
+    blog_seo_keywords: Optional[List[str]] = None
+    image_urls: Optional[List[str]] = None
+    image_prompts: Optional[List[str]] = None
+    video_url: Optional[str] = None
+    video_prompt: Optional[str] = None
+    video_thumbnail_url: Optional[str] = None
+    instagram_caption: Optional[str] = None
+    facebook_post: Optional[str] = None
+    youtube_description: Optional[str] = None
+    status: str
+    generation_status: str
+    error_message: Optional[str] = None
+    published_at: Optional[datetime] = None
+    scheduled_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
