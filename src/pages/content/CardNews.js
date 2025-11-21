@@ -9,6 +9,11 @@ function CardNews() {
   const [generatingStatus, setGeneratingStatus] = useState(''); // 생성 상태 메시지
   const [previewCards, setPreviewCards] = useState([]); // 생성 중 미리보기
 
+  // AI Agentic 모드 상태
+  const [agenticAnalysis, setAgenticAnalysis] = useState(null); // AI 분석 결과
+  const [processLogs, setProcessLogs] = useState([]); // AI 처리 과정 로그
+  const [pagePlans, setPagePlans] = useState([]); // 기획된 페이지들
+
   // 미리 정의된 배경 이미지 URL
   const backgroundTemplates = [
     {
@@ -46,7 +51,8 @@ function CardNews() {
     setTitles(newTitles);
   };
 
-  const handleGenerateCardNews = async () => {
+  // AI Agentic 모드로 카드뉴스 생성 (스트리밍)
+  const handleGenerateAgenticCardNews = async () => {
     if (titles[0].trim().length < 10) {
       alert('카드뉴스로 만들고 싶은 내용을 최소 10자 이상 입력해주세요.');
       return;
@@ -55,66 +61,34 @@ function CardNews() {
     setIsGenerating(true);
     setGeneratedCards([]);
     setPreviewCards([]);
-    setGeneratingStatus('AI가 카드뉴스 콘텐츠를 분석하고 있습니다...');
+    setAgenticAnalysis(null);
+    setProcessLogs([]);
+    setPagePlans([]);
+    setGeneratingStatus('🤖 AI 작업 시작...');
 
     try {
       const formData = new FormData();
-
-      // 선택된 배경 템플릿 URL에서 이미지 가져오기
-      const selectedTemplateUrl = backgroundTemplates[selectedBackground].url;
-      
-      let imageFile;
-      try {
-        const imageResponse = await fetch(selectedTemplateUrl);
-        if (!imageResponse.ok) {
-            throw new Error(`배경 이미지 가져오기 실패: HTTP ${imageResponse.status}`);
-        }
-        const imageBlob = await imageResponse.blob();
-        imageFile = new File([imageBlob], 'background.png', { type: imageBlob.type });
-      } catch (error) {
-        console.error('배경 이미지 fetch 오류:', error);
-        // 이미지를 가져오지 못하더라도 요청을 진행하고 싶다면 이 부분을 조정하세요.
-        throw new Error('배경 이미지 파일을 준비하는 데 실패했습니다.');
-      }
-      
-
-      // 이미지 파일 추가
-      formData.append('images', imageFile);
-
-      // 제목과 설명 추가 (JSON 문자열로 변환)
-      formData.append('titles', JSON.stringify(titles));
-      // descriptions 필드가 사용되지 않더라도 서버가 예상한다면 빈 배열로 추가
-      formData.append('descriptions', JSON.stringify(descriptions)); 
-
-      // 스타일 옵션 추가
+      formData.append('prompt', titles[0]);
+      formData.append('purpose', purpose);
       formData.append('fontStyle', fontStyle);
       formData.append('colorTheme', colorTheme);
-      formData.append('purpose', purpose);
-      formData.append('layoutStyle', layoutStyle);
-      
-      // 💡 디버깅을 위해 FormData 내용 확인 (필요시 주석 해제)
-      // console.log('--- FormData Contents ---');
-      // for (let [key, value] of formData.entries()) {
-      //   console.log(`${key}:`, value);
-      // }
-      // console.log('-------------------------');
+      formData.append('generateImages', 'true');
 
-      const response = await fetch('/api/generate-cardnews-stream', {
+      const response = await fetch('/api/generate-agentic-cardnews-stream', {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
-        // 서버에서 상세 오류 메시지를 반환한다면, 여기서 JSON을 파싱 시도할 수 있음
-        const errorText = await response.text();
-        console.error('서버 응답 오류:', errorText);
-        throw new Error(`카드뉴스 생성 요청에 실패했습니다. (HTTP ${response.status})`);
+        throw new Error(`서버 오류: HTTP ${response.status}`);
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       const cards = [];
+      let finalAnalysis = null;
+      let finalScore = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -122,56 +96,118 @@ function CardNews() {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // 마지막 조각은 불완전할 수 있으므로 버퍼에 저장
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
 
           const raw = line.slice(6).trim();
-
-          // JSON 구조인지 확인
-          if (!(raw.startsWith('{') && raw.endsWith('}'))) {
-            console.warn('⚠ JSON 형식 아님 → 스킵됨:', raw);
-            continue;
-          }
+          if (!(raw.startsWith('{') && raw.endsWith('}'))) continue;
 
           let data;
           try {
             data = JSON.parse(raw);
           } catch (err) {
-            console.error('❌ JSON 파싱 실패:', err, raw);
+            console.error('JSON 파싱 실패:', err);
             continue;
           }
 
-          // SSE 메시지 타입별 처리
+          // 상태 메시지
           if (data.type === 'status') {
             setGeneratingStatus(data.message);
-            continue;
+            setProcessLogs(prev => [...prev, { type: 'status', message: data.message, time: new Date().toLocaleTimeString() }]);
           }
 
-          if (data.type === 'card') {
+          // 분석 결과
+          else if (data.type === 'analysis') {
+            finalAnalysis = data.data;
+            setProcessLogs(prev => [...prev, {
+              type: 'analysis',
+              message: `📊 분석 완료: ${data.data.page_count}페이지, ${data.data.target_audience}, ${data.data.tone}`,
+              time: new Date().toLocaleTimeString()
+            }]);
+          }
+
+          // 페이지 기획
+          else if (data.type === 'page_planned') {
+            setPagePlans(prev => [...prev, { page: data.page, title: data.title, content: data.content }]);
+            setProcessLogs(prev => [...prev, {
+              type: 'page',
+              message: `📄 페이지 ${data.page}: "${data.title}"`,
+              detail: data.content,
+              time: new Date().toLocaleTimeString()
+            }]);
+          }
+
+          // 프롬프트 생성
+          else if (data.type === 'prompt_generated') {
+            setProcessLogs(prev => [...prev, {
+              type: 'prompt',
+              message: `🎨 페이지 ${data.page} 비주얼 프롬프트 생성`,
+              detail: data.prompt,
+              time: new Date().toLocaleTimeString()
+            }]);
+          }
+
+          // 품질 점수
+          else if (data.type === 'quality_report') {
+            finalScore = data.score;
+            setProcessLogs(prev => [...prev, {
+              type: 'quality',
+              message: `⭐ 품질 점수: ${data.score.toFixed(1)}/10`,
+              time: new Date().toLocaleTimeString()
+            }]);
+          }
+
+          // 이미지 생성
+          else if (data.type === 'image_generated') {
+            setProcessLogs(prev => [...prev, {
+              type: 'image',
+              message: `🖼️ 페이지 ${data.page} 배경 이미지 생성 완료`,
+              time: new Date().toLocaleTimeString()
+            }]);
+          }
+
+          // 카드 생성 완료
+          else if (data.type === 'card') {
             cards.push(data.card);
             setPreviewCards([...cards]);
-            setGeneratingStatus(`카드 생성 완료`);
-            continue;
+            setProcessLogs(prev => [...prev, {
+              type: 'card',
+              message: `✅ 카드 ${data.index + 1} 완성: "${data.title}"`,
+              time: new Date().toLocaleTimeString()
+            }]);
           }
 
-          if (data.type === 'complete') {
+          // 완료
+          else if (data.type === 'complete') {
             setGeneratedCards(cards);
+            setAgenticAnalysis({
+              pageCount: data.count,
+              targetAudience: data.target_audience,
+              tone: data.tone,
+              qualityScore: data.quality_score,
+              pagesInfo: pagePlans
+            });
             setGeneratingStatus('');
-            alert(`✅ AI가 카드뉴스를 생성했습니다!`);
-            continue;
+
+            alert(`✅ ${data.count}장의 AI 카드뉴스가 생성되었습니다!\n\n` +
+                  `📊 품질 점수: ${data.quality_score ? data.quality_score.toFixed(1) : 'N/A'}/10\n` +
+                  `🎯 타겟: ${data.target_audience || 'N/A'}\n` +
+                  `🎨 톤: ${data.tone || 'N/A'}`);
           }
 
-          if (data.type === 'error') {
-            throw new Error(data.message || '알 수 없는 AI 생성 오류');
+          // 오류
+          else if (data.type === 'error') {
+            throw new Error(data.message);
           }
         }
       }
     } catch (error) {
-      console.error('카드뉴스 생성 오류:', error);
-      alert(`카드뉴스 생성 중 오류가 발생했습니다:\n${error.message}`);
+      console.error('AI 카드뉴스 생성 오류:', error);
+      alert(`AI 카드뉴스 생성 중 오류가 발생했습니다:\n${error.message}`);
       setGeneratingStatus('');
+      setProcessLogs(prev => [...prev, { type: 'error', message: `❌ 오류: ${error.message}`, time: new Date().toLocaleTimeString() }]);
     } finally {
       setIsGenerating(false);
     }
@@ -196,7 +232,17 @@ function CardNews() {
     <div className="cardnews-page">
       <div className="cardnews-header">
         <h2>📰 AI 카드뉴스 생성기</h2>
-        <p>선택된 스타일과 배경 이미지, 입력한 내용을 바탕으로 카드뉴스를 만듭니다</p>
+        <p>🤖 AI가 프롬프트만으로 자동으로 페이지별 내용을 구성하고 카드뉴스를 생성합니다</p>
+
+        {/* AI Agentic 모드 안내 */}
+        <div style={{ marginTop: '20px', padding: '15px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '8px', color: 'white' }}>
+          <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
+            🚀 AI Agentic 모드
+          </div>
+          <p style={{ fontSize: '14px', margin: 0, opacity: 0.95 }}>
+            ✅ AI가 페이지 수, 제목, 내용, 이미지를 모두 자동으로 생성합니다
+          </p>
+        </div>
       </div>
 
       <div className="cardnews-content">
@@ -340,83 +386,50 @@ function CardNews() {
         
         <hr/>
 
-        {/* 2. 배경 템플릿 선택 섹션 */}
+        {/* 2. 내용 입력 섹션 */}
         <div className="upload-section">
-          <h3>2. 배경 템플릿 선택</h3>
-          <p className="section-desc">카드뉴스에 사용할 기본 배경 디자인을 선택하세요.</p>
-          <div className="uploaded-images">
-            <div className="image-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-              {backgroundTemplates.map((template, index) => (
-                <div
-                  key={template.id}
-                  className={`image-item ${selectedBackground === index ? 'selected' : ''}`}
-                  onClick={() => setSelectedBackground(index)}
-                  style={{
-                    cursor: 'pointer',
-                    border: selectedBackground === index ? '3px solid #FF8B5A' : '2px solid #ddd',
-                    borderRadius: '8px',
-                    padding: '10px',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  <img
-                    src={template.url}
-                    alt={template.name}
-                    style={{
-                      width: '100%',
-                      height: '200px',
-                      objectFit: 'cover',
-                      borderRadius: '4px'
-                    }}
-                  />
-                  <p style={{ textAlign: 'center', marginTop: '10px', fontWeight: selectedBackground === index ? 'bold' : 'normal' }}>
-                    {selectedBackground === index ? '✓ 선택됨' : template.name}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <hr/>
-
-        {/* 3. 내용 입력 섹션 */}
-        <div className="upload-section">
-          <h3>3. 카드뉴스 내용 입력</h3>
-          <p className="section-desc">AI가 입력한 내용을 바탕으로 1장의 카드뉴스를 자동 생성합니다</p>
+          <h3>2. 카드뉴스 내용 입력</h3>
+          <p className="section-desc">
+            🤖 간단한 프롬프트만 입력하세요. AI가 페이지별 제목, 내용, 이미지를 모두 자동으로 생성합니다
+          </p>
           <div className="uploaded-images">
             <div className="image-list">
               <div className="image-item">
-                <img
-                  src={backgroundTemplates[selectedBackground].url}
-                  alt="Selected template"
-                  className="preview-thumbnail"
-                />
                 <div className="image-info">
                   <textarea
-                    placeholder="카드뉴스로 만들고 싶은 내용을 입력하세요. 예: 새로 나온 딸기 케이크 50% 할인, 3일간만 진행되는 특별 행사. (내용이 길수록 AI가 더 풍부하게 생성합니다.)"
+                    placeholder="예시:
+• 새로운 카페 오픈 홍보
+• 여름 세일 50% 할인 이벤트
+• 딸기 시즌 신메뉴 3종 출시
+• 강남역 필라테스 개업 50% 할인
+
+프롬프트가 구체적일수록 더 좋은 결과가 나옵니다!"
                     value={titles[0]}
                     onChange={(e) => handleTitleChange(0, e.target.value)}
                     className="title-input-small"
-                    rows="4"
-                    style={{ resize: 'vertical', minHeight: '100px' }}
+                    rows="6"
+                    style={{ resize: 'vertical', minHeight: '150px' }}
                   />
                 </div>
               </div>
             </div>
           </div>
         </div>
-        
+
         <hr/>
 
         {/* 생성 버튼 */}
         <div className="generate-section">
           <button
-            onClick={handleGenerateCardNews}
+            onClick={handleGenerateAgenticCardNews}
             disabled={isGenerating || titles[0].trim().length < 10}
             className="btn-generate"
+            style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              fontSize: '18px'
+            }}
           >
-            {isGenerating ? '🔄 AI가 열심히 생성 중...' : '🎨 카드뉴스 생성하기'}
+            {isGenerating ? '🔄 AI가 열심히 생성 중...' : '🚀 AI가 자동으로 카드뉴스 생성하기'}
           </button>
           {generatingStatus && (
             <p className="generating-status" style={{ marginTop: '20px', fontSize: '16px', color: '#FF8B5A', fontWeight: 'bold' }}>
@@ -426,6 +439,84 @@ function CardNews() {
         </div>
 
         <hr/>
+
+        {/* AI 처리 과정 로그 (실시간) */}
+        {processLogs.length > 0 && (
+          <div className="result-section" style={{ background: '#fff9f0', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '2px solid #ff9800' }}>
+            <h3>🔄 AI 처리 과정 (실시간)</h3>
+            <div style={{ maxHeight: '400px', overflowY: 'auto', marginTop: '15px' }}>
+              {processLogs.map((log, index) => (
+                <div key={index} style={{
+                  padding: '12px',
+                  background: log.type === 'error' ? '#ffebee' : log.type === 'card' ? '#e8f5e9' : 'white',
+                  borderLeft: `4px solid ${log.type === 'error' ? '#f44336' : log.type === 'card' ? '#4caf50' : log.type === 'prompt' ? '#9c27b0' : '#2196f3'}`,
+                  borderRadius: '4px',
+                  marginBottom: '10px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1 }}>
+                      <strong style={{ color: '#333' }}>{log.message}</strong>
+                      {log.detail && (
+                        <div style={{
+                          marginTop: '8px',
+                          padding: '10px',
+                          background: '#f5f5f5',
+                          borderRadius: '4px',
+                          fontSize: '13px',
+                          color: '#666',
+                          fontFamily: 'monospace',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word'
+                        }}>
+                          {log.detail}
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '11px', color: '#999', marginLeft: '10px', whiteSpace: 'nowrap' }}>
+                      {log.time}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* AI 분석 결과 표시 */}
+        {agenticAnalysis && !isGenerating && (
+          <div className="result-section" style={{ background: '#f0f8ff', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
+            <h3>📊 AI 분석 결과</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginTop: '15px' }}>
+              <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                <strong>📄 생성된 페이지 수:</strong> {agenticAnalysis.pageCount}장
+              </div>
+              <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                <strong>⭐ 품질 점수:</strong> {agenticAnalysis.qualityScore ? `${agenticAnalysis.qualityScore.toFixed(1)}/10` : 'N/A'}
+              </div>
+              <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                <strong>🎯 타겟 청중:</strong> {agenticAnalysis.targetAudience || 'N/A'}
+              </div>
+              <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                <strong>🎨 톤앤매너:</strong> {agenticAnalysis.tone || 'N/A'}
+              </div>
+            </div>
+            {agenticAnalysis.pagesInfo && agenticAnalysis.pagesInfo.length > 0 && (
+              <div style={{ marginTop: '20px' }}>
+                <h4>📝 페이지 구성</h4>
+                <div style={{ marginTop: '10px' }}>
+                  {agenticAnalysis.pagesInfo.map((page, index) => (
+                    <div key={index} style={{ padding: '10px', background: 'white', borderRadius: '8px', marginBottom: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                      <strong>페이지 {page.page}:</strong> {page.title}
+                      <br />
+                      <span style={{ color: '#666', fontSize: '14px' }}>{page.content}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 생성 중 미리보기 */}
         {isGenerating && previewCards.length > 0 && (

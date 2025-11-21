@@ -11,6 +11,11 @@ from pathlib import Path
 from anthropic import Anthropic
 import asyncio
 import re
+import httpx
+import google.generativeai as genai
+
+# AI Agents 임포트
+from ..agents import AgenticCardNewsWorkflow
 
 router = APIRouter(prefix="/api", tags=["cardnews"])
 
@@ -24,35 +29,71 @@ FONT_DIR.mkdir(exist_ok=True)
 CARD_WIDTH = 1080
 CARD_HEIGHT = 1080
 
-# 색상 테마
+# 색상 테마 (확장됨)
 COLOR_THEMES = {
     "warm": {
         "primary": (255, 139, 90),
         "secondary": (255, 229, 217),
         "accent": (212, 101, 74),
         "text": "white",
-        "shadow": (0, 0, 0, 120)
+        "shadow": (0, 0, 0, 120),
+        "gradient_type": "vertical"
     },
     "cool": {
         "primary": (74, 144, 226),
         "secondary": (227, 242, 253),
         "accent": (46, 92, 138),
         "text": "white",
-        "shadow": (0, 0, 0, 120)
+        "shadow": (0, 0, 0, 120),
+        "gradient_type": "vertical"
     },
     "vibrant": {
         "primary": (255, 107, 157),
         "secondary": (255, 229, 238),
         "accent": (233, 30, 99),
         "text": "white",
-        "shadow": (0, 0, 0, 120)
+        "shadow": (0, 0, 0, 120),
+        "gradient_type": "radial"
     },
     "minimal": {
         "primary": (66, 66, 66),
         "secondary": (245, 245, 245),
         "accent": (33, 33, 33),
         "text": "white",
-        "shadow": (0, 0, 0, 120)
+        "shadow": (0, 0, 0, 120),
+        "gradient_type": "vertical"
+    },
+    "sunset": {
+        "primary": (255, 94, 77),
+        "secondary": (255, 176, 59),
+        "accent": (200, 40, 50),
+        "text": "white",
+        "shadow": (0, 0, 0, 150),
+        "gradient_type": "diagonal"
+    },
+    "ocean": {
+        "primary": (26, 188, 156),
+        "secondary": (52, 152, 219),
+        "accent": (22, 160, 133),
+        "text": "white",
+        "shadow": (0, 0, 0, 120),
+        "gradient_type": "diagonal"
+    },
+    "purple": {
+        "primary": (142, 68, 173),
+        "secondary": (155, 89, 182),
+        "accent": (102, 51, 153),
+        "text": "white",
+        "shadow": (0, 0, 0, 130),
+        "gradient_type": "radial"
+    },
+    "pastel": {
+        "primary": (255, 209, 220),
+        "secondary": (190, 227, 248),
+        "accent": (255, 160, 180),
+        "text": "#333333",
+        "shadow": (0, 0, 0, 80),
+        "gradient_type": "vertical"
     }
 }
 
@@ -93,6 +134,22 @@ class FontManager:
         "sharp_regular": {
             "name": "NanumGothic-Regular.ttf",
             "url": "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
+        },
+        "modern_bold": {
+            "name": "NanumSquare-Bold.ttf",
+            "url": "https://github.com/google/fonts/raw/main/ofl/nanumsquare/NanumSquare-Bold.ttf"
+        },
+        "modern_regular": {
+            "name": "NanumSquare-Regular.ttf",
+            "url": "https://github.com/google/fonts/raw/main/ofl/nanumsquare/NanumSquare-Regular.ttf"
+        },
+        "cute_bold": {
+            "name": "SunflowerBold.ttf",
+            "url": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf"
+        },
+        "cute_regular": {
+            "name": "SunflowerMedium.ttf",
+            "url": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Medium.ttf"
         }
     }
 
@@ -118,10 +175,14 @@ class FontManager:
     def get_font(cls, font_style: str, font_size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
         """폰트 가져오기"""
         # 폰트 키 결정
-        if font_style == "rounded":
-            font_key = "rounded_bold" if bold else "rounded_regular"
-        else:  # sharp
-            font_key = "sharp_bold" if bold else "sharp_regular"
+        font_map = {
+            "rounded": "rounded_bold" if bold else "rounded_regular",
+            "sharp": "sharp_bold" if bold else "sharp_regular",
+            "modern": "modern_bold" if bold else "modern_regular",
+            "cute": "cute_bold" if bold else "cute_regular"
+        }
+
+        font_key = font_map.get(font_style, "rounded_bold" if bold else "rounded_regular")
 
         # 폰트 다운로드
         font_info = cls.FONTS[font_key]
@@ -290,10 +351,11 @@ class TextRenderer:
 class CardNewsBuilder:
     """카드뉴스 이미지 생성"""
 
-    def __init__(self, theme: dict, font_style: str, purpose: str):
+    def __init__(self, theme: dict, font_style: str, purpose: str, layout_type: str = "bottom"):
         self.theme = theme
         self.font_style = font_style
         self.purpose = purpose
+        self.layout_type = layout_type  # top, center, bottom
         self.badge_text = BADGE_TEXT_MAP.get(purpose, '정보')
 
     def prepare_background(self, background_image: Image.Image) -> Image.Image:
@@ -345,50 +407,56 @@ class CardNewsBuilder:
         )
 
     def add_content(self, image: Image.Image, title: str, description: str, page_num: int = 1):
-        """콘텐츠 텍스트 추가"""
-        # 제목
+        """콘텐츠 텍스트 추가 (레이아웃 템플릿 적용)"""
+
         title_font = FontManager.get_font(self.font_style, 80, bold=True)
+        desc_font = FontManager.get_font(self.font_style, 40, bold=False)
+
+        # 레이아웃에 따른 위치 설정
+        if self.layout_type == "top":
+            # 상단 배치
+            title_y = 200
+            desc_y = 320
+            align = "left"
+        elif self.layout_type == "center":
+            # 중앙 배치
+            title_y = CARD_HEIGHT // 2 - 80
+            desc_y = CARD_HEIGHT // 2 + 20
+            align = "center"
+        else:  # bottom (기본)
+            # 하단 배치
+            title_y = CARD_HEIGHT - 280
+            desc_y = CARD_HEIGHT - 160
+            align = "left"
+
+        # 제목
         TextRenderer.draw_text_with_shadow(
             image,
             title,
-            (80, CARD_HEIGHT - 280),
+            (80, title_y),
             title_font,
             color=self.theme["text"],
             max_width=CARD_WIDTH - 160,
             shadow=True,
             shadow_color=self.theme["shadow"],
-            align="left",
+            align=align,
             line_spacing=15
         )
 
         # 설명
         if description:
-            desc_font = FontManager.get_font(self.font_style, 40, bold=False)
             TextRenderer.draw_text_with_shadow(
                 image,
                 description,
-                (80, CARD_HEIGHT - 160),
+                (80, desc_y),
                 desc_font,
                 color=self.theme["text"],
                 max_width=CARD_WIDTH - 160,
                 shadow=True,
                 shadow_color=self.theme["shadow"],
-                align="left",
+                align=align,
                 line_spacing=10
             )
-
-        # 페이지 번호
-        page_font = FontManager.get_font(self.font_style, 20, bold=False)
-        page_text = f"{page_num} / 1"
-        TextRenderer.draw_text_with_shadow(
-            image,
-            page_text,
-            (CARD_WIDTH - 120, CARD_HEIGHT - 60),
-            page_font,
-            color=self.theme["text"],
-            shadow=False,
-            align="left"
-        )
 
     def build_card(
         self,
@@ -419,7 +487,8 @@ async def generate_cardnews_stream(
     fontStyle: str = Form(default="rounded"),
     colorTheme: str = Form(default="warm"),
     purpose: str = Form(default="promotion"),
-    layoutStyle: str = Form(default="overlay")
+    layoutStyle: str = Form(default="overlay"),
+    layoutType: str = Form(default="bottom")
 ):
     """카드뉴스 스트리밍 생성 API"""
 
@@ -453,7 +522,7 @@ async def generate_cardnews_stream(
             theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
 
             # 카드 빌더 생성
-            builder = CardNewsBuilder(theme, fontStyle, purpose)
+            builder = CardNewsBuilder(theme, fontStyle, purpose, layoutType)
 
             # 카드 생성
             for i, card_content in enumerate(ai_cards):
@@ -494,7 +563,8 @@ async def generate_cardnews(
     fontStyle: str = Form(default="rounded"),
     colorTheme: str = Form(default="warm"),
     purpose: str = Form(default="promotion"),
-    layoutStyle: str = Form(default="overlay")
+    layoutStyle: str = Form(default="overlay"),
+    layoutType: str = Form(default="bottom")
 ):
     """카드뉴스 생성 API (비스트리밍)"""
     try:
@@ -523,7 +593,7 @@ async def generate_cardnews(
         theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
 
         # 카드 빌더 생성
-        builder = CardNewsBuilder(theme, fontStyle, purpose)
+        builder = CardNewsBuilder(theme, fontStyle, purpose, layoutType)
 
         # 카드 생성
         card_news_images = []
@@ -557,3 +627,366 @@ async def generate_cardnews(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"카드뉴스 생성 중 오류가 발생했습니다: {str(e)}")
+
+
+# ==================== AI Agentic 카드뉴스 생성 (스트리밍) ====================
+
+@router.post("/generate-agentic-cardnews-stream")
+async def generate_agentic_cardnews_stream(
+    prompt: str = Form(...),
+    purpose: str = Form(default="info"),
+    fontStyle: str = Form(default="rounded"),
+    colorTheme: str = Form(default="warm"),
+    generateImages: bool = Form(default=True),
+    layoutType: str = Form(default="bottom")
+):
+    """
+    AI Agentic 방식으로 카드뉴스 자동 생성 (스트리밍)
+
+    실시간으로 AI 처리 과정을 사용자에게 전달
+    """
+
+    async def event_stream():
+        try:
+            yield f"data: {json.dumps({'type': 'status', 'message': '🤖 AI가 프롬프트를 분석하고 있습니다...'})}\n\n"
+            await asyncio.sleep(0.1)
+
+            # Step 1: 요청 분석
+            from ..agents import OrchestratorAgent
+            orchestrator = OrchestratorAgent()
+            analysis = await orchestrator.analyze_user_request(prompt, purpose)
+
+            yield f"data: {json.dumps({'type': 'analysis', 'data': analysis})}\n\n"
+            page_count = analysis.get('page_count', 5)
+            yield f"data: {json.dumps({'type': 'status', 'message': f'📋 {page_count}페이지 카드뉴스를 기획합니다...'})}\n\n"
+            await asyncio.sleep(0.1)
+
+            # Step 2: 콘텐츠 기획
+            from ..agents import ContentPlannerAgent
+            planner = ContentPlannerAgent()
+            pages = await planner.plan_cardnews_pages(prompt, analysis)
+
+            for i, page in enumerate(pages):
+                yield f"data: {json.dumps({'type': 'page_planned', 'page': i+1, 'title': page['title'], 'content': page['content']})}\n\n"
+                await asyncio.sleep(0.1)
+
+            yield f"data: {json.dumps({'type': 'status', 'message': '🎨 각 페이지의 고유한 비주얼 프롬프트를 생성합니다...'})}\n\n"
+
+            # Step 3: 비주얼 프롬프트 생성
+            from ..agents import VisualDesignerAgent
+            designer = VisualDesignerAgent()
+            pages = await designer.generate_page_visuals(pages, analysis.get('style', 'modern'))
+
+            for i, page in enumerate(pages):
+                yield f"data: {json.dumps({'type': 'prompt_generated', 'page': i+1, 'prompt': page.get('image_prompt', ''), 'log': page.get('prompt_generation_log', '')})}\n\n"
+                await asyncio.sleep(0.1)
+
+            # Step 4: 품질 검증
+            yield f"data: {json.dumps({'type': 'status', 'message': '🔍 콘텐츠 품질을 검증하고 있습니다...'})}\n\n"
+            from ..agents import QualityAssuranceAgent
+            qa = QualityAssuranceAgent()
+            quality_report = await qa.validate_and_improve(pages, prompt, analysis)
+
+            yield f"data: {json.dumps({'type': 'quality_report', 'score': quality_report.get('overall_score', 0)})}\n\n"
+
+            # Step 5: 이미지 생성
+            yield f"data: {json.dumps({'type': 'status', 'message': '🖼️ 각 페이지의 배경 이미지를 생성합니다...'})}\n\n"
+
+            background_images = []
+            google_api_key = os.getenv('GOOGLE_API_KEY')
+
+            for i, page in enumerate(pages):
+                yield f"data: {json.dumps({'type': 'status', 'message': f'📸 페이지 {i+1} 이미지 생성 중... ({i+1}/{len(pages)})'})}\n\n"
+
+                try:
+                    if generateImages and google_api_key:
+                        image_url = await generate_background_image_with_gemini(
+                            page.get('image_prompt', page.get('visual_concept', 'modern background'))
+                        )
+                        background_images.append(image_url)
+                    else:
+                        background_images.append(create_fallback_background(colorTheme))
+                except Exception as e:
+                    print(f"  ⚠️ 페이지 {i+1} 이미지 생성 실패: {e}")
+                    background_images.append(create_fallback_background(colorTheme))
+
+                yield f"data: {json.dumps({'type': 'image_generated', 'page': i+1})}\n\n"
+                await asyncio.sleep(0.1)
+
+            # Step 6: 최종 카드 조립
+            yield f"data: {json.dumps({'type': 'status', 'message': '📰 최종 카드뉴스를 조립하고 있습니다...'})}\n\n"
+
+            theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
+            builder = CardNewsBuilder(theme, fontStyle, purpose, layoutType)
+
+            for i, (page, bg_image_data) in enumerate(zip(pages, background_images)):
+                # 배경 이미지 로드
+                if bg_image_data.startswith('data:image'):
+                    image_data = bg_image_data.split(',')[1]
+                    bg_image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+                else:
+                    response = requests.get(bg_image_data, timeout=30)
+                    bg_image = Image.open(io.BytesIO(response.content))
+
+                # 카드 생성
+                card = builder.build_card(bg_image, page['title'], page['content'], i + 1)
+
+                # Base64 변환
+                buffer = io.BytesIO()
+                card.save(buffer, format="PNG")
+                card_base64 = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+
+                yield f"data: {json.dumps({'type': 'card', 'index': i, 'card': card_base64, 'title': page['title']})}\n\n"
+                await asyncio.sleep(0.1)
+
+            # 완료
+            result = {
+                'type': 'complete',
+                'count': len(pages),
+                'quality_score': quality_report.get('overall_score'),
+                'target_audience': analysis.get('target_audience'),
+                'tone': analysis.get('tone')
+            }
+            yield f"data: {json.dumps(result)}\n\n"
+
+        except Exception as e:
+            print(f"\n❌ AI 카드뉴스 스트리밍 실패: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+# ==================== AI Agentic 카드뉴스 생성 (Non-streaming) ====================
+
+@router.post("/generate-agentic-cardnews")
+async def generate_agentic_cardnews(
+    prompt: str = Form(...),
+    purpose: str = Form(default="info"),
+    fontStyle: str = Form(default="rounded"),
+    colorTheme: str = Form(default="warm"),
+    generateImages: bool = Form(default=True),
+    layoutType: str = Form(default="bottom")
+):
+    """
+    AI Agentic 방식으로 카드뉴스 자동 생성
+
+    사용자가 입력한 프롬프트를 기반으로:
+    1. AI가 페이지별 내용 구성
+    2. 각 페이지의 비주얼 컨셉 생성
+    3. 품질 검증 및 개선
+    4. 최종 카드뉴스 이미지 생성
+
+    Args:
+        prompt: 사용자 입력 프롬프트 (예: "새로운 카페 오픈 홍보")
+        purpose: 목적 (promotion/menu/info/event)
+        fontStyle: 폰트 스타일 (rounded/sharp)
+        colorTheme: 색상 테마 (warm/cool/vibrant/minimal)
+        generateImages: 배경 이미지 자동 생성 여부
+    """
+    try:
+        print("\n" + "="*80)
+        print("🤖 AI Agentic 카드뉴스 생성 시작")
+        print(f"📝 프롬프트: {prompt}")
+        print(f"🎯 목적: {purpose}")
+        print("="*80 + "\n")
+
+        # Step 1: AI Agentic 워크플로우 실행
+        workflow = AgenticCardNewsWorkflow()
+        result = await workflow.execute(prompt, purpose)
+
+        if not result.get('success'):
+            raise HTTPException(
+                status_code=500,
+                detail=f"AI 워크플로우 실패: {result.get('error', '알 수 없는 오류')}"
+            )
+
+        analysis = result['analysis']
+        pages = result['pages']
+        quality_report = result['quality_report']
+
+        # Step 2: 배경 이미지 생성 (옵션)
+        print("\n🖼️ 배경 이미지 생성 중...")
+        background_images = []
+
+        if generateImages:
+            google_api_key = os.getenv('GOOGLE_API_KEY')
+            if google_api_key:
+                for i, page in enumerate(pages):
+                    try:
+                        print(f"  📸 페이지 {i+1} 이미지 생성 중...")
+                        image_url = await generate_background_image_with_gemini(
+                            page.get('image_prompt', page.get('visual_concept', 'modern background'))
+                        )
+                        background_images.append(image_url)
+                        print(f"  ✅ 페이지 {i+1} 이미지 생성 완료")
+                    except Exception as e:
+                        print(f"  ⚠️ 페이지 {i+1} 이미지 생성 실패: {e}")
+                        # 폴백: 단색 배경 생성
+                        background_images.append(create_fallback_background(colorTheme))
+            else:
+                print("  ⚠️ Google API Key 없음, 단색 배경 사용")
+                for _ in pages:
+                    background_images.append(create_fallback_background(colorTheme))
+        else:
+            # 단색 배경 사용
+            for _ in pages:
+                background_images.append(create_fallback_background(colorTheme))
+
+        # Step 3: 최종 카드뉴스 생성
+        print("\n📰 최종 카드뉴스 조립 중...")
+        theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
+        builder = CardNewsBuilder(theme, fontStyle, purpose, layoutType)
+
+        final_cards = []
+        for i, (page, bg_image_data) in enumerate(zip(pages, background_images)):
+            print(f"  🎨 카드 {i+1}/{len(pages)} 생성 중...")
+
+            # 배경 이미지 로드
+            if bg_image_data.startswith('data:image'):
+                # Base64 디코딩
+                image_data = bg_image_data.split(',')[1]
+                bg_image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+            else:
+                # URL에서 다운로드
+                response = requests.get(bg_image_data, timeout=30)
+                bg_image = Image.open(io.BytesIO(response.content))
+
+            # 카드 생성
+            card = builder.build_card(
+                bg_image,
+                page['title'],
+                page['content'],
+                i + 1
+            )
+
+            # Base64 변환
+            buffer = io.BytesIO()
+            card.save(buffer, format="PNG")
+            card_base64 = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+            final_cards.append(card_base64)
+
+            print(f"  ✅ 카드 {i+1} 완성")
+
+        print("\n" + "="*80)
+        print(f"✅ {len(final_cards)}장의 AI 카드뉴스 생성 완료!")
+        print("="*80 + "\n")
+
+        return {
+            "success": True,
+            "cards": final_cards,
+            "count": len(final_cards),
+            "analysis": {
+                "page_count": analysis.get('page_count'),
+                "target_audience": analysis.get('target_audience'),
+                "tone": analysis.get('tone'),
+                "style": analysis.get('style')
+            },
+            "quality_score": quality_report.get('overall_score') if quality_report else None,
+            "pages_info": [
+                {
+                    "page": p['page'],
+                    "title": p['title'],
+                    "content": p['content']
+                }
+                for p in pages
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"\n❌ AI 카드뉴스 생성 실패: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI 카드뉴스 생성 중 오류: {str(e)}"
+        )
+
+
+async def generate_background_image_with_gemini(prompt: str) -> str:
+    """Gemini 2.0 Flash로 배경 이미지 생성"""
+    google_api_key = os.getenv('GOOGLE_API_KEY')
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={google_api_key}",
+            json={
+                "contents": [{
+                    "parts": [{
+                        "text": f"Generate an image: {prompt}"
+                    }]
+                }]
+            },
+            headers={"Content-Type": "application/json"}
+        )
+
+    if response.status_code != 200:
+        raise Exception(f"Gemini API 오류: {response.status_code}")
+
+    data = response.json()
+
+    # 이미지 추출
+    if data.get("candidates") and len(data["candidates"]) > 0:
+        candidate = data["candidates"][0]
+        if candidate.get("content") and candidate["content"].get("parts"):
+            for part in candidate["content"]["parts"]:
+                if part.get("inline_data") and part["inline_data"].get("data"):
+                    mime_type = part["inline_data"].get("mime_type", "image/png")
+                    image_data = part["inline_data"]["data"]
+                    return f"data:{mime_type};base64,{image_data}"
+
+    raise Exception("Gemini에서 이미지를 추출할 수 없습니다")
+
+
+def create_fallback_background(color_theme: str) -> str:
+    """폴백용 그라데이션 배경 생성 (향상된 버전)"""
+    theme = COLOR_THEMES.get(color_theme, COLOR_THEMES["warm"])
+
+    # 그라데이션 배경 생성
+    img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT))
+    draw = ImageDraw.Draw(img)
+
+    primary = theme["primary"]
+    secondary = theme["secondary"]
+    gradient_type = theme.get("gradient_type", "vertical")
+
+    if gradient_type == "vertical":
+        # 세로 그라데이션
+        for y in range(CARD_HEIGHT):
+            ratio = y / CARD_HEIGHT
+            r = int(primary[0] * (1 - ratio) + secondary[0] * ratio)
+            g = int(primary[1] * (1 - ratio) + secondary[1] * ratio)
+            b = int(primary[2] * (1 - ratio) + secondary[2] * ratio)
+            draw.line([(0, y), (CARD_WIDTH, y)], fill=(r, g, b))
+
+    elif gradient_type == "diagonal":
+        # 대각선 그라데이션
+        for y in range(CARD_HEIGHT):
+            for x in range(CARD_WIDTH):
+                ratio = (x + y) / (CARD_WIDTH + CARD_HEIGHT)
+                r = int(primary[0] * (1 - ratio) + secondary[0] * ratio)
+                g = int(primary[1] * (1 - ratio) + secondary[1] * ratio)
+                b = int(primary[2] * (1 - ratio) + secondary[2] * ratio)
+                draw.point((x, y), fill=(r, g, b))
+
+    elif gradient_type == "radial":
+        # 방사형 그라데이션
+        center_x, center_y = CARD_WIDTH // 2, CARD_HEIGHT // 2
+        max_distance = ((CARD_WIDTH / 2) ** 2 + (CARD_HEIGHT / 2) ** 2) ** 0.5
+
+        for y in range(CARD_HEIGHT):
+            for x in range(CARD_WIDTH):
+                distance = ((x - center_x) ** 2 + (y - center_y) ** 2) ** 0.5
+                ratio = min(distance / max_distance, 1.0)
+                r = int(primary[0] * (1 - ratio) + secondary[0] * ratio)
+                g = int(primary[1] * (1 - ratio) + secondary[1] * ratio)
+                b = int(primary[2] * (1 - ratio) + secondary[2] * ratio)
+                draw.point((x, y), fill=(r, g, b))
+
+    # Base64 변환
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
