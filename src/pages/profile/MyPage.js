@@ -129,11 +129,30 @@ const MyPage = () => {
               <div className="info-card full-width">
                 <div className="info-label">비즈니스 설명</div>
                 <div className="info-value description">
-                  {user.business_description}
+                  {parseBusinessDescription(user.business_description).mainDescription}
                 </div>
               </div>
             )}
           </div>
+
+          {/* 추가 비즈니스 정보 */}
+          {user.business_description && parseBusinessDescription(user.business_description).additionalInfo && (
+            <div className="additional-business-info">
+              <h3>상세 정보</h3>
+              <div className="business-detail-grid">
+                {Object.entries(parseBusinessDescription(user.business_description).additionalInfo).map(([key, value]) => (
+                  <div key={key} className="business-detail-item">
+                    <span className="detail-icon">✓</span>
+                    <div className="detail-content">
+                      <div className="detail-key">{getBusinessDetailLabel(key)}</div>
+                      <div className="detail-value">{value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
@@ -302,6 +321,48 @@ const MyPage = () => {
 };
 
 // 헬퍼 함수들
+const parseBusinessDescription = (description) => {
+  // "건강한 재료로 만든 디저트를 판매하는 카페입니다. 추가 정보: { "main_products": "마들렌, 스콘", "special_features": "유기농" }"
+  // 형태의 문자열을 파싱
+
+  const parts = description.split('추가 정보:');
+  const mainDescription = parts[0].trim();
+
+  let additionalInfo = null;
+  if (parts.length > 1) {
+    try {
+      const jsonString = parts[1].trim();
+      additionalInfo = JSON.parse(jsonString);
+    } catch (e) {
+      console.error('Failed to parse additional info:', e);
+    }
+  }
+
+  return { mainDescription, additionalInfo };
+};
+
+const getBusinessDetailLabel = (key) => {
+  const labels = {
+    'main_products': '주요 제품',
+    'special_features': '특별한 특징',
+    'style_category': '스타일 카테고리',
+    'occasion': '착용 시나리오',
+    'programs': '프로그램',
+    'facilities': '시설 특징',
+    'subjects': '강의 분야',
+    'target_students': '수강 대상',
+    'tech_services': '기술 서비스',
+    'client_type': '고객층',
+    'product_categories': '상품 카테고리',
+    'sales_channel': '판매 채널',
+    'service_type': '서비스 유형',
+    'service_area': '서비스 지역',
+    'main_offering': '주요 제공 사항',
+    'unique_selling_point': '차별점'
+  };
+  return labels[key] || key;
+};
+
 const getBusinessTypeLabel = (type) => {
   const labels = {
     'food': '음식점/카페',
