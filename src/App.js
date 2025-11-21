@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/auth/Login';
 import OAuthCallback from './pages/auth/OAuthCallback';
+import DynamicOnboarding from './pages/onboarding/DynamicOnboarding';
 import Dashboard from './pages/dashboard/Dashboard';
 import ContentCreator from './pages/content/ContentCreator';
 import ContentList from './pages/content/ContentList';
@@ -13,6 +14,7 @@ import Analytics from './pages/analytics/Analytics';
 import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
 import VideoCreator from './pages/content/VideoCreator';
+import MyPage from './pages/profile/MyPage';
 import './App.css';
 
 function App() {
@@ -24,8 +26,27 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/oauth/callback" element={<OAuthCallback />} />
 
+          {/* 온보딩 라우트 */}
+          <Route
+            path="/onboarding"
+            element={
+              <ProtectedRoute>
+                <DynamicOnboarding />
+              </ProtectedRoute>
+            }
+          />
+
           {/* 보호된 라우트 */}
           <Route path="/"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/dashboard"
             element={
               <ProtectedRoute>
                 <Layout>
@@ -101,6 +122,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Settings />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/mypage"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <MyPage />
                 </Layout>
               </ProtectedRoute>
             }

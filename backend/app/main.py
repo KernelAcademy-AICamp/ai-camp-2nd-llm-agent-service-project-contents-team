@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-from .routers import auth, oauth, image, video, cardnews
+from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user
 from .database import engine, Base
 
 # 루트 .env 파일 먼저 로드 (프로젝트 루트)
@@ -45,9 +45,12 @@ app.add_middleware(
 # 라우터 등록
 app.include_router(auth.router)
 app.include_router(oauth.router)
+app.include_router(user.router)
 app.include_router(image.router)
 app.include_router(video.router)
 app.include_router(cardnews.router)
+app.include_router(onboarding.router)
+app.include_router(ai_recommendations.router)
 
 
 @app.get("/")

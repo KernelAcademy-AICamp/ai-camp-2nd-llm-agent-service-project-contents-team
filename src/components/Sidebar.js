@@ -13,6 +13,7 @@ function Sidebar() {
     { path: '/contents', icon: '📝', label: '콘텐츠 관리' },
     { path: '/templates', icon: '📋', label: '템플릿' },
     { path: '/analytics', icon: '📈', label: '분석' },
+    { path: '/mypage', icon: '👤', label: '마이페이지' },
     { path: '/settings', icon: '⚙️', label: '설정' },
   ];
 

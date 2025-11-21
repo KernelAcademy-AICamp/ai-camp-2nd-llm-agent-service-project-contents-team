@@ -30,9 +30,13 @@ function OAuthCallback() {
 
         setStatus('success');
 
-        // 대시보드로 리다이렉트
+        // 온보딩 완료 여부 확인 후 리다이렉트
         setTimeout(() => {
-          window.location.href = '/';
+          if (!userInfo.onboarding_completed) {
+            window.location.href = '/onboarding';
+          } else {
+            window.location.href = '/dashboard';
+          }
         }, 1000);
 
       } catch (error) {
