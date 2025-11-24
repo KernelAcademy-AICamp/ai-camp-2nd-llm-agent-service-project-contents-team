@@ -159,15 +159,30 @@ async def generate_image(request: ImageGenerateRequest):
 
             data = response.json()
 
+            # 디버깅: API 응답 구조 확인
+            print(f"📊 Gemini API 응답 구조: {list(data.keys())}")
+            if data.get("candidates"):
+                print(f"📊 Candidates 수: {len(data['candidates'])}")
+                if len(data["candidates"]) > 0:
+                    candidate = data["candidates"][0]
+                    print(f"📊 첫 번째 candidate 키: {list(candidate.keys())}")
+                    if candidate.get("content"):
+                        print(f"📊 Content 키: {list(candidate['content'].keys())}")
+                        if candidate["content"].get("parts"):
+                            print(f"📊 Parts 수: {len(candidate['content']['parts'])}")
+                            for i, part in enumerate(candidate["content"]["parts"]):
+                                print(f"📊 Part {i} 키: {list(part.keys())}")
+
             # 응답에서 이미지 추출
             if data.get("candidates") and len(data["candidates"]) > 0:
                 candidate = data["candidates"][0]
 
                 if candidate.get("content") and candidate["content"].get("parts"):
                     for part in candidate["content"]["parts"]:
-                        if part.get("inline_data") and part["inline_data"].get("data"):
-                            mime_type = part["inline_data"].get("mime_type", "image/png")
-                            image_data = part["inline_data"]["data"]
+                        # Gemini API는 camelCase를 사용 (inlineData)
+                        if part.get("inlineData") and part["inlineData"].get("data"):
+                            mime_type = part["inlineData"].get("mimeType", "image/png")
+                            image_data = part["inlineData"]["data"]
                             image_url = f"data:{mime_type};base64,{image_data}"
                             break
 

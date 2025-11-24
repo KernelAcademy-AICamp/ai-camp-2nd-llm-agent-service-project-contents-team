@@ -31,13 +31,11 @@ app.add_middleware(
     secret_key=os.getenv("SECRET_KEY", "your-secret-key-here")
 )
 
-# CORS 설정
-origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-
+# CORS 설정 - 개발 환경에서는 모든 출처 허용
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # 개발 환경에서 모든 출처 허용
+    allow_credentials=False,  # credentials를 사용하지 않으므로 False
     allow_methods=["*"],
     allow_headers=["*"],
 )
