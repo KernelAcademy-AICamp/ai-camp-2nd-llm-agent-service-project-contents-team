@@ -81,7 +81,7 @@ function ContentCreator() {
         requestBody.referenceImage = referenceImage;
       }
 
-      const response = await fetch('/api/generate-image', {
+      const response = await fetch('http://localhost:8000/api/generate-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
