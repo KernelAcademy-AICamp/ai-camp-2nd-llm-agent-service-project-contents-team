@@ -12,7 +12,7 @@
 .templates-header h2 {
   font-size: 28px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -23,17 +23,17 @@
 }
 
 .template-card {
-  background: white;
-  border-radius: 12px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
   padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
   transition: transform 0.2s, box-shadow 0.2s;
   cursor: pointer;
 }
 
 .template-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
 }
 
 .template-icon {
@@ -44,13 +44,13 @@
 .template-card h3 {
   font-size: 18px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--text-primary);
   margin: 0 0 8px 0;
 }
 
 .template-category {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-tertiary);
   margin: 0 0 16px 0;
 }
 
@@ -59,20 +59,20 @@
   justify-content: space-between;
   align-items: center;
   padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border-color);
 }
 
 .template-uses {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--text-tertiary);
 }
 
 .btn-use {
   padding: 6px 16px;
-  background-color: #1967d2;
+  background-color: var(--accent-color);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -80,5 +80,5 @@
 }
 
 .btn-use:hover {
-  background-color: #1557b0;
+  background-color: var(--accent-hover);
 }
