@@ -12,11 +12,13 @@ function ContentCreator() {
   const [platform, setPlatform] = useState('instagram');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [aiModel, setAiModel] = useState('nanovana');
+  const [aiModel, setAiModel] = useState('whisk');
   const [imagePrompt, setImagePrompt] = useState('');
   const [generatedImage, setGeneratedImage] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedBlogPost, setGeneratedBlogPost] = useState(null);
+  const [referenceImage, setReferenceImage] = useState(null); // 레퍼런스 이미지
+  const [generationMode, setGenerationMode] = useState('text'); // 'text' or 'image'
 
   const contentTypes = [
     { id: 'ai', label: 'AI 글 생성', icon: '🤖' },
@@ -38,6 +40,7 @@ function ContentCreator() {
   };
 
   const aiModels = [
+    { id: 'whisk', label: '✨ Whisk AI (무료)', provider: 'Pollinations' },
     { id: 'nanovana', label: '나노바나나 (Nanovana)', provider: 'Anthropic' },
     { id: 'gemini', label: '제미나이 (Gemini)', provider: 'Google' },
   ];
@@ -49,6 +52,17 @@ function ContentCreator() {
     }
   }, [contentType, navigate]);
 
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setReferenceImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleGenerateImage = async () => {
     if (!imagePrompt.trim()) {
       alert('이미지 생성을 위한 프롬프트를 입력해주세요.');
@@ -57,15 +71,22 @@ function ContentCreator() {
 
     setIsGenerating(true);
     try {
+      const requestBody = {
+        prompt: imagePrompt,
+        model: aiModel,
+      };
+
+      // 레퍼런스 이미지가 있으면 추가
+      if (generationMode === 'image' && referenceImage) {
+        requestBody.referenceImage = referenceImage;
+      }
+
       const response = await fetch('/api/generate-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          prompt: imagePrompt,
-          model: aiModel,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       // 응답 텍스트 먼저 확인
@@ -238,6 +259,130 @@ function ContentCreator() {
                 </select>
               </div>
 
+              {/* 이미지 생성 타입일 때 AI 모델 선택 추가 */}
+              {contentType === 'image' && (
+                <>
+                  <div className="section">
+                    <h3>🤖 AI 모델 선택</h3>
+                    <select
+                      className="platform-select"
+                      value={aiModel}
+                      onChange={(e) => setAiModel(e.target.value)}
+                      style={{ marginBottom: '12px' }}
+                    >
+                      {aiModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+                      {aiModels.find(m => m.id === aiModel)?.provider} 제공
+                    </p>
+                  </div>
+
+                  <div className="section">
+                    <h3>📐 생성 모드 선택</h3>
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                      <button
+                        className={`mode-button ${generationMode === 'text' ? 'active' : ''}`}
+                        onClick={() => {
+                          setGenerationMode('text');
+                          setReferenceImage(null);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          border: generationMode === 'text' ? '2px solid #2196F3' : '2px solid #e0e0e0',
+                          borderRadius: '8px',
+                          background: generationMode === 'text' ? '#e3f2fd' : 'white',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <div style={{ fontSize: '24px', marginBottom: '4px' }}>📝</div>
+                        <div style={{ fontWeight: 'bold' }}>텍스트 → 이미지</div>
+                        <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                          텍스트 설명으로 이미지 생성
+                        </div>
+                      </button>
+                      <button
+                        className={`mode-button ${generationMode === 'image' ? 'active' : ''}`}
+                        onClick={() => setGenerationMode('image')}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          border: generationMode === 'image' ? '2px solid #2196F3' : '2px solid #e0e0e0',
+                          borderRadius: '8px',
+                          background: generationMode === 'image' ? '#e3f2fd' : 'white',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <div style={{ fontSize: '24px', marginBottom: '4px' }}>🖼️</div>
+                        <div style={{ fontWeight: 'bold' }}>이미지 → 이미지</div>
+                        <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                          레퍼런스 이미지 기반 생성
+                        </div>
+                      </button>
+                    </div>
+
+                    {generationMode === 'image' && (
+                      <div style={{ marginTop: '12px' }}>
+                        <label
+                          htmlFor="reference-image-upload"
+                          style={{
+                            display: 'block',
+                            padding: '16px',
+                            border: '2px dashed #2196F3',
+                            borderRadius: '8px',
+                            textAlign: 'center',
+                            cursor: 'pointer',
+                            background: referenceImage ? '#e3f2fd' : '#f5f5f5',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <input
+                            id="reference-image-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            style={{ display: 'none' }}
+                          />
+                          {referenceImage ? (
+                            <div>
+                              <img
+                                src={referenceImage}
+                                alt="Reference"
+                                style={{
+                                  maxWidth: '100%',
+                                  maxHeight: '200px',
+                                  borderRadius: '4px',
+                                  marginBottom: '8px',
+                                }}
+                              />
+                              <p style={{ color: '#2196F3', fontSize: '12px' }}>
+                                ✅ 레퍼런스 이미지 업로드됨 (클릭하여 변경)
+                              </p>
+                            </div>
+                          ) : (
+                            <div>
+                              <div style={{ fontSize: '48px', marginBottom: '8px' }}>📁</div>
+                              <p style={{ color: '#2196F3', fontWeight: 'bold' }}>
+                                레퍼런스 이미지 업로드
+                              </p>
+                              <p style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                                클릭하여 이미지 파일 선택
+                              </p>
+                            </div>
+                          )}
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
               <div className="section">
                 <h3>제목</h3>
                 <input
@@ -251,16 +396,30 @@ function ContentCreator() {
 
               <div className="section">
                 <div className="section-header">
-                  <h3>내용</h3>
-                  <button className="btn-ai" onClick={handleGenerate}>
-                    ✨ AI로 생성하기
-                  </button>
+                  <h3>{contentType === 'image' ? '이미지 프롬프트' : '내용'}</h3>
+                  {contentType === 'image' ? (
+                    <button
+                      className="btn-ai"
+                      onClick={handleGenerateImage}
+                      disabled={isGenerating}
+                    >
+                      {isGenerating ? '🎨 생성 중...' : '🚀 이미지 생성하기'}
+                    </button>
+                  ) : (
+                    <button className="btn-ai" onClick={handleGenerate}>
+                      ✨ AI로 생성하기
+                    </button>
+                  )}
                 </div>
                 <textarea
                   className="content-textarea"
-                  placeholder="콘텐츠 내용을 입력하거나 AI로 생성하세요..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
+                  placeholder={contentType === 'image'
+                    ? "이미지 설명을 입력하세요 (예: A beautiful sunset over mountains with golden light)"
+                    : "콘텐츠 내용을 입력하거나 AI로 생성하세요..."}
+                  value={contentType === 'image' ? imagePrompt : content}
+                  onChange={(e) => contentType === 'image'
+                    ? setImagePrompt(e.target.value)
+                    : setContent(e.target.value)}
                   rows={12}
                 />
               </div>
@@ -274,13 +433,42 @@ function ContentCreator() {
               <div className="preview-content">
                 {contentType === 'image' ? (
                   <>
-                    <h4>{title || '이미지 제목'}</h4>
-                    {generatedImage ? (
-                      <img src={generatedImage} alt="Preview" style={{ width: '100%', borderRadius: '8px', marginTop: '12px' }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <h4>{title || '이미지 미리보기'}</h4>
+                      {generatedImage && (
+                        <span style={{ fontSize: '11px', color: '#666', backgroundColor: '#f0f9ff', padding: '4px 8px', borderRadius: '4px' }}>
+                          {aiModels.find(m => m.id === aiModel)?.label}
+                        </span>
+                      )}
+                    </div>
+                    {isGenerating ? (
+                      <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                        <div style={{
+                          border: '3px solid #f3f3f3',
+                          borderTop: '3px solid #3498db',
+                          borderRadius: '50%',
+                          width: '40px',
+                          height: '40px',
+                          animation: 'spin 1s linear infinite',
+                          margin: '0 auto 16px'
+                        }}></div>
+                        <p style={{ color: '#666' }}>🎨 AI가 이미지를 생성하고 있습니다...</p>
+                        <p style={{ color: '#999', fontSize: '12px', marginTop: '8px' }}>
+                          {aiModel === 'whisk' ? '보통 10-20초 정도 소요됩니다' : '보통 30초~1분 정도 소요됩니다'}
+                        </p>
+                      </div>
+                    ) : generatedImage ? (
+                      <>
+                        <img src={generatedImage} alt="Preview" style={{ width: '100%', borderRadius: '8px', marginTop: '12px' }} />
+                        <p style={{ fontSize: '12px', color: '#666', marginTop: '8px', textAlign: 'center' }}>
+                          ✅ 생성 완료! 이미지를 우클릭하여 저장할 수 있습니다.
+                        </p>
+                      </>
                     ) : (
-                      <p style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0' }}>
-                        이미지 생성 후 미리보기가 표시됩니다
-                      </p>
+                      <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎨</div>
+                        <p style={{ color: '#9ca3af' }}>프롬프트를 입력하고<br />이미지를 생성해보세요</p>
+                      </div>
                     )}
                   </>
                 ) : (
@@ -296,12 +484,36 @@ function ContentCreator() {
           <div className="tips-section">
             <h3>💡 작성 팁</h3>
             {contentType === 'image' ? (
-              <ul className="tips-list">
-                <li>구체적이고 상세한 프롬프트를 작성하세요</li>
-                <li>원하는 스타일과 분위기를 명확히 하세요</li>
-                <li>색상, 조명, 구도 등을 구체적으로 명시하세요</li>
-                <li>영어로 작성하면 더 좋은 결과를 얻을 수 있습니다</li>
-              </ul>
+              <>
+                <div style={{ marginBottom: '12px', padding: '8px', backgroundColor: '#f0f9ff', borderRadius: '4px', fontSize: '13px' }}>
+                  <strong>선택된 모델:</strong> {aiModels.find(m => m.id === aiModel)?.label}
+                </div>
+                {aiModel === 'whisk' ? (
+                  <ul className="tips-list">
+                    <li><strong>✨ 간단하게:</strong> Whisk는 짧고 핵심적인 아이디어를 좋아합니다</li>
+                    <li><strong>🎨 창의성:</strong> 예상치 못한 창의적인 해석을 기대하세요</li>
+                    <li><strong>🌈 추상적 개념:</strong> "행복", "모험", "미래" 같은 단어도 효과적</li>
+                    <li><strong>🔮 조합 실험:</strong> 서로 다른 요소를 조합해보세요 (예: "우주 카페")</li>
+                    <li><strong>무료 &amp; 빠름:</strong> API 키 없이 고품질 이미지 생성</li>
+                  </ul>
+                ) : aiModel === 'nanovana' ? (
+                  <ul className="tips-list">
+                    <li><strong>🍌 상세하게:</strong> 구체적인 디테일을 많이 포함하세요</li>
+                    <li><strong>📸 사실적:</strong> "고화질", "사진 같은", "리얼리스틱" 표현 추가</li>
+                    <li><strong>🌟 품질 키워드:</strong> "프로페셔널", "4K", "고품질" 등</li>
+                    <li><strong>💡 조명과 색감:</strong> 조명과 색상 톤을 구체적으로 설명</li>
+                    <li><strong>⚠️ 할당량:</strong> Google API 무료 할당량 제한 있음</li>
+                  </ul>
+                ) : (
+                  <ul className="tips-list">
+                    <li><strong>🎨 구체적으로:</strong> "필라테스 센터" 보다 "현대적인 필라테스 센터 인테리어, 밝은 자연광"</li>
+                    <li><strong>🌅 분위기 설명:</strong> "따뜻한", "차가운", "활기찬" 같은 표현 추가</li>
+                    <li><strong>💡 조명 언급:</strong> "자연광", "따뜻한 조명", "스튜디오 조명" 등</li>
+                    <li><strong>🌐 한국어 가능:</strong> 모든 모델이 한국어를 잘 이해합니다</li>
+                    <li><strong>🚫 네거티브:</strong> 원하지 않는 요소를 명시하면 더 정확</li>
+                  </ul>
+                )}
+              </>
             ) : (
               <ul className="tips-list">
                 <li>명확하고 간결한 제목을 사용하세요</li>
