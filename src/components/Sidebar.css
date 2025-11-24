@@ -4,8 +4,8 @@
   top: 64px;
   bottom: 0;
   width: 240px;
-  background-color: #ffffff;
-  border-right: 1px solid #e5e7eb;
+  background-color: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
   overflow-y: auto;
   z-index: 999;
 }
@@ -22,22 +22,23 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   text-decoration: none;
-  color: #4b5563;
+  color: var(--text-secondary);
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
 }
 
 .sidebar-item:hover {
-  background-color: #f9fafb;
-  color: #1f2937;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .sidebar-item.active {
-  background-color: #e8f0fe;
-  color: #1967d2;
+  background: var(--gradient-accent);
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
 }
 
 .sidebar-icon {

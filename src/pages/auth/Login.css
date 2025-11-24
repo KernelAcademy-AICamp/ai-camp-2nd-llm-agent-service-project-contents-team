@@ -3,17 +3,19 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-primary);
   padding: 20px;
 }
 
 .login-box {
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
   padding: 50px 40px;
   width: 100%;
   max-width: 420px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
 }
 
 .login-header {
@@ -23,26 +25,29 @@
 
 .login-header h1 {
   font-size: 32px;
-  color: #333;
+  background: var(--gradient-secondary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 12px;
   font-weight: 700;
 }
 
 .login-header p {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.5;
 }
 
 .error-message {
-  background-color: #fee;
-  color: #c33;
+  background-color: var(--error-light);
+  color: var(--error-dark);
   padding: 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin-bottom: 24px;
   font-size: 14px;
   text-align: center;
-  border: 1px solid #fcc;
+  border: 1px solid var(--error-color);
 }
 
 /* 소셜 로그인 */
@@ -58,19 +63,19 @@
   justify-content: center;
   gap: 12px;
   padding: 16px 20px;
-  border: 2px solid #e0e0e0;
-  border-radius: 10px;
-  background: white;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
 }
 
 .social-btn:hover {
-  background: #f8f8f8;
+  background: var(--bg-secondary);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-lg);
 }
 
 .social-btn svg {
