@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/auth/Login';
 import OAuthCallback from './pages/auth/OAuthCallback';
 import DynamicOnboarding from './pages/onboarding/DynamicOnboarding';
+import Home from './pages/Home';
 import Dashboard from './pages/dashboard/Dashboard';
 import ContentCreator from './pages/content/ContentCreator';
 import ContentList from './pages/content/ContentList';
@@ -37,6 +38,15 @@ function App() {
           />
 
           {/* 보호된 라우트 */}
+          <Route path="/home"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Home />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
           <Route path="/"
             element={
               <ProtectedRoute>

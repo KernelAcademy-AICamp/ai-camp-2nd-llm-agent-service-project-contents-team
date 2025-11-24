@@ -11,11 +11,11 @@
 .video-creator-header h2 {
   font-size: 2rem;
   margin-bottom: 0.5rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .video-creator-header p {
-  color: #666;
+  color: var(--text-tertiary);
   font-size: 1.1rem;
 }
 
@@ -27,10 +27,10 @@
 
 /* 왼쪽 폼 섹션 */
 .video-form-section {
-  background: white;
+  background: var(--bg-primary);
   padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .form-group {
@@ -41,7 +41,7 @@
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .form-group input[type="text"],
@@ -49,8 +49,8 @@
 .form-group textarea {
   width: 100%;
   padding: 0.75rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
   font-size: 1rem;
   transition: border-color 0.3s;
 }
@@ -58,13 +58,13 @@
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: var(--accent-color);
 }
 
 .input-hint {
   margin-top: 0.5rem;
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-tertiary);
 }
 
 /* 모델 선택 */
@@ -79,22 +79,22 @@
   align-items: center;
   gap: 1rem;
   padding: 1rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 10px;
-  background: white;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
   cursor: pointer;
   transition: all 0.3s;
 }
 
 .model-btn:hover {
-  border-color: #667eea;
+  border-color: var(--accent-color);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+  box-shadow: var(--shadow-lg);
 }
 
 .model-btn.active {
-  border-color: #667eea;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: var(--accent-color);
+  background: var(--gradient-secondary);
   color: white;
 }
 
@@ -121,10 +121,10 @@
 .btn-generate {
   width: 100%;
   padding: 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--gradient-secondary);
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   font-size: 1.1rem;
   font-weight: 600;
   cursor: pointer;
@@ -137,7 +137,7 @@
 
 .btn-generate:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: var(--shadow-xl);
 }
 
 .btn-generate:disabled {
@@ -162,14 +162,14 @@
 .info-box {
   margin-top: 2rem;
   padding: 1.5rem;
-  background: #f8f9fa;
-  border-radius: 10px;
-  border-left: 4px solid #667eea;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border-left: 4px solid var(--accent-color);
 }
 
 .info-box h4 {
   margin-bottom: 1rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .info-box ul {
@@ -180,16 +180,16 @@
 
 .info-box li {
   margin-bottom: 0.5rem;
-  color: #555;
+  color: var(--text-secondary);
   line-height: 1.6;
 }
 
 /* 오른쪽 결과 섹션 */
 .video-result-section {
-  background: white;
+  background: var(--bg-primary);
   padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
   min-height: 500px;
   display: flex;
   flex-direction: column;
@@ -201,7 +201,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #999;
+  color: var(--text-tertiary);
 }
 
 .placeholder-icon {
@@ -215,10 +215,10 @@
   align-items: flex-start;
   gap: 1rem;
   padding: 1.5rem;
-  background: #fff3cd;
-  border: 1px solid #ffc107;
-  border-radius: 10px;
-  color: #856404;
+  background: var(--warning-light);
+  border: 1px solid var(--warning-color);
+  border-radius: var(--radius-lg);
+  color: var(--warning-dark);
 }
 
 .error-icon {
@@ -231,7 +231,7 @@
 }
 
 .video-result h3 {
-  color: #28a745;
+  color: var(--success-color);
   margin-bottom: 1.5rem;
 }
 
@@ -243,38 +243,38 @@
   display: flex;
   justify-content: space-between;
   padding: 0.75rem 0;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .info-label {
   font-weight: 600;
-  color: #666;
+  color: var(--text-tertiary);
 }
 
 .info-value {
-  color: #333;
+  color: var(--text-primary);
 }
 
 .status-badge {
   padding: 0.25rem 0.75rem;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 0.9rem;
   font-weight: 600;
 }
 
 .status-badge.completed {
-  background: #d4edda;
-  color: #155724;
+  background: var(--success-light);
+  color: var(--success-dark);
 }
 
 .status-badge.processing {
-  background: #fff3cd;
-  color: #856404;
+  background: var(--warning-light);
+  color: var(--warning-dark);
 }
 
 .status-badge.failed {
-  background: #f8d7da;
-  color: #721c24;
+  background: var(--error-light);
+  color: var(--error-dark);
 }
 
 /* 동영상 미리보기 */
@@ -284,7 +284,7 @@
 
 .generated-video {
   width: 100%;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   background: #000;
   max-height: 400px;
   object-fit: contain;
@@ -300,7 +300,7 @@
 .btn-copy {
   flex: 1;
   padding: 0.75rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -312,24 +312,24 @@
 }
 
 .btn-download {
-  background: #28a745;
+  background: var(--success-color);
   color: white;
   border: none;
 }
 
 .btn-download:hover {
-  background: #218838;
+  background: var(--success-dark);
   transform: translateY(-2px);
 }
 
 .btn-copy {
-  background: white;
-  color: #667eea;
-  border: 2px solid #667eea;
+  background: var(--bg-primary);
+  color: var(--accent-color);
+  border: 2px solid var(--accent-color);
 }
 
 .btn-copy:hover {
-  background: #667eea;
+  background: var(--accent-color);
   color: white;
   transform: translateY(-2px);
 }
@@ -337,9 +337,9 @@
 .error-details {
   margin-top: 1.5rem;
   padding: 1rem;
-  background: #f8d7da;
-  border-radius: 8px;
-  color: #721c24;
+  background: var(--error-light);
+  border-radius: var(--radius-md);
+  color: var(--error-dark);
 }
 
 /* 반응형 */

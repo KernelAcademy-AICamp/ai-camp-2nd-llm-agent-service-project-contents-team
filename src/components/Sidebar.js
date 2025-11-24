@@ -6,15 +6,11 @@ function Sidebar() {
   const location = useLocation();
 
   const menuItems = [
+    { path: '/home', icon: '🏠', label: '홈' },
     { path: '/', icon: '📊', label: '대시보드' },
     { path: '/create', icon: '✨', label: '콘텐츠 생성' },
     { path: '/cardnews', icon: '📰', label: '카드뉴스' },
     { path: '/video', icon: '🎬', label: 'AI 동영상' },
-    { path: '/contents', icon: '📝', label: '콘텐츠 관리' },
-    { path: '/templates', icon: '📋', label: '템플릿' },
-    { path: '/analytics', icon: '📈', label: '분석' },
-    { path: '/mypage', icon: '👤', label: '마이페이지' },
-    { path: '/settings', icon: '⚙️', label: '설정' },
   ];
 
   return (

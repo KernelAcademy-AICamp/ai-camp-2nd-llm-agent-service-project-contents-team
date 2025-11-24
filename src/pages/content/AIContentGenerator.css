@@ -11,13 +11,13 @@
 .page-header h1 {
   font-size: 32px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text-primary);
   margin: 0 0 8px 0;
 }
 
 .page-description {
   font-size: 16px;
-  color: #6b7280;
+  color: var(--text-tertiary);
   margin: 0;
   line-height: 1.5;
 }
@@ -26,9 +26,9 @@
 .progress-banner {
   margin-bottom: 24px;
   padding: 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+  background: var(--gradient-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   animation: slideDown 0.3s ease-out;
 }
 
@@ -101,16 +101,16 @@
 
 /* 기능 설명 섹션 */
 .feature-info {
-  background: white;
-  border-radius: 12px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
   padding: 32px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
 }
 
 .feature-info h3 {
   font-size: 20px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text-primary);
   margin: 0 0 24px 0;
   text-align: center;
 }
@@ -123,16 +123,16 @@
 
 .feature-card {
   padding: 24px;
-  background: #f9fafb;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
   transition: all 0.3s;
 }
 
 .feature-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  border-color: #8b5cf6;
+  box-shadow: var(--shadow-lg);
+  border-color: var(--accent-color);
 }
 
 .feature-icon {
@@ -143,13 +143,13 @@
 .feature-card h4 {
   font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-primary);
   margin: 0 0 8px 0;
 }
 
 .feature-card p {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-tertiary);
   line-height: 1.6;
   margin: 0;
 }
