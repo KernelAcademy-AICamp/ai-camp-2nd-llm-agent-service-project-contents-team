@@ -33,6 +33,11 @@ function DynamicOnboarding() {
   const [aiReasoning, setAiReasoning] = useState('');
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
+  // 블로그 분석
+  const [blogUrl, setBlogUrl] = useState('');
+  const [blogAnalysisStatus, setBlogAnalysisStatus] = useState('idle'); // idle, analyzing, completed, failed
+  const [blogAnalysisResult, setBlogAnalysisResult] = useState(null);
+
   // Step 2: 콘텐츠 선호도
   const [preferences, setPreferences] = useState({
     text_style_sample: '',
@@ -119,6 +124,56 @@ function DynamicOnboarding() {
       console.error('AI 추천 실패:', error);
     } finally {
       setLoadingRecommendations(false);
+    }
+  };
+
+  const analyzeBlog = async () => {
+    if (!blogUrl.trim()) {
+      alert('네이버 블로그 URL을 입력해주세요.');
+      return;
+    }
+
+    setBlogAnalysisStatus('analyzing');
+    try {
+      // 분석 시작
+      await api.post('/api/blog/analyze', {
+        blog_url: blogUrl,
+        max_posts: 10
+      });
+
+      // 분석 상태 폴링 (3초마다 체크)
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await api.get('/api/blog/analysis-status');
+          const status = statusResponse.data.status;
+
+          if (status === 'completed') {
+            clearInterval(pollInterval);
+            setBlogAnalysisStatus('completed');
+            setBlogAnalysisResult(statusResponse.data.analysis);
+          } else if (status === 'failed') {
+            clearInterval(pollInterval);
+            setBlogAnalysisStatus('failed');
+            alert('블로그 분석에 실패했습니다. 다시 시도해주세요.');
+          }
+        } catch (error) {
+          console.error('분석 상태 확인 실패:', error);
+        }
+      }, 3000);
+
+      // 최대 2분 후 타임아웃
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (blogAnalysisStatus === 'analyzing') {
+          setBlogAnalysisStatus('failed');
+          alert('분석 시간이 초과되었습니다. 다시 시도해주세요.');
+        }
+      }, 120000);
+
+    } catch (error) {
+      console.error('블로그 분석 실패:', error);
+      setBlogAnalysisStatus('failed');
+      alert('블로그 분석 요청에 실패했습니다.');
     }
   };
 
@@ -474,6 +529,74 @@ function DynamicOnboarding() {
                 placeholder="예: 건강한 재료로 만든 디저트를 판매하는 카페입니다."
                 rows={4}
               />
+            </div>
+
+            {/* 블로그 분석 섹션 */}
+            <div className="blog-analysis-section">
+              <h3 className="section-title">📝 블로그 분석 (선택)</h3>
+              <p className="section-hint">
+                네이버 블로그 주소를 입력하시면 AI가 자동으로 브랜드 톤앤매너와 특성을 분석합니다
+              </p>
+
+              <div className="blog-url-input-group">
+                <input
+                  type="text"
+                  value={blogUrl}
+                  onChange={(e) => setBlogUrl(e.target.value)}
+                  placeholder="예: https://blog.naver.com/your_blog_id"
+                  disabled={blogAnalysisStatus === 'analyzing'}
+                />
+                <button
+                  type="button"
+                  onClick={analyzeBlog}
+                  disabled={blogAnalysisStatus === 'analyzing' || !blogUrl.trim()}
+                  className="btn-analyze"
+                >
+                  {blogAnalysisStatus === 'analyzing' ? (
+                    <>
+                      <div className="spinner-small"></div>
+                      분석 중...
+                    </>
+                  ) : (
+                    '🔍 분석하기'
+                  )}
+                </button>
+              </div>
+
+              {blogAnalysisStatus === 'analyzing' && (
+                <div className="analysis-progress">
+                  <p>블로그 포스트를 수집하고 분석하고 있습니다... (최대 2분 소요)</p>
+                </div>
+              )}
+
+              {blogAnalysisStatus === 'completed' && blogAnalysisResult && (
+                <div className="analysis-result fade-in">
+                  <h4>✅ 분석 완료!</h4>
+                  <div className="analysis-summary">
+                    <div className="analysis-item">
+                      <strong>브랜드 톤:</strong> {blogAnalysisResult.analysis?.brand_tone}
+                    </div>
+                    <div className="analysis-item">
+                      <strong>글쓰기 스타일:</strong> {blogAnalysisResult.analysis?.writing_style}
+                    </div>
+                    <div className="analysis-item">
+                      <strong>타겟 고객:</strong> {blogAnalysisResult.analysis?.target_audience}
+                    </div>
+                    <div className="analysis-item">
+                      <strong>감정적 톤:</strong> {blogAnalysisResult.analysis?.emotional_tone}
+                    </div>
+                  </div>
+                  <p className="analysis-note">
+                    💡 이 정보는 AI 콘텐츠 생성 시 자동으로 활용됩니다
+                  </p>
+                </div>
+              )}
+
+              {blogAnalysisStatus === 'failed' && (
+                <div className="analysis-error">
+                  분석에 실패했습니다. URL을 확인하고 다시 시도해주세요.
+                </div>
+              )}
             </div>
 
             <h3 className="section-title">타겟 고객</h3>
