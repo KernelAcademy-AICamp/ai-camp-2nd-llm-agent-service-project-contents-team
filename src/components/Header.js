@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './Header.css';
 
 function Header() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -29,6 +31,19 @@ function Header() {
     setShowDropdown(false);
   };
 
+  const handleMenuClick = (path) => {
+    navigate(path);
+    setShowDropdown(false);
+  };
+
+  const menuItems = [
+    { path: '/contents', icon: '📝', label: '콘텐츠 관리' },
+    { path: '/templates', icon: '📋', label: '템플릿' },
+    { path: '/analytics', icon: '📈', label: '분석' },
+    { path: '/mypage', icon: '👤', label: '마이페이지' },
+    { path: '/settings', icon: '⚙️', label: '설정' },
+  ];
+
   return (
     <header className="header">
       <div className="header-content">
@@ -47,15 +62,31 @@ function Header() {
             </button>
             {showDropdown && (
               <div className="user-dropdown">
-                <div className="user-info">
-                  <p className="user-email">{user?.email}</p>
-                  {user?.full_name && (
-                    <p className="user-fullname">{user.full_name}</p>
-                  )}
-                </div>
+                <button
+                  onClick={() => handleMenuClick('/mypage')}
+                  className="user-info-button"
+                >
+                  <span className="user-info-avatar">👤</span>
+                  <div className="user-info-text">
+                    <p className="user-info-name">{user?.username || 'User'}</p>
+                    <p className="user-info-link">마이페이지 보기</p>
+                  </div>
+                </button>
+                <div className="dropdown-divider"></div>
+                {menuItems.filter(item => item.path !== '/mypage').map((item) => (
+                  <button
+                    key={item.path}
+                    onClick={() => handleMenuClick(item.path)}
+                    className="dropdown-item menu-item"
+                  >
+                    <span className="dropdown-icon">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
                 <div className="dropdown-divider"></div>
                 <button onClick={handleLogout} className="dropdown-item logout-btn">
-                  로그아웃
+                  <span className="dropdown-icon">🚪</span>
+                  <span>로그아웃</span>
                 </button>
               </div>
             )}
