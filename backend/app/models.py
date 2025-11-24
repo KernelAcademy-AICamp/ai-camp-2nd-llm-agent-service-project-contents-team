@@ -30,14 +30,6 @@ class User(Base):
     # 타겟 고객 정보 (JSON)
     target_audience = Column(JSON, nullable=True)  # {"age_range": "20-30", "gender": "all", "interests": ["fashion", "beauty"]}
 
-    # SNS 계정 정보
-    naver_blog_url = Column(String, nullable=True)  # 네이버 블로그 URL
-
-    # AI 브랜드 분석 결과 (JSON)
-    brand_analysis = Column(JSON, nullable=True)  # Gemini가 분석한 브랜드 특성
-    blog_analysis_status = Column(String, default="pending")  # pending, analyzing, completed, failed
-    blog_analyzed_at = Column(DateTime(timezone=True), nullable=True)  # 마지막 분석 시간
-
     # 온보딩 완료 여부
     onboarding_completed = Column(Boolean, default=False)
 
@@ -48,6 +40,7 @@ class User(Base):
     videos = relationship("Video", back_populates="user", cascade="all, delete-orphan")
     preferences = relationship("UserPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
     contents = relationship("Content", back_populates="user", cascade="all, delete-orphan")
+    brand_analysis = relationship("BrandAnalysis", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class UserPreference(Base):
@@ -163,3 +156,60 @@ class Video(Base):
 
     # Relationships
     user = relationship("User", back_populates="videos")
+
+
+class BrandAnalysis(Base):
+    """
+    브랜드 분석 모델 (멀티 플랫폼 지원)
+    - 전반적인 브랜드 특성: 모든 플랫폼에 공통으로 적용
+    - 플랫폼별 특성: 블로그, 인스타그램, 유튜브 각각의 스타일
+    """
+    __tablename__ = "brand_analysis"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+
+    # ===== 전반적인 브랜드 요소 (Overall Brand Elements) =====
+    # 모든 플랫폼에 공통으로 적용되는 브랜드 특성
+    brand_tone = Column(String, nullable=True)  # 브랜드 톤앤매너 (예: 친근하고 전문적인)
+    brand_values = Column(JSON, nullable=True)  # 브랜드 가치 ["진정성", "혁신"]
+    target_audience = Column(String, nullable=True)  # 타겟 고객층 (예: 20-30대 여성)
+    brand_personality = Column(Text, nullable=True)  # 브랜드 성격 종합 설명
+    key_themes = Column(JSON, nullable=True)  # 주요 주제 ["건강", "라이프스타일"]
+    emotional_tone = Column(String, nullable=True)  # 감정적 톤 (예: 따뜻한, 유머러스한)
+
+    # ===== 블로그 플랫폼 특성 (Blog Platform Specifics) =====
+    blog_url = Column(String, nullable=True)  # 분석된 블로그 URL
+    blog_writing_style = Column(String, nullable=True)  # 글쓰기 스타일 (예: ~해요체, 스토리텔링 중심)
+    blog_content_structure = Column(String, nullable=True)  # 콘텐츠 구조 (예: 도입-본론-결론)
+    blog_call_to_action = Column(String, nullable=True)  # 행동 유도 방식 (예: 질문형, 직접적)
+    blog_keyword_usage = Column(JSON, nullable=True)  # 자주 사용하는 키워드와 빈도
+    blog_analyzed_posts = Column(Integer, default=0)  # 분석된 포스트 수
+    blog_analyzed_at = Column(DateTime(timezone=True), nullable=True)  # 마지막 분석 시간
+    blog_analysis_status = Column(String, default="pending")  # pending, analyzing, completed, failed
+
+    # ===== 인스타그램 플랫폼 특성 (Instagram Platform Specifics) =====
+    instagram_url = Column(String, nullable=True)  # 분석된 인스타그램 URL
+    instagram_caption_style = Column(String, nullable=True)  # 캡션 작성 스타일 (예: 짧고 임팩트 있는)
+    instagram_image_style = Column(String, nullable=True)  # 이미지 느낌 (예: 밝고 화사한, 미니멀)
+    instagram_hashtag_pattern = Column(String, nullable=True)  # 해시태그 사용 패턴 (예: 5-10개, 브랜드명 포함)
+    instagram_color_palette = Column(JSON, nullable=True)  # 주요 색상 팔레트 ["#FF5733", "#C70039"]
+    instagram_analyzed_posts = Column(Integer, default=0)  # 분석된 포스트 수
+    instagram_analyzed_at = Column(DateTime(timezone=True), nullable=True)
+    instagram_analysis_status = Column(String, default="pending")
+
+    # ===== 유튜브 플랫폼 특성 (YouTube Platform Specifics) =====
+    youtube_url = Column(String, nullable=True)  # 분석된 유튜브 채널 URL
+    youtube_content_style = Column(String, nullable=True)  # 콘텐츠 스타일 (예: 튜토리얼, 브이로그)
+    youtube_title_pattern = Column(String, nullable=True)  # 제목 패턴 (예: 숫자 활용, 질문형)
+    youtube_description_style = Column(String, nullable=True)  # 설명 작성 스타일
+    youtube_thumbnail_style = Column(String, nullable=True)  # 썸네일 스타일 (예: 텍스트 오버레이, 밝은 배경)
+    youtube_analyzed_videos = Column(Integer, default=0)  # 분석된 영상 수
+    youtube_analyzed_at = Column(DateTime(timezone=True), nullable=True)
+    youtube_analysis_status = Column(String, default="pending")
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationship
+    user = relationship("User", back_populates="brand_analysis")

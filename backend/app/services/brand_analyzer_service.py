@@ -64,24 +64,28 @@ class BrandAnalyzerService:
 
 위 블로그 포스트들을 분석하여 다음 정보를 JSON 형식으로 추출해주세요:
 
+1. **전반적인 브랜드 특성** (모든 플랫폼에 공통 적용)
+2. **블로그 플랫폼 특성** (블로그만의 글쓰기 스타일)
+
 {{
-  "brand_tone": "브랜드 톤앤매너 (예: 친근하고 전문적인, 캐주얼한, 격식있는 등)",
-  "writing_style": "글쓰기 스타일 특징 (예: ~해요체 사용, 이모티콘 활용, 스토리텔링 중심 등)",
-  "key_themes": ["주요 주제1", "주요 주제2", "주요 주제3"],
-  "target_audience": "추정되는 타겟 고객층 (예: 20-30대 여성, 자영업자, 부모님 등)",
-  "brand_values": ["브랜드 가치1", "브랜드 가치2"],
-  "content_structure": "콘텐츠 구조 패턴 (예: 도입-본론-결론, Q&A 형식, 리스트 형식 등)",
-  "unique_features": ["이 브랜드만의 독특한 특징1", "특징2"],
-  "keyword_frequency": {{
-    "핵심키워드1": 빈도수,
-    "핵심키워드2": 빈도수,
-    "핵심키워드3": 빈도수
+  "overall": {{
+    "brand_tone": "브랜드 톤앤매너 (예: 친근하고 전문적인)",
+    "brand_values": ["브랜드 가치1", "브랜드 가치2"],
+    "target_audience": "타겟 고객층 (예: 20-30대 여성)",
+    "brand_personality": "브랜드 성격 종합 설명 (2-3문장)",
+    "key_themes": ["주요 주제1", "주요 주제2"],
+    "emotional_tone": "감정적 톤 (예: 따뜻한, 유머러스한)"
   }},
-  "emotional_tone": "감정적 톤 (예: 따뜻한, 유머러스한, 진지한, 열정적인 등)",
-  "call_to_action_style": "행동 유도 방식 (예: 직접적, 간접적, 질문형 등)",
-  "image_usage_pattern": "이미지 사용 패턴 (추정)",
-  "posting_topics": ["주로 다루는 주제 유형들"],
-  "brand_personality": "브랜드 성격 종합 설명 (2-3문장)"
+  "blog": {{
+    "writing_style": "블로그 글쓰기 스타일 (예: ~해요체, 스토리텔링 중심)",
+    "content_structure": "콘텐츠 구조 (예: 도입-본론-결론)",
+    "call_to_action": "행동 유도 방식 (예: 질문형, 직접적)",
+    "keyword_usage": {{
+      "핵심키워드1": 빈도수,
+      "핵심키워드2": 빈도수,
+      "핵심키워드3": 빈도수
+    }}
+  }}
 }}
 
 **중요**: 반드시 위 JSON 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요.
@@ -101,11 +105,7 @@ class BrandAnalyzerService:
             analysis = json.loads(response_text)
 
             logger.info("브랜드 분석 완료")
-            return {
-                "analysis": analysis,
-                "analyzed_posts_count": len(posts),
-                "total_content_length": len(combined_text)
-            }
+            return analysis
 
         except json.JSONDecodeError as e:
             logger.error(f"JSON 파싱 실패: {e}")
