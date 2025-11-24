@@ -12,24 +12,26 @@
 .dashboard-header h2 {
   font-size: 28px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .btn-primary {
-  background-color: #1967d2;
+  background: var(--gradient-secondary);
   color: white;
   border: none;
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-md);
 }
 
 .btn-primary:hover {
-  background-color: #1557b0;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
 .stats-grid {
@@ -40,12 +42,20 @@
 }
 
 .stat-card {
-  background: white;
-  border-radius: 12px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
   padding: 20px;
   display: flex;
   gap: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary-light);
 }
 
 .stat-icon {
@@ -55,8 +65,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f0f4ff;
-  border-radius: 12px;
+  background: var(--gradient-accent);
+  border-radius: var(--radius-lg);
+  color: white;
 }
 
 .stat-content {
@@ -65,14 +76,14 @@
 
 .stat-label {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-tertiary);
   margin-bottom: 4px;
 }
 
 .stat-value {
   font-size: 28px;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--text-primary);
   margin-bottom: 4px;
 }
 
@@ -82,7 +93,7 @@
 }
 
 .stat-change.positive {
-  color: #10b981;
+  color: var(--success-color);
 }
 
 .dashboard-content {
@@ -93,17 +104,17 @@
 
 .content-section,
 .quick-actions {
-  background: white;
-  border-radius: 12px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
   padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .content-section h3,
 .quick-actions h3 {
   font-size: 18px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--text-primary);
   margin: 0 0 20px 0;
 }
 
@@ -118,19 +129,21 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  transition: border-color 0.2s;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: all 0.3s ease;
 }
 
 .content-item:hover {
-  border-color: #cbd5e1;
+  border-color: var(--primary-light);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(4px);
 }
 
 .content-info h4 {
   font-size: 15px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--text-primary);
   margin: 0 0 8px 0;
 }
 
@@ -138,7 +151,7 @@
   display: flex;
   gap: 12px;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-tertiary);
 }
 
 .content-status {
@@ -150,18 +163,18 @@
 }
 
 .status-발행됨 {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: var(--success-light);
+  color: var(--success-dark);
 }
 
 .status-예약됨 {
-  background-color: #dbeafe;
-  color: #1e40af;
+  background-color: var(--info-light);
+  color: var(--info-dark);
 }
 
 .status-작성\ 중 {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: var(--warning-light);
+  color: var(--warning-dark);
 }
 
 .action-buttons {
@@ -175,19 +188,22 @@
   align-items: center;
   gap: 12px;
   padding: 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-secondary);
 }
 
 .action-btn:hover {
-  background-color: #f9fafb;
-  border-color: #cbd5e1;
+  background: var(--gradient-primary);
+  border-color: transparent;
+  color: white;
+  transform: translateX(4px);
+  box-shadow: var(--shadow-md);
 }
 
 .action-icon {
