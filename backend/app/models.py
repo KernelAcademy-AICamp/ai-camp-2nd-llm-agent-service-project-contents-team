@@ -30,6 +30,14 @@ class User(Base):
     # 타겟 고객 정보 (JSON)
     target_audience = Column(JSON, nullable=True)  # {"age_range": "20-30", "gender": "all", "interests": ["fashion", "beauty"]}
 
+    # SNS 계정 정보
+    naver_blog_url = Column(String, nullable=True)  # 네이버 블로그 URL
+
+    # AI 브랜드 분석 결과 (JSON)
+    brand_analysis = Column(JSON, nullable=True)  # Gemini가 분석한 브랜드 특성
+    blog_analysis_status = Column(String, default="pending")  # pending, analyzing, completed, failed
+    blog_analyzed_at = Column(DateTime(timezone=True), nullable=True)  # 마지막 분석 시간
+
     # 온보딩 완료 여부
     onboarding_completed = Column(Boolean, default=False)
 

@@ -194,6 +194,20 @@ ${feedback.sns ? `SNS: ${feedback.sns.join(', ')}` : ''}
 위 피드백을 반영하여 개선된 버전을 작성하세요.
 ` : '';
 
+    // 브랜드 분석 정보가 있으면 추가
+    const brandGuidelines = analysisData.brandAnalysis ? `
+
+**🎯 브랜드 가이드라인 (기존 블로그 분석 결과):**
+- 브랜드 톤: ${analysisData.brandAnalysis.brand_tone}
+- 글쓰기 스타일: ${analysisData.brandAnalysis.writing_style}
+- 타겟 고객: ${analysisData.brandAnalysis.target_audience}
+- 감정적 톤: ${analysisData.brandAnalysis.emotional_tone}
+- 행동 유도 스타일: ${analysisData.brandAnalysis.call_to_action_style}
+- 콘텐츠 구조: ${analysisData.brandAnalysis.content_structure}
+
+**중요**: 위 브랜드 가이드라인을 반드시 준수하여 일관성 있는 브랜드 톤으로 작성하세요.
+` : '';
+
     const prompt = `당신은 전문 콘텐츠 작가입니다. 분석된 정보를 바탕으로 두 가지 플랫폼용 콘텐츠를 생성하세요.
 
 **분석 정보:**
@@ -206,6 +220,7 @@ ${feedback.sns ? `SNS: ${feedback.sns.join(', ')}` : ''}
 - 톤앤매너: ${analysisData.recommendedTone}
 - 업종: ${analysisData.businessType}
 ${analysisData.visualInfo ? `- 비주얼: ${analysisData.visualInfo}` : ''}
+${brandGuidelines}
 ${improvementInstructions}
 
 **작성 요구사항:**
@@ -350,6 +365,22 @@ export const generateAgenticContent = async ({ textInput, images = [] }, onProgr
       console.log(`📊 Progress: ${message}`);
     };
 
+    // 0단계: 브랜드 분석 정보 가져오기 (있다면)
+    let brandAnalysis = null;
+    try {
+      const response = await fetch('/api/blog/brand-analysis', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        brandAnalysis = await response.json();
+        console.log('✅ 브랜드 분석 정보 로드:', brandAnalysis);
+      }
+    } catch (error) {
+      console.log('ℹ️ 브랜드 분석 정보 없음 (선택 사항)');
+    }
+
     // 1단계: Orchestrator가 입력 분석
     updateProgress('입력 분석 중...', 'analyzing');
     const inputAnalysis = await orchestrator.analyzeInput(textInput, images);
@@ -358,6 +389,13 @@ export const generateAgenticContent = async ({ textInput, images = [] }, onProgr
     // 2단계: Multi-Modal 분석
     updateProgress('콘텐츠 정보 추출 중...', 'extracting');
     const analysisResult = await multiModalAgent.analyze(textInput, images);
+
+    // 브랜드 분석 정보가 있으면 통합
+    if (brandAnalysis?.analysis) {
+      analysisResult.brandAnalysis = brandAnalysis.analysis;
+      console.log('✅ 브랜드 분석 정보 통합 완료');
+    }
+
     orchestrator.updateState('analyzed', { analysisResult });
     console.log('분석 결과:', analysisResult);
 
