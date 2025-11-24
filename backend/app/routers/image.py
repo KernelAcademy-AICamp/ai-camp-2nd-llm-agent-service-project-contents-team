@@ -15,6 +15,7 @@ router = APIRouter(
 class ImageGenerateRequest(BaseModel):
     prompt: str
     model: str = "nanovana"
+    referenceImage: Optional[str] = None  # Base64 encoded image for image-to-image
 
 
 class ImageGenerateResponse(BaseModel):
@@ -23,12 +24,13 @@ class ImageGenerateResponse(BaseModel):
     optimizedPrompt: Optional[str] = None
     usedClaudeOptimization: bool = False
     usedNanovanaAPI: bool = False
+    usedWhiskAPI: bool = False
 
 
 async def optimize_prompt_with_gemini(user_prompt: str) -> str:
     """Gemini를 사용하여 프롬프트 최적화"""
     try:
-        google_api_key = os.getenv('GOOGLE_API_KEY')
+        google_api_key = os.getenv('REACT_APP_GEMINI_API_KEY')
         if not google_api_key:
             return user_prompt
 
@@ -52,7 +54,7 @@ Transform this into an optimized Stable Diffusion prompt with style, lighting, q
 async def generate_image(request: ImageGenerateRequest):
     """
     이미지 생성 엔드포인트
-    - model: 'nanovana' (Gemini 2.0 Flash) 또는 'gemini' (Stable Diffusion 2.1)
+    - model: 'whisk' (Imagen 3), 'nanovana' (Gemini 2.0 Flash) 또는 'gemini' (Stable Diffusion 2.1)
     """
     if not request.prompt:
         raise HTTPException(status_code=400, detail="프롬프트가 필요합니다.")
@@ -61,29 +63,91 @@ async def generate_image(request: ImageGenerateRequest):
         optimized_prompt = request.prompt
         used_claude_optimization = False
         used_nanovana_api = False
+        used_whisk_api = False
         image_url = None
 
-        # Nanovana (Gemini 2.0 Flash Image)
-        if request.model == "nanovana":
-            google_api_key = os.getenv('GOOGLE_API_KEY')
+        # Whisk AI (Pollinations - 무료, API 키 불필요)
+        if request.model == "whisk":
+            print(f"✨ Whisk AI (Pollinations)로 창의적인 이미지 생성 중...")
+            print(f"📝 받은 프롬프트: {request.prompt}")
+
+            # URL 인코딩된 프롬프트
+            import urllib.parse
+            encoded_prompt = urllib.parse.quote(request.prompt)
+            print(f"🔗 인코딩된 프롬프트: {encoded_prompt}")
+
+            # Pollinations AI는 GET 요청으로 이미지를 직접 반환합니다
+            # enhance=false로 설정하여 사용자의 정확한 프롬프트를 사용합니다
+            image_generation_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&model=flux&nologo=true&enhance=false"
+
+            async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
+                response = await client.get(image_generation_url)
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Whisk AI (Pollinations) 오류: 상태 코드 {response.status_code}"
+                )
+
+            # 이미지를 base64로 인코딩
+            image_data = base64.b64encode(response.content).decode('utf-8')
+            image_url = f"data:image/png;base64,{image_data}"
+            used_whisk_api = True
+            print("✅ Whisk AI (Pollinations) 이미지 생성 완료!")
+
+        # Nanovana (Gemini 2.5 Flash Image with Thinking)
+        elif request.model == "nanovana":
+            google_api_key = os.getenv('REACT_APP_GEMINI_API_KEY')
             if not google_api_key:
                 raise HTTPException(
                     status_code=500,
-                    detail="Google API 키가 필요합니다. (Gemini 2.0 Flash Image)"
+                    detail="Google API 키가 필요합니다. (Gemini 2.5 Flash Image)"
                 )
 
-            print("🍌 나노바나나(Gemini 2.0 Flash Image)로 이미지 생성 중...")
+            # 레퍼런스 이미지가 있는지 확인
+            if request.referenceImage:
+                print("🍌 나노바나나(Gemini 2.5 Flash Image - Image-to-Image)로 이미지 생성 중...")
+                print(f"📝 받은 프롬프트: {request.prompt}")
+                print(f"🖼️  레퍼런스 이미지 사용")
 
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={google_api_key}",
-                    json={
-                        "contents": [{
-                            "parts": [{
-                                "text": f"Generate an image: {request.prompt}"
-                            }]
+                # Base64에서 data:image/...;base64, 접두사 제거
+                image_data = request.referenceImage
+                if ',' in image_data:
+                    image_data = image_data.split(',')[1]
+
+                # 요청에 레퍼런스 이미지 포함
+                request_body = {
+                    "contents": [{
+                        "parts": [
+                            {
+                                "inline_data": {
+                                    "mime_type": "image/jpeg",
+                                    "data": image_data
+                                }
+                            },
+                            {
+                                "text": f"Based on this reference image, generate a new image: {request.prompt}"
+                            }
+                        ]
+                    }]
+                }
+            else:
+                print("🍌 나노바나나(Gemini 2.5 Flash Image - Text-to-Image)로 이미지 생성 중...")
+                print(f"📝 받은 프롬프트: {request.prompt}")
+
+                # 텍스트만 사용
+                request_body = {
+                    "contents": [{
+                        "parts": [{
+                            "text": f"Generate an image: {request.prompt}"
                         }]
-                    },
+                    }]
+                }
+
+            async with httpx.AsyncClient(timeout=180.0) as client:
+                response = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key={google_api_key}",
+                    json=request_body,
                     headers={"Content-Type": "application/json"}
                 )
 
@@ -133,7 +197,7 @@ async def generate_image(request: ImageGenerateRequest):
                 )
 
             # Gemini로 프롬프트 최적화
-            if os.getenv('GOOGLE_API_KEY'):
+            if os.getenv('REACT_APP_GEMINI_API_KEY'):
                 optimized_prompt = await optimize_prompt_with_gemini(request.prompt)
                 used_claude_optimization = True
 
@@ -174,7 +238,7 @@ async def generate_image(request: ImageGenerateRequest):
         else:
             raise HTTPException(
                 status_code=400,
-                detail="지원하지 않는 AI 모델입니다."
+                detail="지원하지 않는 AI 모델입니다. (whisk, nanovana, gemini 중 선택)"
             )
 
         return ImageGenerateResponse(
@@ -182,7 +246,8 @@ async def generate_image(request: ImageGenerateRequest):
             imageUrl=image_url,
             optimizedPrompt=optimized_prompt if optimized_prompt != request.prompt else None,
             usedClaudeOptimization=used_claude_optimization,
-            usedNanovanaAPI=used_nanovana_api
+            usedNanovanaAPI=used_nanovana_api,
+            usedWhiskAPI=used_whisk_api
         )
 
     except HTTPException:
