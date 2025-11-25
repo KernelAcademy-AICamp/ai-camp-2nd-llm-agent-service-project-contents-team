@@ -241,14 +241,14 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     role = Column(String, nullable=False)  # user, assistant
     content = Column(Text, nullable=False)
     model = Column(String, nullable=True)  # AI 모델명 (gemini-1.5-pro 등)
     tokens_used = Column(Integer, nullable=True)  # 사용된 토큰 수
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Relationships
     session = relationship("ChatSession", back_populates="messages")

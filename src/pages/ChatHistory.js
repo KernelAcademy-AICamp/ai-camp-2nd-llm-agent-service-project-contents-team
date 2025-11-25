@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import './ChatHistory.css';
 
 function ChatHistory() {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -48,6 +50,11 @@ function ChatHistory() {
     }
   };
 
+  const handleContinueChat = (sessionId) => {
+    // 해당 세션으로 Home 페이지로 이동
+    navigate(`/home?session_id=${sessionId}`);
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -79,7 +86,11 @@ function ChatHistory() {
     return (
       <div className="chat-history-page">
         <div className="loading-container">
-          <div className="loading-spinner"></div>
+          <div className="loading-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
           <span>불러오는 중...</span>
         </div>
       </div>
@@ -122,19 +133,32 @@ function ChatHistory() {
               <div
                 key={session.id}
                 className="session-card"
-                onClick={() => fetchSessionMessages(session.id)}
               >
-                <div className="session-header">
-                  <h3 className="session-title">{session.title}</h3>
-                  <span className="session-time">
-                    {formatDate(session.updated_at)}
-                  </span>
+                <div
+                  className="session-content"
+                  onClick={() => fetchSessionMessages(session.id)}
+                >
+                  <div className="session-header">
+                    <h3 className="session-title">{session.title}</h3>
+                    <span className="session-time">
+                      {formatDate(session.updated_at)}
+                    </span>
+                  </div>
+                  <div className="session-footer">
+                    <span className="message-count">
+                      💬 {session.message_count}개 메시지
+                    </span>
+                  </div>
                 </div>
-                <div className="session-footer">
-                  <span className="message-count">
-                    💬 {session.message_count}개 메시지
-                  </span>
-                </div>
+                <button
+                  className="btn-continue-chat"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleContinueChat(session.id);
+                  }}
+                >
+                  대화 이어가기 →
+                </button>
               </div>
             ))}
           </div>
@@ -155,7 +179,11 @@ function ChatHistory() {
 
       {messagesLoading ? (
         <div className="loading-container">
-          <div className="loading-spinner"></div>
+          <div className="loading-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
           <span>불러오는 중...</span>
         </div>
       ) : (

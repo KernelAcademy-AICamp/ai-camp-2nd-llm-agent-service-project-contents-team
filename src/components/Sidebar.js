@@ -9,9 +9,6 @@ function Sidebar() {
     { path: '/home', icon: '🏠', label: '홈' },
     { path: '/', icon: '📊', label: '대시보드' },
     { path: '/create', icon: '✨', label: '콘텐츠 생성' },
-    { path: '/cardnews', icon: '📰', label: '카드뉴스' },
-    { path: '/video', icon: '🎬', label: 'AI 동영상' },
-    { path: '/chat-history', icon: '💬', label: '채팅 내역' },
   ];
 
   return (

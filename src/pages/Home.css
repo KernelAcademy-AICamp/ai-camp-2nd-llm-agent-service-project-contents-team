@@ -1,11 +1,130 @@
 .home-page {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   height: calc(100vh - 64px);
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 채팅 히스토리 사이드바 */
+.chat-sidebar {
+  width: 260px;
+  background: #f7f7f8;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s, transform 0.3s;
+  position: relative;
+  z-index: 10;
+}
+
+.chat-sidebar.closed {
+  width: 0;
+  transform: translateX(-100%);
+}
+
+.sidebar-header {
+  padding: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.btn-new-chat-sidebar {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn-new-chat-sidebar:hover {
+  background: #357abd;
+}
+
+.btn-toggle-sidebar {
+  padding: 0.75rem;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.2s;
+}
+
+.btn-toggle-sidebar:hover {
+  background: #f0f0f0;
+}
+
+.sidebar-sessions {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.sidebar-loading {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.sidebar-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.sidebar-session-item {
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.sidebar-session-item:hover {
+  background: #f0f4f8;
+  border-color: #4a90e2;
+}
+
+.sidebar-session-item.active {
+  background: #e3f2fd;
+  border-color: #4a90e2;
+}
+
+.sidebar-session-item .session-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-session-item .session-time {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+/* 메인 채팅 영역 */
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   max-width: 1000px;
   margin: 0 auto;
   padding: 24px;
-  position: relative;
+  width: 100%;
 }
 
 /* Chat Header */
@@ -29,6 +148,37 @@
 
 .btn-new-chat:hover {
   background: #357abd;
+}
+
+/* Loading History */
+.loading-history {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 1rem;
+  color: #666;
+}
+
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f0f0f0;
+  border-top: 4px solid #4a90e2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Welcome Screen */
@@ -220,17 +370,17 @@
 .message-text h4 { font-size: 1.1em; }
 
 .message-text p {
-  margin: 8px 0;
+  margin: 4px 0;
 }
 
 .message-text ul,
 .message-text ol {
-  margin: 8px 0;
+  margin: 6px 0;
   padding-left: 24px;
 }
 
 .message-text li {
-  margin: 4px 0;
+  margin: 2px 0;
 }
 
 .message-text code {

@@ -42,6 +42,107 @@ SYSTEM_PROMPT = load_system_prompt()
 logger.info(f"시스템 프롬프트 로드 완료 ({len(SYSTEM_PROMPT)} 글자)")
 
 
+def build_user_context(user: models.User, db: Session) -> str:
+    """
+    사용자 프로필 및 활동 정보를 기반으로 컨텍스트 문자열 생성
+    """
+    context_parts = ["\n\n## 현재 대화 중인 사용자 정보"]
+
+    # 기본 프로필 정보
+    context_parts.append(f"- **이름**: {user.username}")
+    if user.full_name:
+        context_parts.append(f"- **전체 이름**: {user.full_name}")
+    context_parts.append(f"- **이메일**: {user.email}")
+
+    # 비즈니스 정보
+    if user.brand_name or user.business_type or user.business_description:
+        context_parts.append("\n### 비즈니스 정보")
+        if user.brand_name:
+            context_parts.append(f"- **브랜드명**: {user.brand_name}")
+        if user.business_type:
+            context_parts.append(f"- **업종**: {user.business_type}")
+        if user.business_description:
+            context_parts.append(f"- **비즈니스 설명**: {user.business_description}")
+
+    # 타겟 고객 정보
+    if user.target_audience:
+        context_parts.append("\n### 타겟 고객")
+        target = user.target_audience
+        if isinstance(target, dict):
+            if target.get('age_range'):
+                context_parts.append(f"- **연령대**: {target['age_range']}")
+            if target.get('gender'):
+                context_parts.append(f"- **성별**: {target['gender']}")
+            if target.get('interests'):
+                interests = ", ".join(target['interests']) if isinstance(target['interests'], list) else target['interests']
+                context_parts.append(f"- **관심사**: {interests}")
+
+    # 온보딩 상태
+    if not user.onboarding_completed:
+        context_parts.append("\n⚠️ **참고**: 사용자가 아직 온보딩을 완료하지 않았습니다. 필요시 온보딩 완료를 권장해주세요.")
+
+    # 활동 통계
+    try:
+        # 채팅 세션 수
+        chat_count = db.query(models.ChatSession).filter(
+            models.ChatSession.user_id == user.id
+        ).count()
+
+        # 콘텐츠 수
+        content_count = db.query(models.Content).filter(
+            models.Content.user_id == user.id
+        ).count()
+
+        # 동영상 수
+        video_count = db.query(models.Video).filter(
+            models.Video.user_id == user.id
+        ).count()
+
+        if chat_count > 0 or content_count > 0 or video_count > 0:
+            context_parts.append("\n### 서비스 활동 내역")
+            if chat_count > 0:
+                context_parts.append(f"- **채팅 세션**: {chat_count}개")
+            if content_count > 0:
+                context_parts.append(f"- **생성한 콘텐츠**: {content_count}개")
+            if video_count > 0:
+                context_parts.append(f"- **생성한 동영상**: {video_count}개")
+    except Exception as e:
+        logger.warning(f"사용자 활동 통계 조회 실패: {e}")
+
+    # 브랜드 분석 정보
+    try:
+        brand_analysis = db.query(models.BrandAnalysis).filter(
+            models.BrandAnalysis.user_id == user.id
+        ).first()
+
+        if brand_analysis:
+            context_parts.append("\n### 브랜드 분석 정보")
+            if brand_analysis.brand_tone:
+                context_parts.append(f"- **브랜드 톤앤매너**: {brand_analysis.brand_tone}")
+            if brand_analysis.brand_personality:
+                context_parts.append(f"- **브랜드 성격**: {brand_analysis.brand_personality}")
+            if brand_analysis.emotional_tone:
+                context_parts.append(f"- **감정적 톤**: {brand_analysis.emotional_tone}")
+
+            # 플랫폼별 분석 상태
+            platforms = []
+            if brand_analysis.blog_analysis_status == "completed":
+                platforms.append("블로그")
+            if brand_analysis.instagram_analysis_status == "completed":
+                platforms.append("인스타그램")
+            if brand_analysis.youtube_analysis_status == "completed":
+                platforms.append("유튜브")
+
+            if platforms:
+                context_parts.append(f"- **분석 완료 플랫폼**: {', '.join(platforms)}")
+    except Exception as e:
+        logger.warning(f"브랜드 분석 정보 조회 실패: {e}")
+
+    context_parts.append("\n**중요**: 위 정보를 바탕으로 사용자에게 맞춤형 답변을 제공하세요. 사용자의 비즈니스와 상황에 맞는 구체적인 조언을 해주세요.")
+
+    return "\n".join(context_parts)
+
+
 class ChatMessage(BaseModel):
     role: str  # 'user' or 'assistant'
     content: str
@@ -149,13 +250,21 @@ async def chat(
             model="gemini-2.0-flash-exp"
         )
         db.add(user_message)
+        # 세션의 updated_at 변경사항도 함께 커밋
+        db.add(session)
         db.commit()
         logger.debug(f"사용자 메시지 저장 완료 (message_id: {user_message.id})")
 
-        # Gemini 모델 초기화 (시스템 프롬프트 포함)
+        # 사용자 컨텍스트 생성
+        user_context = build_user_context(current_user, db)
+        personalized_prompt = f"{SYSTEM_PROMPT}{user_context}"
+
+        logger.debug(f"개인화된 시스템 프롬프트 생성 완료 ({len(personalized_prompt)} 글자)")
+
+        # Gemini 모델 초기화 (개인화된 시스템 프롬프트 포함)
         model = genai.GenerativeModel(
             'gemini-2.0-flash-exp',
-            system_instruction=SYSTEM_PROMPT
+            system_instruction=personalized_prompt
         )
 
         # 대화 히스토리를 Gemini 형식으로 변환
@@ -279,33 +388,37 @@ async def get_session_messages(
     """
     특정 세션의 메시지 조회
     시간 순으로 정렬 (created_at 오름차순)
+    최적화: 세션 소유권 확인과 메시지 조회를 한 쿼리로 통합
     """
     try:
-        logger.info(f"세션 메시지 조회 (user_id: {current_user.id}, session_id: {session_id})")
+        logger.info(f"세션 메시지 조회 (user_id: {current_user.id}, session_id: {session_id}, limit: {limit})")
 
-        # 세션 소유권 확인
-        session = db.query(models.ChatSession).filter(
-            models.ChatSession.id == session_id,
-            models.ChatSession.user_id == current_user.id
-        ).first()
-
-        if not session:
-            raise HTTPException(
-                status_code=404,
-                detail="세션을 찾을 수 없습니다."
+        # 메시지 조회 시 세션 소유권도 함께 확인 (JOIN 사용)
+        messages = (
+            db.query(models.ChatMessage)
+            .join(models.ChatSession)
+            .filter(
+                models.ChatMessage.session_id == session_id,
+                models.ChatSession.user_id == current_user.id
             )
+            .order_by(models.ChatMessage.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
 
-        # 전체 메시지 수 조회
-        total = db.query(models.ChatMessage).filter(
-            models.ChatMessage.session_id == session_id
-        ).count()
+        if not messages and offset == 0:
+            # 메시지가 없으면 세션이 없거나 권한이 없음
+            session_exists = db.query(models.ChatSession).filter(
+                models.ChatSession.id == session_id,
+                models.ChatSession.user_id == current_user.id
+            ).first()
+            if not session_exists:
+                raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
 
-        # 메시지 조회 (시간 순서대로)
-        messages = db.query(models.ChatMessage).filter(
-            models.ChatMessage.session_id == session_id
-        ).order_by(
-            models.ChatMessage.created_at.asc()
-        ).limit(limit).offset(offset).all()
+        # 최신순으로 조회했으므로 역순으로 정렬 (오래된 메시지가 먼저)
+        messages = list(reversed(messages))
+        total = len(messages)  # limit 적용된 결과 수만 반환
 
         # created_at을 문자열로 변환
         messages_data = [

@@ -42,7 +42,7 @@
   font-size: 0.95rem;
 }
 
-/* 로딩 상태 - 심플한 디자인 */
+/* 로딩 상태 - 점 애니메이션 */
 .loading-container {
   display: flex;
   align-items: center;
@@ -53,18 +53,39 @@
   font-size: 0.9rem;
 }
 
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid #4a90e2;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+.loading-dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.loading-dots span {
+  width: 6px;
+  height: 6px;
+  background: #4a90e2;
+  border-radius: 50%;
+  animation: dotBounce 1.4s infinite ease-in-out both;
+}
+
+.loading-dots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.loading-dots span:nth-child(3) {
+  animation-delay: 0s;
+}
+
+@keyframes dotBounce {
+  0%, 80%, 100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
 }
 
 /* 에러 상태 */
@@ -137,14 +158,21 @@
   border-radius: 12px;
   padding: 1.5rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
   border-left: 4px solid #4a90e2;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .session-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.session-content {
+  cursor: pointer;
+  flex: 1;
 }
 
 .session-header {
@@ -180,6 +208,24 @@
 .message-count {
   font-size: 0.9rem;
   color: #666;
+}
+
+.btn-continue-chat {
+  padding: 0.75rem 1.5rem;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.2s;
+  width: 100%;
+  text-align: center;
+}
+
+.btn-continue-chat:hover {
+  background: #357abd;
 }
 
 /* 채팅 내역 리스트 */
