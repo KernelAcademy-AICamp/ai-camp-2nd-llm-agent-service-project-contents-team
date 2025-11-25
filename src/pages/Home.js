@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import api from '../services/api';
+import ReactMarkdown from 'react-markdown';
 import './Home.css';
 
 function Home() {
@@ -7,6 +9,7 @@ function Home() {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -38,20 +41,45 @@ function Home() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const userInput = inputValue.trim();
     setInputValue('');
     setIsLoading(true);
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
+    try {
+      // AI 챗봇 API 호출
+      const response = await api.post('/api/chat', {
+        message: userInput,
+        session_id: currentSessionId,
+        history: messages.map(msg => ({
+          role: msg.type === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        }))
+      });
+
+      // 첫 메시지인 경우 세션 ID 저장
+      if (!currentSessionId && response.data.session_id) {
+        setCurrentSessionId(response.data.session_id);
+      }
+
       const aiMessage = {
         id: Date.now() + 1,
         type: 'ai',
-        content: '안녕하세요! 저는 AI 어시스턴트입니다. 어떻게 도와드릴까요?',
+        content: response.data.response,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('AI 응답 실패:', error);
+      const errorMessage = {
+        id: Date.now() + 1,
+        type: 'ai',
+        content: '죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -59,6 +87,11 @@ function Home() {
       e.preventDefault();
       handleSubmit(e);
     }
+  };
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setCurrentSessionId(null);
   };
 
   const suggestedPrompts = [
@@ -70,6 +103,13 @@ function Home() {
 
   return (
     <div className="home-page">
+      {messages.length > 0 && (
+        <div className="chat-header">
+          <button onClick={handleNewChat} className="btn-new-chat">
+            ➕ 새 채팅
+          </button>
+        </div>
+      )}
       {messages.length === 0 ? (
         <div className="home-welcome">
           <div className="welcome-header">
@@ -109,7 +149,9 @@ function Home() {
                 )}
               </div>
               <div className="message-content">
-                <div className="message-text">{message.content}</div>
+                <div className="message-text">
+                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                </div>
               </div>
             </div>
           ))}
