@@ -80,7 +80,7 @@ function ChatHistory() {
       <div className="chat-history-page">
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>채팅 내역을 불러오는 중...</p>
+          <span>불러오는 중...</span>
         </div>
       </div>
     );
@@ -156,7 +156,7 @@ function ChatHistory() {
       {messagesLoading ? (
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>메시지를 불러오는 중...</p>
+          <span>불러오는 중...</span>
         </div>
       ) : (
         <div className="chat-history-list">

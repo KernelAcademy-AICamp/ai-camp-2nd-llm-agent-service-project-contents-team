@@ -207,6 +207,7 @@ async def get_chat_sessions(
     """
     현재 로그인한 사용자의 채팅 세션 목록 조회
     최신 순으로 정렬 (updated_at 기준)
+    단일 쿼리로 최적화 (JOIN 사용)
     """
     try:
         logger.info(f"채팅 세션 목록 조회 (user_id: {current_user.id}, limit: {limit}, offset: {offset})")
@@ -216,27 +217,44 @@ async def get_chat_sessions(
             models.ChatSession.user_id == current_user.id
         ).count()
 
-        # 세션 조회 (최신순: updated_at 기준 내림차순, NULL은 맨 뒤로)
-        sessions = db.query(models.ChatSession).filter(
-            models.ChatSession.user_id == current_user.id
-        ).order_by(
-            models.ChatSession.updated_at.desc().nullslast()
-        ).limit(limit).offset(offset).all()
+        # 세션 조회와 메시지 수를 한 번에 (subquery 사용으로 N+1 문제 해결)
+        from sqlalchemy import func, select
 
-        # 각 세션의 메시지 수 조회 및 데이터 변환
-        sessions_data = []
-        for session in sessions:
-            message_count = db.query(models.ChatMessage).filter(
-                models.ChatMessage.session_id == session.id
-            ).count()
+        # 메시지 수를 계산하는 서브쿼리
+        message_count_subq = (
+            db.query(
+                models.ChatMessage.session_id,
+                func.count(models.ChatMessage.id).label('message_count')
+            )
+            .group_by(models.ChatMessage.session_id)
+            .subquery()
+        )
 
-            sessions_data.append(ChatSessionInfo(
+        # 세션과 메시지 수를 조인하여 한 번에 조회
+        sessions_with_count = (
+            db.query(
+                models.ChatSession,
+                func.coalesce(message_count_subq.c.message_count, 0).label('message_count')
+            )
+            .outerjoin(message_count_subq, models.ChatSession.id == message_count_subq.c.session_id)
+            .filter(models.ChatSession.user_id == current_user.id)
+            .order_by(models.ChatSession.updated_at.desc().nullslast())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
+
+        # 데이터 변환
+        sessions_data = [
+            ChatSessionInfo(
                 id=session.id,
                 title=session.title or "새 채팅",
                 created_at=session.created_at.isoformat() if session.created_at else "",
                 updated_at=session.updated_at.isoformat() if session.updated_at else session.created_at.isoformat(),
                 message_count=message_count
-            ))
+            )
+            for session, message_count in sessions_with_count
+        ]
 
         logger.info(f"채팅 세션 목록 조회 완료 (total: {total}, returned: {len(sessions_data)})")
 
