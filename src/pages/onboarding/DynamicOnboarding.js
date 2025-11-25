@@ -7,9 +7,12 @@ import './DynamicOnboarding.css';
 function DynamicOnboarding() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(0); // 0: SNS 질문, 1: 비즈니스 정보, 2: 스타일, 3: 완료
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // 온보딩 경로 선택
+  const [onboardingPath, setOnboardingPath] = useState(null); // 'sns_analysis' or 'manual_input'
 
   // Step 1: 비즈니스 정보
   const [businessInfo, setBusinessInfo] = useState({
@@ -33,10 +36,25 @@ function DynamicOnboarding() {
   const [aiReasoning, setAiReasoning] = useState('');
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
-  // 블로그 분석
+  // SNS 분석 (멀티 플랫폼)
+  const [platformUrls, setPlatformUrls] = useState({
+    blog: '',
+    instagram: '',
+    youtube: ''
+  });
+
+  // 블로그 분석 (기존 - 레거시)
   const [blogUrl, setBlogUrl] = useState('');
   const [blogAnalysisStatus, setBlogAnalysisStatus] = useState('idle'); // idle, analyzing, completed, failed
   const [blogAnalysisResult, setBlogAnalysisResult] = useState(null);
+
+  // 멀티 플랫폼 분석 상태
+  const [multiPlatformAnalysisStatus, setMultiPlatformAnalysisStatus] = useState('idle'); // idle, analyzing, completed, failed
+  const [multiPlatformAnalysisResult, setMultiPlatformAnalysisResult] = useState(null);
+
+  // 수동 입력 분석 상태
+  const [manualAnalysisStatus, setManualAnalysisStatus] = useState('idle'); // idle, analyzing, completed, failed
+  const [manualAnalysisResult, setManualAnalysisResult] = useState(null);
 
   // Step 2: 콘텐츠 선호도
   const [preferences, setPreferences] = useState({
@@ -47,7 +65,12 @@ function DynamicOnboarding() {
     video_duration_preference: 'short'
   });
 
-  // 파일 업로드 (드래그 앤 드롭)
+  // 파일 업로드 (드래그 앤 드롭) - 수동 입력 경로용 (여러 개)
+  const [textSamples, setTextSamples] = useState([]); // 최소 2개
+  const [imageSamples, setImageSamples] = useState([]); // 최소 2개
+  const [videoSamples, setVideoSamples] = useState([]); // 최소 2개
+
+  // 레거시 - SNS 분석 경로에서는 사용 안 함
   const [imageSample, setImageSample] = useState(null);
   const [videoSample, setVideoSample] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -174,6 +197,181 @@ function DynamicOnboarding() {
       console.error('블로그 분석 실패:', error);
       setBlogAnalysisStatus('failed');
       alert('블로그 분석 요청에 실패했습니다.');
+    }
+  };
+
+  const analyzeMultiPlatform = async () => {
+    const hasAtLeastOne = platformUrls.blog || platformUrls.instagram || platformUrls.youtube;
+    if (!hasAtLeastOne) {
+      alert('최소 1개 이상의 플랫폼 URL을 입력해주세요.');
+      return;
+    }
+
+    setMultiPlatformAnalysisStatus('analyzing');
+    setCurrentStep(2); // 분석 중 페이지로 이동
+
+    try {
+      // 분석 시작
+      const requestData = {};
+      if (platformUrls.blog) requestData.blog_url = platformUrls.blog;
+      if (platformUrls.instagram) requestData.instagram_url = platformUrls.instagram;
+      if (platformUrls.youtube) requestData.youtube_url = platformUrls.youtube;
+      requestData.max_posts = 10;
+
+      const response = await api.post('/api/brand-analysis/multi-platform', requestData);
+      console.log('멀티 플랫폼 분석 시작:', response.data);
+
+      // 분석 상태 폴링 (5초마다 체크)
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await api.get('/api/brand-analysis/status');
+          console.log('분석 상태:', statusResponse.data);
+
+          const { overall } = statusResponse.data;
+
+          // overall 데이터가 있으면 분석 완료
+          if (overall && overall.brand_tone) {
+            clearInterval(pollInterval);
+            setMultiPlatformAnalysisStatus('completed');
+            setMultiPlatformAnalysisResult(statusResponse.data);
+
+            // ✅ businessInfo 업데이트: 백엔드에서 추출한 브랜드명, 업종, 타겟 반영
+            setBusinessInfo(prev => ({
+              ...prev,
+              brand_name: overall.brand_name || prev.brand_name,
+              business_type: overall.business_type || prev.business_type,
+              target_audience: {
+                ...prev.target_audience,
+                age_range: overall.target_audience || prev.target_audience.age_range
+              }
+            }));
+
+            // 완료 페이지로 이동
+            setTimeout(() => {
+              setCurrentStep(3);
+            }, 1000);
+          }
+        } catch (error) {
+          console.error('분석 상태 확인 실패:', error);
+        }
+      }, 5000);
+
+      // 최대 5분 후 타임아웃
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (multiPlatformAnalysisStatus === 'analyzing') {
+          setMultiPlatformAnalysisStatus('failed');
+          alert('분석 시간이 초과되었습니다. 다시 시도해주세요.');
+          setCurrentStep(1); // 다시 입력 페이지로
+        }
+      }, 300000);
+
+    } catch (error) {
+      console.error('멀티 플랫폼 분석 실패:', error);
+      setMultiPlatformAnalysisStatus('failed');
+      alert('플랫폼 분석 요청에 실패했습니다: ' + (error.response?.data?.detail || error.message));
+      setCurrentStep(1); // 다시 입력 페이지로
+    }
+  };
+
+  const analyzeManualContent = async () => {
+    // 유효성 검사: 최소 1개 타입에서 2개 이상의 샘플
+    const hasValidText = textSamples.length >= 2 && textSamples.every(s => s.trim());
+    const hasValidImages = imageSamples.length >= 2;
+    const hasValidVideos = videoSamples.length >= 2;
+
+    if (!hasValidText && !hasValidImages && !hasValidVideos) {
+      alert('최소 1개 콘텐츠 타입에서 2개 이상의 샘플을 업로드해주세요.');
+      return;
+    }
+
+    // 각 타입별로 업로드된 경우 2개 미만이면 경고
+    if (textSamples.length > 0 && !hasValidText) {
+      alert('글 샘플은 최소 2개 이상 입력해주세요.');
+      return;
+    }
+    if (imageSamples.length > 0 && !hasValidImages) {
+      alert('이미지 샘플은 최소 2개 이상 업로드해주세요.');
+      return;
+    }
+    if (videoSamples.length > 0 && !hasValidVideos) {
+      alert('영상 샘플은 최소 2개 이상 업로드해주세요.');
+      return;
+    }
+
+    setManualAnalysisStatus('analyzing');
+    setIsLoading(true);
+
+    try {
+      // FormData 생성
+      const formData = new FormData();
+
+      // 텍스트 샘플 추가 (JSON 문자열로)
+      if (hasValidText) {
+        formData.append('text_samples', JSON.stringify(textSamples.filter(s => s.trim())));
+      }
+
+      // 이미지 샘플 추가
+      if (hasValidImages) {
+        imageSamples.forEach((file) => {
+          formData.append('image_files', file);
+        });
+      }
+
+      // 영상 샘플 추가
+      if (hasValidVideos) {
+        videoSamples.forEach((file) => {
+          formData.append('video_files', file);
+        });
+      }
+
+      const response = await api.post('/api/brand-analysis/manual', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      console.log('수동 콘텐츠 분석 시작:', response.data);
+
+      // 분석 상태 폴링 (5초마다 체크)
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await api.get('/api/brand-analysis/status');
+          console.log('분석 상태:', statusResponse.data);
+
+          const { overall } = statusResponse.data;
+
+          // overall 데이터가 있으면 분석 완료
+          if (overall && overall.brand_tone) {
+            clearInterval(pollInterval);
+            setManualAnalysisStatus('completed');
+            setManualAnalysisResult(statusResponse.data);
+            setIsLoading(false);
+
+            // 완료 페이지로 이동
+            setShowSuccess(true);
+            setTimeout(() => {
+              setShowSuccess(false);
+              setCurrentStep(3);
+            }, 1000);
+          }
+        } catch (error) {
+          console.error('분석 상태 확인 실패:', error);
+        }
+      }, 5000);
+
+      // 최대 5분 후 타임아웃
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (manualAnalysisStatus === 'analyzing') {
+          setManualAnalysisStatus('failed');
+          setIsLoading(false);
+          alert('분석 시간이 초과되었습니다. 다시 시도해주세요.');
+        }
+      }, 300000);
+
+    } catch (error) {
+      console.error('수동 콘텐츠 분석 실패:', error);
+      setManualAnalysisStatus('failed');
+      setIsLoading(false);
+      alert('콘텐츠 분석 요청에 실패했습니다: ' + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -431,23 +629,71 @@ function DynamicOnboarding() {
           />
         </div>
         <div className="progress-steps">
-          <div className={`step ${currentStep >= 1 ? 'active' : ''}`}>
-            <div className="step-number">1</div>
-            <div className="step-label">비즈니스</div>
-          </div>
-          <div className={`step ${currentStep >= 2 ? 'active' : ''}`}>
-            <div className="step-number">2</div>
-            <div className="step-label">스타일</div>
-          </div>
-          <div className={`step ${currentStep >= 3 ? 'active' : ''}`}>
-            <div className="step-number">3</div>
-            <div className="step-label">완료</div>
-          </div>
+          {currentStep > 0 && (
+            <>
+              <div className={`step ${currentStep >= 1 ? 'active' : ''}`}>
+                <div className="step-number">1</div>
+                <div className="step-label">{onboardingPath === 'sns_analysis' ? 'SNS 입력' : '비즈니스'}</div>
+              </div>
+              <div className={`step ${currentStep >= 2 ? 'active' : ''}`}>
+                <div className="step-number">2</div>
+                <div className="step-label">{onboardingPath === 'sns_analysis' ? '분석 중' : '스타일'}</div>
+              </div>
+              <div className={`step ${currentStep >= 3 ? 'active' : ''}`}>
+                <div className="step-number">3</div>
+                <div className="step-label">완료</div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Step 1: 비즈니스 정보 */}
-      {currentStep === 1 && (
+      {/* Step 0: SNS 여부 질문 */}
+      {currentStep === 0 && (
+        <div className="onboarding-step fade-in">
+          <h2>안녕하세요! 기존에 운영하시는 SNS가 있으신가요?</h2>
+          <p className="step-description">
+            기존 SNS가 있다면 AI가 자동으로 브랜드 특성을 분석해드립니다
+          </p>
+
+          <div className="sns-choice-container">
+            <button
+              className="choice-button yes-button"
+              onClick={() => {
+                setOnboardingPath('sns_analysis');
+                setCurrentStep(1);
+              }}
+            >
+              <div className="choice-icon">✅</div>
+              <div className="choice-title">예, 있습니다</div>
+              <div className="choice-description">
+                블로그, 인스타그램, 유튜브 등 운영 중인 SNS를 분석하여
+                <br />
+                브랜드 특성을 자동으로 파악합니다
+              </div>
+            </button>
+
+            <button
+              className="choice-button no-button"
+              onClick={() => {
+                setOnboardingPath('manual_input');
+                setCurrentStep(1);
+              }}
+            >
+              <div className="choice-icon">📝</div>
+              <div className="choice-title">아니오, 없습니다</div>
+              <div className="choice-description">
+                비즈니스 정보와 콘텐츠 샘플을 직접 입력하여
+                <br />
+                브랜드 특성을 설정합니다
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 1: 비즈니스 정보 (또는 SNS URL 입력) */}
+      {currentStep === 1 && onboardingPath === 'manual_input' && (
         <div className="onboarding-step fade-in">
           <h2>비즈니스를 알려주세요</h2>
           <p className="step-description">AI가 이 정보를 바탕으로 완벽한 콘텐츠를 만듭니다</p>
@@ -531,105 +777,29 @@ function DynamicOnboarding() {
               />
             </div>
 
-            {/* 블로그 분석 섹션 */}
-            <div className="blog-analysis-section">
-              <h3 className="section-title">📝 블로그 분석 (선택)</h3>
-              <p className="section-hint">
-                네이버 블로그 주소를 입력하시면 AI가 자동으로 브랜드 톤앤매너와 특성을 분석합니다
-              </p>
-
-              <div className="blog-url-input-group">
-                <input
-                  type="text"
-                  value={blogUrl}
-                  onChange={(e) => setBlogUrl(e.target.value)}
-                  placeholder="예: https://blog.naver.com/your_blog_id"
-                  disabled={blogAnalysisStatus === 'analyzing'}
-                />
-                <button
-                  type="button"
-                  onClick={analyzeBlog}
-                  disabled={blogAnalysisStatus === 'analyzing' || !blogUrl.trim()}
-                  className="btn-analyze"
-                >
-                  {blogAnalysisStatus === 'analyzing' ? (
-                    <>
-                      <div className="spinner-small"></div>
-                      분석 중...
-                    </>
-                  ) : (
-                    '🔍 분석하기'
-                  )}
-                </button>
-              </div>
-
-              {blogAnalysisStatus === 'analyzing' && (
-                <div className="analysis-progress">
-                  <p>블로그 포스트를 수집하고 분석하고 있습니다... (최대 2분 소요)</p>
-                </div>
-              )}
-
-              {blogAnalysisStatus === 'completed' && blogAnalysisResult && (
-                <div className="analysis-result fade-in">
-                  <h4>✅ 분석 완료!</h4>
-                  <div className="analysis-summary">
-                    <div className="analysis-item">
-                      <strong>브랜드 톤:</strong> {blogAnalysisResult.analysis?.brand_tone}
-                    </div>
-                    <div className="analysis-item">
-                      <strong>글쓰기 스타일:</strong> {blogAnalysisResult.analysis?.writing_style}
-                    </div>
-                    <div className="analysis-item">
-                      <strong>타겟 고객:</strong> {blogAnalysisResult.analysis?.target_audience}
-                    </div>
-                    <div className="analysis-item">
-                      <strong>감정적 톤:</strong> {blogAnalysisResult.analysis?.emotional_tone}
-                    </div>
-                  </div>
-                  <p className="analysis-note">
-                    💡 이 정보는 AI 콘텐츠 생성 시 자동으로 활용됩니다
-                  </p>
-                </div>
-              )}
-
-              {blogAnalysisStatus === 'failed' && (
-                <div className="analysis-error">
-                  분석에 실패했습니다. URL을 확인하고 다시 시도해주세요.
-                </div>
-              )}
-            </div>
-
             <h3 className="section-title">타겟 고객</h3>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label>연령대</label>
-                <select
-                  name="age_range"
-                  value={businessInfo.target_audience.age_range}
-                  onChange={handleTargetAudienceChange}
-                >
-                  <option value="">선택</option>
-                  <option value="10-19">10대</option>
-                  <option value="20-29">20대</option>
-                  <option value="30-39">30대</option>
-                  <option value="40-49">40대</option>
-                  <option value="50+">50대 이상</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>성별</label>
-                <select
-                  name="gender"
-                  value={businessInfo.target_audience.gender}
-                  onChange={handleTargetAudienceChange}
-                >
-                  <option value="all">전체</option>
-                  <option value="male">남성</option>
-                  <option value="female">여성</option>
-                </select>
-              </div>
+            <div className="form-group">
+              <label>타겟 고객층</label>
+              <input
+                type="text"
+                name="target_description"
+                value={businessInfo.target_audience.age_range}
+                onChange={(e) => {
+                  setBusinessInfo(prev => ({
+                    ...prev,
+                    target_audience: {
+                      ...prev.target_audience,
+                      age_range: e.target.value,
+                      gender: 'all'
+                    }
+                  }));
+                }}
+                placeholder="예: 20-30대 남성, 40-50대 여성, 30대 직장인 등"
+              />
+              <p className="input-hint">
+                자유롭게 입력하세요. 예: "20-30대 남성", "40-50대 여성", "30대 직장인"
+              </p>
             </div>
 
             {/* AI 추천 버튼 */}
@@ -714,8 +884,78 @@ function DynamicOnboarding() {
         </div>
       )}
 
-      {/* Step 2: 콘텐츠 스타일 */}
-      {currentStep === 2 && (
+      {/* Step 1: SNS URL 입력 (SNS 분석 경로) */}
+      {currentStep === 1 && onboardingPath === 'sns_analysis' && (
+        <div className="onboarding-step fade-in">
+          <h2>SNS 계정을 알려주세요</h2>
+          <p className="step-description">
+            운영 중인 플랫폼의 URL을 입력해주세요.
+            <br />
+            입력하신 플랫폼만 분석되며, 선택적으로 입력 가능합니다.
+          </p>
+
+          <div className="form-section">
+            <div className="platform-input-group">
+              <h3>📝 네이버 블로그 (선택)</h3>
+              <input
+                type="text"
+                value={platformUrls.blog}
+                onChange={(e) => setPlatformUrls(prev => ({ ...prev, blog: e.target.value }))}
+                placeholder="예: https://blog.naver.com/your_blog_id"
+                className="platform-url-input"
+              />
+              <small>블로그 URL을 입력하시면 글쓰기 스타일과 브랜드 톤을 분석합니다</small>
+            </div>
+
+            <div className="platform-input-group">
+              <h3>📸 인스타그램 (선택)</h3>
+              <input
+                type="text"
+                value={platformUrls.instagram}
+                onChange={(e) => setPlatformUrls(prev => ({ ...prev, instagram: e.target.value }))}
+                placeholder="예: https://instagram.com/your_account"
+                className="platform-url-input"
+              />
+              <small>인스타그램 URL을 입력하시면 이미지 스타일과 캡션 특성을 분석합니다</small>
+            </div>
+
+            <div className="platform-input-group">
+              <h3>🎥 유튜브 (선택)</h3>
+              <input
+                type="text"
+                value={platformUrls.youtube}
+                onChange={(e) => setPlatformUrls(prev => ({ ...prev, youtube: e.target.value }))}
+                placeholder="예: https://youtube.com/@your_channel"
+                className="platform-url-input"
+              />
+              <small>유튜브 URL을 입력하시면 영상 스타일과 콘텐츠 특성을 분석합니다</small>
+            </div>
+
+            <div className="platform-note">
+              ℹ️ 최소 1개 이상의 플랫폼 URL을 입력해주세요
+            </div>
+
+            <div className="step-actions">
+              <button
+                onClick={() => setCurrentStep(0)}
+                className="btn-secondary"
+              >
+                이전
+              </button>
+              <button
+                onClick={analyzeMultiPlatform}
+                disabled={!platformUrls.blog && !platformUrls.instagram && !platformUrls.youtube}
+                className="btn-primary"
+              >
+                분석 시작
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: 콘텐츠 스타일 (수동 입력 경로만) */}
+      {currentStep === 2 && onboardingPath === 'manual_input' && (
         <div className="onboarding-step fade-in">
           <h2>선호하는 콘텐츠 스타일</h2>
           <p className="step-description">샘플을 제공하시면 더 정확한 콘텐츠를 만들 수 있어요</p>
@@ -723,182 +963,212 @@ function DynamicOnboarding() {
           <div className="form-section">
             {/* 글 스타일 */}
             <div className="style-card">
-              <h3>📝 글 스타일</h3>
+              <h3>📝 글 스타일 (선택)</h3>
+              <p className="style-hint">
+                업로드 시 최소 2개의 글 샘플을 입력해주세요
+              </p>
 
-              <div className="form-group">
-                <label>톤앤매너</label>
-                <div className="tone-selector">
-                  {[
-                    { value: 'casual', label: '캐주얼', emoji: '😊' },
-                    { value: 'professional', label: '전문적', emoji: '💼' },
-                    { value: 'friendly', label: '친근함', emoji: '🤗' },
-                    { value: 'formal', label: '격식있음', emoji: '🎩' }
-                  ].map(tone => (
+              {textSamples.map((sample, index) => (
+                <div key={index} className="sample-item">
+                  <label>글 샘플 {index + 1}</label>
+                  <textarea
+                    value={sample}
+                    onChange={(e) => {
+                      const newSamples = [...textSamples];
+                      newSamples[index] = e.target.value;
+                      setTextSamples(newSamples);
+                    }}
+                    placeholder="예: 안녕하세요! 오늘은 건강한 디저트 레시피를 소개해드릴게요 😊"
+                    rows={4}
+                  />
+                  {textSamples.length > 0 && (
                     <button
-                      key={tone.value}
                       type="button"
-                      className={`tone-option ${preferences.text_tone === tone.value ? 'active' : ''}`}
-                      onClick={() => setPreferences(prev => ({ ...prev, text_tone: tone.value }))}
+                      className="btn-remove-sample"
+                      onClick={() => setTextSamples(textSamples.filter((_, i) => i !== index))}
                     >
-                      <span className="tone-emoji">{tone.emoji}</span>
-                      <span>{tone.label}</span>
+                      삭제
                     </button>
-                  ))}
+                  )}
                 </div>
-              </div>
+              ))}
 
-              <div className="form-group">
-                <label>선호하는 글 샘플 (선택)</label>
-                <textarea
-                  name="text_style_sample"
-                  value={preferences.text_style_sample}
-                  onChange={handlePreferenceChange}
-                  placeholder="예: 안녕하세요! 오늘은 건강한 디저트 레시피를 소개해드릴게요 😊"
-                  rows={4}
-                />
-                <small>이런 스타일의 글을 원하신다면 샘플을 입력해주세요.</small>
-              </div>
+              <button
+                type="button"
+                className="btn-add-sample"
+                onClick={() => setTextSamples([...textSamples, ''])}
+              >
+                + 글 샘플 추가
+              </button>
+
+              {textSamples.length > 0 && textSamples.length < 2 && (
+                <small className="validation-warning">
+                  최소 2개의 글 샘플이 필요합니다
+                </small>
+              )}
             </div>
 
             {/* 이미지 스타일 */}
             <div className="style-card">
-              <h3>🎨 이미지 스타일</h3>
+              <h3>🎨 이미지 스타일 (선택)</h3>
+              <p className="style-hint">
+                업로드 시 최소 2개의 이미지 샘플을 업로드해주세요
+              </p>
 
-              <div
-                className={`drag-drop-zone ${dragActive.image ? 'drag-active' : ''} ${imagePreview ? 'has-file' : ''}`}
-                onDragEnter={(e) => handleDrag(e, 'image')}
-                onDragLeave={(e) => handleDrag(e, 'image')}
-                onDragOver={(e) => handleDrag(e, 'image')}
-                onDrop={(e) => handleDrop(e, 'image')}
-                onClick={() => imageInputRef.current?.click()}
-              >
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageInputChange}
-                  style={{ display: 'none' }}
-                />
-                {imagePreview ? (
-                  <div className="file-preview">
-                    <img src={imagePreview} alt="이미지 샘플" />
+              <div className="multiple-samples-container">
+                {imageSamples.map((sample, index) => (
+                  <div key={index} className="sample-preview">
+                    <img src={URL.createObjectURL(sample)} alt={`이미지 샘플 ${index + 1}`} />
                     <button
                       type="button"
-                      className="btn-remove-file"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setImageSample(null);
-                        setImagePreview(null);
-                      }}
+                      className="btn-remove-sample-mini"
+                      onClick={() => setImageSamples(imageSamples.filter((_, i) => i !== index))}
                     >
                       ×
                     </button>
                   </div>
-                ) : (
-                  <div className="drag-drop-content">
-                    <div className="upload-icon">📸</div>
-                    <p>이미지를 드래그하거나 클릭하여 업로드</p>
-                    <small>선호하는 이미지 스타일을 보여주세요</small>
-                  </div>
-                )}
+                ))}
               </div>
 
-              <div className="form-group">
-                <label>원하는 이미지 스타일 설명</label>
-                <textarea
-                  name="image_style_description"
-                  value={preferences.image_style_description}
-                  onChange={handlePreferenceChange}
-                  placeholder="예: 밝고 화사한 느낌, 파스텔 톤"
-                  rows={3}
-                />
-              </div>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files);
+                  setImageSamples([...imageSamples, ...files]);
+                }}
+                style={{ display: 'none' }}
+              />
+
+              <button
+                type="button"
+                className="btn-upload-sample"
+                onClick={() => imageInputRef.current?.click()}
+              >
+                📸 이미지 추가
+              </button>
+
+              {imageSamples.length > 0 && imageSamples.length < 2 && (
+                <small className="validation-warning">
+                  최소 2개의 이미지 샘플이 필요합니다
+                </small>
+              )}
             </div>
 
             {/* 영상 스타일 */}
             <div className="style-card">
-              <h3>🎥 영상 스타일</h3>
+              <h3>🎥 영상 스타일 (선택)</h3>
+              <p className="style-hint">
+                업로드 시 최소 2개의 영상 샘플을 업로드해주세요
+              </p>
 
-              <div
-                className={`drag-drop-zone ${dragActive.video ? 'drag-active' : ''} ${videoPreview ? 'has-file' : ''}`}
-                onDragEnter={(e) => handleDrag(e, 'video')}
-                onDragLeave={(e) => handleDrag(e, 'video')}
-                onDragOver={(e) => handleDrag(e, 'video')}
-                onDrop={(e) => handleDrop(e, 'video')}
-                onClick={() => videoInputRef.current?.click()}
-              >
-                <input
-                  ref={videoInputRef}
-                  type="file"
-                  accept="video/*"
-                  onChange={handleVideoInputChange}
-                  style={{ display: 'none' }}
-                />
-                {videoPreview ? (
-                  <div className="file-preview">
-                    <video src={videoPreview} controls />
+              <div className="multiple-samples-container">
+                {videoSamples.map((sample, index) => (
+                  <div key={index} className="sample-preview video-preview">
+                    <video src={URL.createObjectURL(sample)} controls />
                     <button
                       type="button"
-                      className="btn-remove-file"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setVideoSample(null);
-                        setVideoPreview(null);
-                      }}
+                      className="btn-remove-sample-mini"
+                      onClick={() => setVideoSamples(videoSamples.filter((_, i) => i !== index))}
                     >
                       ×
                     </button>
                   </div>
-                ) : (
-                  <div className="drag-drop-content">
-                    <div className="upload-icon">🎬</div>
-                    <p>영상을 드래그하거나 클릭하여 업로드</p>
-                    <small>선호하는 영상 스타일을 보여주세요</small>
-                  </div>
-                )}
+                ))}
               </div>
 
-              <div className="form-group">
-                <label>원하는 영상 스타일 설명</label>
-                <textarea
-                  name="video_style_description"
-                  value={preferences.video_style_description}
-                  onChange={handlePreferenceChange}
-                  placeholder="예: 역동적이고 빠른 편집, ASMR 느낌"
-                  rows={3}
-                />
-              </div>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files);
+                  setVideoSamples([...videoSamples, ...files]);
+                }}
+                style={{ display: 'none' }}
+              />
 
-              <div className="form-group">
-                <label>선호하는 영상 길이</label>
-                <div className="duration-selector">
-                  {[
-                    { value: 'short', label: '짧음', time: '15초' },
-                    { value: 'medium', label: '보통', time: '30초' },
-                    { value: 'long', label: '길게', time: '60초+' }
-                  ].map(duration => (
-                    <button
-                      key={duration.value}
-                      type="button"
-                      className={`duration-option ${preferences.video_duration_preference === duration.value ? 'active' : ''}`}
-                      onClick={() => setPreferences(prev => ({ ...prev, video_duration_preference: duration.value }))}
-                    >
-                      <span className="duration-label">{duration.label}</span>
-                      <span className="duration-time">{duration.time}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <button
+                type="button"
+                className="btn-upload-sample"
+                onClick={() => videoInputRef.current?.click()}
+              >
+                🎬 영상 추가
+              </button>
+
+              {videoSamples.length > 0 && videoSamples.length < 2 && (
+                <small className="validation-warning">
+                  최소 2개의 영상 샘플이 필요합니다
+                </small>
+              )}
+            </div>
+
+            <div className="sample-note">
+              ℹ️ 최소 1개 콘텐츠 타입(글/이미지/영상)을 선택하여 업로드해주세요.
+              <br />
+              각 타입별로 최소 2개의 샘플이 필요합니다.
             </div>
 
             <div className="step-actions">
               <button onClick={() => setCurrentStep(1)} className="btn-secondary">
                 이전
               </button>
-              <button onClick={savePreferences} disabled={isLoading} className="btn-primary">
-                {isLoading ? '저장 중...' : '다음 단계'}
+              <button
+                onClick={analyzeManualContent}
+                disabled={isLoading}
+                className="btn-primary"
+              >
+                {isLoading ? '분석 중...' : '분석 시작'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: SNS 분석 진행 중 (SNS 분석 경로만) */}
+      {currentStep === 2 && onboardingPath === 'sns_analysis' && (
+        <div className="onboarding-step fade-in">
+          <h2>SNS 분석 중입니다...</h2>
+          <p className="step-description">
+            입력하신 플랫폼의 콘텐츠를 분석하고 있습니다.
+            <br />
+            잠시만 기다려주세요 (최대 5분 소요)
+          </p>
+
+          <div className="analysis-progress-container">
+            <div className="spinner-large"></div>
+
+            {multiPlatformAnalysisStatus === 'analyzing' && (
+              <div className="progress-message">
+                <p>🔍 플랫폼 콘텐츠 수집 중...</p>
+                <p>🤖 AI가 브랜드 특성을 분석 중...</p>
+                {platformUrls.blog && <p>📝 블로그 분석 진행 중</p>}
+                {platformUrls.instagram && <p>📸 인스타그램 분석 진행 중</p>}
+                {platformUrls.youtube && <p>🎥 유튜브 분석 진행 중</p>}
+              </div>
+            )}
+
+            {multiPlatformAnalysisStatus === 'completed' && (
+              <div className="analysis-complete fade-in">
+                <div className="completion-icon">✅</div>
+                <h3>분석 완료!</h3>
+                <p>브랜드 특성 분석이 성공적으로 완료되었습니다.</p>
+              </div>
+            )}
+
+            {multiPlatformAnalysisStatus === 'failed' && (
+              <div className="analysis-failed">
+                <div className="error-icon">❌</div>
+                <h3>분석 실패</h3>
+                <p>분석 중 오류가 발생했습니다. 다시 시도해주세요.</p>
+                <button onClick={() => setCurrentStep(1)} className="btn-secondary">
+                  다시 시도
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

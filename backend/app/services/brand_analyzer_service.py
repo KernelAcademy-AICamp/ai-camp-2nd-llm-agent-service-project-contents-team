@@ -22,7 +22,7 @@ class BrandAnalyzerService:
             raise ValueError("GEMINI_API_KEY 환경 변수가 설정되지 않았습니다")
 
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        self.model = genai.GenerativeModel('gemini-2.5-flash')
 
     async def analyze_brand(self, posts: List[Dict[str, str]], business_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -64,14 +64,17 @@ class BrandAnalyzerService:
 
 위 블로그 포스트들을 분석하여 다음 정보를 JSON 형식으로 추출해주세요:
 
-1. **전반적인 브랜드 특성** (모든 플랫폼에 공통 적용)
-2. **블로그 플랫폼 특성** (블로그만의 글쓰기 스타일)
+1. **브랜드 기본 정보** (블로그에서 추론)
+2. **전반적인 브랜드 특성** (모든 플랫폼에 공통 적용)
+3. **블로그 플랫폼 특성** (블로그만의 글쓰기 스타일)
 
 {{
   "overall": {{
+    "brand_name": "블로그에서 추론한 브랜드명 (예: '카페 블루밍', '테크 스타트업 ABC')",
+    "business_type": "업종 (예: '카페/베이커리', 'IT/소프트웨어', '패션/뷰티', '교육/강의')",
     "brand_tone": "브랜드 톤앤매너 (예: 친근하고 전문적인)",
     "brand_values": ["브랜드 가치1", "브랜드 가치2"],
-    "target_audience": "타겟 고객층 (예: 20-30대 여성)",
+    "target_audience": "타겟 고객층 - 반드시 구체적으로 (예: '20-30대 직장인 여성', '40-50대 자영업자', '10-20대 학생'). '전체', '모든 연령', '일반인' 같은 모호한 답변 금지",
     "brand_personality": "브랜드 성격 종합 설명 (2-3문장)",
     "key_themes": ["주요 주제1", "주요 주제2"],
     "emotional_tone": "감정적 톤 (예: 따뜻한, 유머러스한)"
@@ -88,7 +91,11 @@ class BrandAnalyzerService:
   }}
 }}
 
-**중요**: 반드시 위 JSON 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요.
+**중요 지침**:
+- 반드시 위 JSON 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요.
+- brand_name: 블로그에서 반복적으로 언급되는 브랜드명이나 사업체명을 찾아주세요
+- business_type: 글 내용을 바탕으로 정확한 업종을 파악해주세요
+- target_audience: 반드시 연령대나 직업군을 포함하여 구체적으로 작성하세요
 """
 
             logger.info("Gemini로 브랜드 분석 요청 중...")

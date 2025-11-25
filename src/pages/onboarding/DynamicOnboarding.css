@@ -863,4 +863,362 @@
   .summary-grid {
     grid-template-columns: 1fr;
   }
+
+  .sns-choice-container {
+    flex-direction: column;
+  }
+
+  .choice-button {
+    width: 100%;
+  }
+}
+
+/* === 새로운 온보딩 플로우 스타일 === */
+
+/* Step 0: SNS 선택 버튼 */
+.sns-choice-container {
+  display: flex;
+  gap: 30px;
+  max-width: 900px;
+  margin: 40px auto;
+  justify-content: center;
+}
+
+.choice-button {
+  flex: 1;
+  max-width: 400px;
+  padding: 40px 30px;
+  background: white;
+  border: 3px solid transparent;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.choice-button:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.yes-button:hover {
+  border-color: #4CAF50;
+}
+
+.no-button:hover {
+  border-color: #2196F3;
+}
+
+.choice-icon {
+  font-size: 60px;
+  margin-bottom: 20px;
+}
+
+.choice-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.choice-description {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+}
+
+/* Step 1: 플랫폼 URL 입력 */
+.platform-input-group {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.platform-input-group h3 {
+  color: #333;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.platform-url-input {
+  width: 100%;
+  padding: 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 15px;
+  transition: all 0.3s;
+}
+
+.platform-url-input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  outline: none;
+}
+
+.platform-input-group small {
+  display: block;
+  margin-top: 8px;
+  color: #666;
+  font-size: 13px;
+}
+
+.platform-note {
+  background: rgba(33, 150, 243, 0.1);
+  padding: 15px 20px;
+  border-radius: 10px;
+  color: #1976D2;
+  margin-top: 20px;
+  font-size: 14px;
+  border-left: 4px solid #2196F3;
+}
+
+/* Step 2: 수동 입력 - 여러 샘플 */
+.style-hint {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.sample-item {
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.sample-item label {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-weight: 600;
+}
+
+.sample-item textarea {
+  width: 100%;
+  padding: 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: inherit;
+  resize: vertical;
+  transition: all 0.3s;
+}
+
+.sample-item textarea:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  outline: none;
+}
+
+.btn-remove-sample {
+  position: absolute;
+  top: 40px;
+  right: 10px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.btn-remove-sample:hover {
+  background: #d32f2f;
+}
+
+.btn-add-sample {
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 10px;
+}
+
+.btn-add-sample:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+.multiple-samples-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.sample-preview {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.sample-preview img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.sample-preview.video-preview video {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.btn-remove-sample-mini {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(244, 67, 54, 0.9);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-remove-sample-mini:hover {
+  background: #d32f2f;
+  transform: scale(1.1);
+}
+
+.btn-upload-sample {
+  width: 100%;
+  padding: 15px;
+  background: white;
+  color: #667eea;
+  border: 2px dashed #667eea;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-upload-sample:hover {
+  background: rgba(102, 126, 234, 0.1);
+  border-color: #764ba2;
+}
+
+.validation-warning {
+  display: block;
+  margin-top: 10px;
+  color: #f44336;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sample-note {
+  background: rgba(255, 193, 7, 0.1);
+  padding: 15px 20px;
+  border-radius: 10px;
+  color: #F57C00;
+  margin-top: 30px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  border-left: 4px solid #FF9800;
+  line-height: 1.6;
+}
+
+/* 분석 진행 중 페이지 */
+.analysis-progress-container {
+  background: white;
+  border-radius: 20px;
+  padding: 60px 40px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+  margin: 40px auto;
+}
+
+.spinner-large {
+  width: 80px;
+  height: 80px;
+  border: 8px solid rgba(102, 126, 234, 0.2);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 30px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.progress-message {
+  margin-top: 30px;
+  animation: fadeIn 0.5s ease;
+}
+
+.progress-message p {
+  font-size: 16px;
+  color: #555;
+  margin: 10px 0;
+  line-height: 1.6;
+}
+
+.analysis-complete {
+  animation: fadeIn 0.5s ease;
+}
+
+.analysis-complete .completion-icon {
+  font-size: 80px;
+  margin-bottom: 20px;
+  animation: scaleIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.analysis-complete h3 {
+  font-size: 28px;
+  color: #4CAF50;
+  margin-bottom: 10px;
+}
+
+.analysis-complete p {
+  font-size: 16px;
+  color: #666;
+}
+
+.analysis-failed {
+  animation: fadeIn 0.5s ease;
+}
+
+.analysis-failed .error-icon {
+  font-size: 80px;
+  margin-bottom: 20px;
+}
+
+.analysis-failed h3 {
+  font-size: 28px;
+  color: #f44336;
+  margin-bottom: 10px;
+}
+
+.analysis-failed p {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
