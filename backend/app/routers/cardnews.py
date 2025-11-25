@@ -94,6 +94,30 @@ COLOR_THEMES = {
         "text": "#333333",
         "shadow": (0, 0, 0, 80),
         "gradient_type": "vertical"
+    },
+    "black": {
+        "primary": (0, 0, 0),
+        "secondary": (30, 30, 30),
+        "accent": (50, 50, 50),
+        "text": "white",
+        "shadow": (0, 0, 0, 0),
+        "gradient_type": "vertical"
+    },
+    "blue": {
+        "primary": (0, 26, 255),
+        "secondary": (0, 26, 255),
+        "accent": (0, 26, 255),
+        "text": "white",
+        "shadow": (0, 0, 0, 0),
+        "gradient_type": "vertical"
+    },
+    "orange": {
+        "primary": (255, 94, 0),
+        "secondary": (255, 94, 0),
+        "accent": (255, 94, 0),
+        "text": "white",
+        "shadow": (0, 0, 0, 0),
+        "gradient_type": "vertical"
     }
 }
 
@@ -121,35 +145,39 @@ class FontManager:
     FONTS = {
         "rounded_bold": {
             "name": "NotoSansKR-Bold.ttf",
-            "url": "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Bold.ttf"
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf"
+        },
+        "rounded_medium": {
+            "name": "NotoSansKR-Medium.ttf",
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Medium.otf"
         },
         "rounded_regular": {
             "name": "NotoSansKR-Regular.ttf",
-            "url": "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR-Regular.ttf"
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf"
         },
         "sharp_bold": {
             "name": "BlackHanSans-Regular.ttf",
-            "url": "https://github.com/google/fonts/raw/main/ofl/blackhansans/BlackHanSans-Regular.ttf"
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Black.otf"
         },
         "sharp_regular": {
             "name": "NanumGothic-Regular.ttf",
-            "url": "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf"
         },
         "modern_bold": {
-            "name": "NanumSquare-Bold.ttf",
-            "url": "https://github.com/google/fonts/raw/main/ofl/nanumsquare/NanumSquare-Bold.ttf"
+            "name": "NanumSquareRound-Bold.ttf",
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf"
         },
         "modern_regular": {
-            "name": "NanumSquare-Regular.ttf",
-            "url": "https://github.com/google/fonts/raw/main/ofl/nanumsquare/NanumSquare-Regular.ttf"
+            "name": "NanumSquareRound-Regular.ttf",
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf"
         },
         "cute_bold": {
-            "name": "SunflowerBold.ttf",
-            "url": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Bold.ttf"
+            "name": "Sunflower-Bold.ttf",
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf"
         },
         "cute_regular": {
-            "name": "SunflowerMedium.ttf",
-            "url": "https://github.com/google/fonts/raw/main/ofl/sunflower/Sunflower-Medium.ttf"
+            "name": "Sunflower-Medium.ttf",
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Medium.otf"
         }
     }
 
@@ -172,17 +200,42 @@ class FontManager:
             return None
 
     @classmethod
-    def get_font(cls, font_style: str, font_size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-        """폰트 가져오기"""
-        # 폰트 키 결정
-        font_map = {
-            "rounded": "rounded_bold" if bold else "rounded_regular",
-            "sharp": "sharp_bold" if bold else "sharp_regular",
-            "modern": "modern_bold" if bold else "modern_regular",
-            "cute": "cute_bold" if bold else "cute_regular"
-        }
+    def get_font(cls, font_style: str, font_size: int, weight: str = "light") -> ImageFont.FreeTypeFont:
+        """폰트 가져오기
 
-        font_key = font_map.get(font_style, "rounded_bold" if bold else "rounded_regular")
+        Args:
+            font_style: 폰트 스타일 (rounded, sharp, modern, cute)
+            font_size: 폰트 크기
+            weight: 폰트 굵기 (light, medium, bold)
+        """
+        # weight에 따라 폰트 키 결정
+        # light: regular 폰트 (얇게)
+        # medium: medium 폰트 (중간)
+        # bold: bold 폰트 (굵게)
+
+        if weight == "bold":
+            font_map = {
+                "rounded": "rounded_bold",
+                "sharp": "sharp_bold",
+                "modern": "modern_bold",
+                "cute": "cute_bold"
+            }
+        elif weight == "medium":
+            font_map = {
+                "rounded": "rounded_medium",
+                "sharp": "sharp_regular",  # sharp는 medium이 없어서 regular 사용
+                "modern": "modern_regular",  # modern은 medium이 없어서 regular 사용
+                "cute": "cute_regular"
+            }
+        else:  # light
+            font_map = {
+                "rounded": "rounded_regular",
+                "sharp": "sharp_regular",
+                "modern": "modern_regular",
+                "cute": "cute_regular"
+            }
+
+        font_key = font_map.get(font_style, "rounded_regular")
 
         # 폰트 다운로드
         font_info = cls.FONTS[font_key]
@@ -351,11 +404,12 @@ class TextRenderer:
 class CardNewsBuilder:
     """카드뉴스 이미지 생성"""
 
-    def __init__(self, theme: dict, font_style: str, purpose: str, layout_type: str = "bottom"):
+    def __init__(self, theme: dict, font_style: str, purpose: str, layout_type: str = "bottom", font_weight: str = "light"):
         self.theme = theme
         self.font_style = font_style
         self.purpose = purpose
         self.layout_type = layout_type  # top, center, bottom
+        self.font_weight = font_weight  # light, medium, bold
         self.badge_text = BADGE_TEXT_MAP.get(purpose, '정보')
 
     def prepare_background(self, background_image: Image.Image) -> Image.Image:
@@ -373,63 +427,59 @@ class CardNewsBuilder:
 
         return img
 
-    def add_badge(self, image: Image.Image):
-        """배지 추가"""
-        draw = ImageDraw.Draw(image)
+    def add_logo(self, image: Image.Image):
+        """로고 배지 추가"""
+        import os
 
-        # 배지 위치 및 크기
-        badge_x, badge_y = 50, 50
-        badge_width, badge_height = 180, 70
+        # 로고 파일 경로
+        logo_path = os.path.join(os.path.dirname(__file__), "../../../public/logo192.png")
 
-        # 배지 배경
-        draw.rectangle(
-            [(badge_x, badge_y), (badge_x + badge_width, badge_y + badge_height)],
-            fill=self.theme["accent"]
-        )
+        # 프로젝트 루트 기준 경로도 시도
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(os.path.dirname(__file__), "../../../../public/logo192.png")
 
-        # 배지 하단 라인
-        draw.rectangle(
-            [(badge_x, badge_y + badge_height), (badge_x + badge_width, badge_y + badge_height + 5)],
-            fill=(255, 255, 255)
-        )
+        if not os.path.exists(logo_path):
+            # 절대 경로로 시도
+            logo_path = "/Users/ohhwayoung/Desktop/ai-content/ai-camp-2nd-llm-agent-service-project-contents-team/public/logo192.png"
 
-        # 배지 텍스트
-        font = FontManager.get_font(self.font_style, 32, bold=True)
-        TextRenderer.draw_text_with_shadow(
-            image,
-            self.badge_text,
-            (badge_x + 20, badge_y + 20),
-            font,
-            color="white",
-            max_width=badge_width - 40,
-            shadow=False,
-            align="center"
-        )
+        try:
+            # 로고 이미지 로드
+            logo = Image.open(logo_path).convert("RGBA")
+
+            # 로고 크기 조정 (60x60)
+            logo_size = 60
+            logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+
+            # 로고 위치 (상단 가운데)
+            logo_x = (CARD_WIDTH - logo_size) // 2
+            logo_y = 40
+
+            # 로고 붙이기 (투명도 유지)
+            image.paste(logo, (logo_x, logo_y), logo)
+        except Exception as e:
+            print(f"로고 로드 실패: {e}")
 
     def add_content(self, image: Image.Image, title: str, description: str, page_num: int = 1):
-        """콘텐츠 텍스트 추가 (레이아웃 템플릿 적용)"""
+        """콘텐츠 텍스트 추가 (위치 선택 가능)"""
 
-        title_font = FontManager.get_font(self.font_style, 80, bold=True)
-        desc_font = FontManager.get_font(self.font_style, 40, bold=False)
+        # 폰트 사이즈 축소
+        title_font = FontManager.get_font(self.font_style, 48, weight=self.font_weight)
+        desc_font = FontManager.get_font(self.font_style, 28, weight=self.font_weight)
 
-        # 레이아웃에 따른 위치 설정
+        # 위치에 따른 Y 좌표 설정
         if self.layout_type == "top":
-            # 상단 배치
-            title_y = 200
-            desc_y = 320
-            align = "left"
-        elif self.layout_type == "center":
-            # 중앙 배치
-            title_y = CARD_HEIGHT // 2 - 80
-            desc_y = CARD_HEIGHT // 2 + 20
-            align = "center"
-        else:  # bottom (기본)
-            # 하단 배치
-            title_y = CARD_HEIGHT - 280
-            desc_y = CARD_HEIGHT - 160
-            align = "left"
+            title_y = 150
+            desc_y = 220
+        elif self.layout_type == "bottom":
+            title_y = CARD_HEIGHT - 250
+            desc_y = CARD_HEIGHT - 180
+        else:  # center (기본값)
+            title_y = CARD_HEIGHT // 2 - 30
+            desc_y = CARD_HEIGHT // 2 + 40
 
-        # 제목
+        align = "center"
+
+        # 제목 (중앙 정렬)
         TextRenderer.draw_text_with_shadow(
             image,
             title,
@@ -437,13 +487,12 @@ class CardNewsBuilder:
             title_font,
             color=self.theme["text"],
             max_width=CARD_WIDTH - 160,
-            shadow=True,
-            shadow_color=self.theme["shadow"],
+            shadow=False,
             align=align,
-            line_spacing=15
+            line_spacing=12
         )
 
-        # 설명
+        # 설명 (중앙 정렬)
         if description:
             TextRenderer.draw_text_with_shadow(
                 image,
@@ -452,10 +501,9 @@ class CardNewsBuilder:
                 desc_font,
                 color=self.theme["text"],
                 max_width=CARD_WIDTH - 160,
-                shadow=True,
-                shadow_color=self.theme["shadow"],
+                shadow=False,
                 align=align,
-                line_spacing=10
+                line_spacing=8
             )
 
     def build_card(
@@ -469,8 +517,8 @@ class CardNewsBuilder:
         # 배경 준비
         card = self.prepare_background(background_image)
 
-        # 배지 추가
-        self.add_badge(card)
+        # 로고 추가
+        self.add_logo(card)
 
         # 콘텐츠 추가
         self.add_content(card, title, description, page_num)
@@ -638,7 +686,8 @@ async def generate_agentic_cardnews_stream(
     fontStyle: str = Form(default="rounded"),
     colorTheme: str = Form(default="warm"),
     generateImages: bool = Form(default=True),
-    layoutType: str = Form(default="bottom")
+    layoutType: str = Form(default="bottom"),
+    fontWeight: str = Form(default="light")
 ):
     """
     AI Agentic 방식으로 카드뉴스 자동 생성 (스트리밍)
@@ -717,7 +766,7 @@ async def generate_agentic_cardnews_stream(
             yield f"data: {json.dumps({'type': 'status', 'message': '📰 최종 카드뉴스를 조립하고 있습니다...'})}\n\n"
 
             theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
-            builder = CardNewsBuilder(theme, fontStyle, purpose, layoutType)
+            builder = CardNewsBuilder(theme, fontStyle, purpose, layoutType, fontWeight)
 
             for i, (page, bg_image_data) in enumerate(zip(pages, background_images)):
                 # 배경 이미지 로드
@@ -728,8 +777,8 @@ async def generate_agentic_cardnews_stream(
                     response = requests.get(bg_image_data, timeout=30)
                     bg_image = Image.open(io.BytesIO(response.content))
 
-                # 카드 생성
-                card = builder.build_card(bg_image, page['title'], page['content'], i + 1)
+                # 카드 생성 (사용자 프롬프트만 표시, AI 생성 title/content 제거)
+                card = builder.build_card(bg_image, prompt, "", i + 1)
 
                 # Base64 변환
                 buffer = io.BytesIO()
@@ -853,11 +902,11 @@ async def generate_agentic_cardnews(
                 response = requests.get(bg_image_data, timeout=30)
                 bg_image = Image.open(io.BytesIO(response.content))
 
-            # 카드 생성
+            # 카드 생성 (사용자 프롬프트만 표시, AI 생성 title/content 제거)
             card = builder.build_card(
                 bg_image,
-                page['title'],
-                page['content'],
+                prompt,
+                "",
                 i + 1
             )
 
@@ -942,49 +991,12 @@ async def generate_background_image_with_gemini(prompt: str) -> str:
 
 
 def create_fallback_background(color_theme: str) -> str:
-    """폴백용 그라데이션 배경 생성 (향상된 버전)"""
+    """폴백용 단색 배경 생성"""
     theme = COLOR_THEMES.get(color_theme, COLOR_THEMES["warm"])
 
-    # 그라데이션 배경 생성
-    img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT))
-    draw = ImageDraw.Draw(img)
-
+    # 단색 배경 생성 (그라데이션 제거)
     primary = theme["primary"]
-    secondary = theme["secondary"]
-    gradient_type = theme.get("gradient_type", "vertical")
-
-    if gradient_type == "vertical":
-        # 세로 그라데이션
-        for y in range(CARD_HEIGHT):
-            ratio = y / CARD_HEIGHT
-            r = int(primary[0] * (1 - ratio) + secondary[0] * ratio)
-            g = int(primary[1] * (1 - ratio) + secondary[1] * ratio)
-            b = int(primary[2] * (1 - ratio) + secondary[2] * ratio)
-            draw.line([(0, y), (CARD_WIDTH, y)], fill=(r, g, b))
-
-    elif gradient_type == "diagonal":
-        # 대각선 그라데이션
-        for y in range(CARD_HEIGHT):
-            for x in range(CARD_WIDTH):
-                ratio = (x + y) / (CARD_WIDTH + CARD_HEIGHT)
-                r = int(primary[0] * (1 - ratio) + secondary[0] * ratio)
-                g = int(primary[1] * (1 - ratio) + secondary[1] * ratio)
-                b = int(primary[2] * (1 - ratio) + secondary[2] * ratio)
-                draw.point((x, y), fill=(r, g, b))
-
-    elif gradient_type == "radial":
-        # 방사형 그라데이션
-        center_x, center_y = CARD_WIDTH // 2, CARD_HEIGHT // 2
-        max_distance = ((CARD_WIDTH / 2) ** 2 + (CARD_HEIGHT / 2) ** 2) ** 0.5
-
-        for y in range(CARD_HEIGHT):
-            for x in range(CARD_WIDTH):
-                distance = ((x - center_x) ** 2 + (y - center_y) ** 2) ** 0.5
-                ratio = min(distance / max_distance, 1.0)
-                r = int(primary[0] * (1 - ratio) + secondary[0] * ratio)
-                g = int(primary[1] * (1 - ratio) + secondary[1] * ratio)
-                b = int(primary[2] * (1 - ratio) + secondary[2] * ratio)
-                draw.point((x, y), fill=(r, g, b))
+    img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color=primary)
 
     # Base64 변환
     buffer = io.BytesIO()
