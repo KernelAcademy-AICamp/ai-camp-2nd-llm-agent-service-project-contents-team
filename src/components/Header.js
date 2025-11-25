@@ -44,10 +44,16 @@ function Header() {
     { path: '/settings', icon: '⚙️', label: '설정' },
   ];
 
+  const handleHomeClick = () => {
+    navigate('/home');
+  };
+
   return (
     <header className="header">
       <div className="header-content">
-        <h1 className="header-title">콘텐츠 크리에이터</h1>
+        <h1 className="header-title" onClick={handleHomeClick} style={{ cursor: 'pointer' }}>
+          콘텐츠 크리에이터
+        </h1>
         <div className="header-actions">
           <button className="btn-notification">
             <span className="notification-icon">🔔</span>

@@ -28,6 +28,13 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
   margin: 0;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.header-title:hover {
+  opacity: 0.8;
+  transform: scale(1.02);
 }
 
 .header-actions {

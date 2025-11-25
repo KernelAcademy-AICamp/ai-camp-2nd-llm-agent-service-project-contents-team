@@ -5,6 +5,9 @@ import os
 import base64
 from typing import Optional
 import google.generativeai as genai
+from ..logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(
     prefix="/api",
@@ -46,7 +49,7 @@ Transform this into an optimized Stable Diffusion prompt with style, lighting, q
         response = model.generate_content(optimization_prompt)
         return response.text.strip()
     except Exception as e:
-        print(f"Gemini 프롬프트 최적화 실패: {e}")
+        logger.warning(f"Gemini 프롬프트 최적화 실패: {e}")
         return user_prompt
 
 
@@ -68,13 +71,13 @@ async def generate_image(request: ImageGenerateRequest):
 
         # Whisk AI (Pollinations - 무료, API 키 불필요)
         if request.model == "whisk":
-            print(f"✨ Whisk AI (Pollinations)로 창의적인 이미지 생성 중...")
-            print(f"📝 받은 프롬프트: {request.prompt}")
+            logger.info(f"Whisk AI 이미지 생성 시작")
+            logger.debug(f"프롬프트: {request.prompt}")
 
             # URL 인코딩된 프롬프트
             import urllib.parse
             encoded_prompt = urllib.parse.quote(request.prompt)
-            print(f"🔗 인코딩된 프롬프트: {encoded_prompt}")
+            logger.debug(f"인코딩된 프롬프트: {encoded_prompt}")
 
             # Pollinations AI는 GET 요청으로 이미지를 직접 반환합니다
             # enhance=false로 설정하여 사용자의 정확한 프롬프트를 사용합니다
@@ -93,7 +96,7 @@ async def generate_image(request: ImageGenerateRequest):
             image_data = base64.b64encode(response.content).decode('utf-8')
             image_url = f"data:image/png;base64,{image_data}"
             used_whisk_api = True
-            print("✅ Whisk AI (Pollinations) 이미지 생성 완료!")
+            logger.info("Whisk AI 이미지 생성 완료")
 
         # Nanovana (Gemini 2.5 Flash Image with Thinking)
         elif request.model == "nanovana":
@@ -106,9 +109,9 @@ async def generate_image(request: ImageGenerateRequest):
 
             # 레퍼런스 이미지가 있는지 확인
             if request.referenceImage:
-                print("🍌 나노바나나(Gemini 2.5 Flash Image - Image-to-Image)로 이미지 생성 중...")
-                print(f"📝 받은 프롬프트: {request.prompt}")
-                print(f"🖼️  레퍼런스 이미지 사용")
+                logger.info("Nanovana (Gemini 2.5 Flash) Image-to-Image 생성 시작")
+                logger.debug(f"프롬프트: {request.prompt}")
+                logger.debug("레퍼런스 이미지 사용")
 
                 # Base64에서 data:image/...;base64, 접두사 제거
                 image_data = request.referenceImage
@@ -132,8 +135,8 @@ async def generate_image(request: ImageGenerateRequest):
                     }]
                 }
             else:
-                print("🍌 나노바나나(Gemini 2.5 Flash Image - Text-to-Image)로 이미지 생성 중...")
-                print(f"📝 받은 프롬프트: {request.prompt}")
+                logger.info("Nanovana (Gemini 2.5 Flash) Text-to-Image 생성 시작")
+                logger.debug(f"프롬프트: {request.prompt}")
 
                 # 텍스트만 사용
                 request_body = {
@@ -160,18 +163,18 @@ async def generate_image(request: ImageGenerateRequest):
             data = response.json()
 
             # 디버깅: API 응답 구조 확인
-            print(f"📊 Gemini API 응답 구조: {list(data.keys())}")
+            logger.debug(f"Gemini API 응답 구조: {list(data.keys())}")
             if data.get("candidates"):
-                print(f"📊 Candidates 수: {len(data['candidates'])}")
+                logger.debug(f"Candidates 수: {len(data['candidates'])}")
                 if len(data["candidates"]) > 0:
                     candidate = data["candidates"][0]
-                    print(f"📊 첫 번째 candidate 키: {list(candidate.keys())}")
+                    logger.debug(f"첫 번째 candidate 키: {list(candidate.keys())}")
                     if candidate.get("content"):
-                        print(f"📊 Content 키: {list(candidate['content'].keys())}")
+                        logger.debug(f"Content 키: {list(candidate['content'].keys())}")
                         if candidate["content"].get("parts"):
-                            print(f"📊 Parts 수: {len(candidate['content']['parts'])}")
+                            logger.debug(f"Parts 수: {len(candidate['content']['parts'])}")
                             for i, part in enumerate(candidate["content"]["parts"]):
-                                print(f"📊 Part {i} 키: {list(part.keys())}")
+                                logger.debug(f"Part {i} 키: {list(part.keys())}")
 
             # 응답에서 이미지 추출
             if data.get("candidates") and len(data["candidates"]) > 0:
@@ -187,20 +190,20 @@ async def generate_image(request: ImageGenerateRequest):
                             break
 
                 if not image_url:
-                    print(f"Gemini API 응답: {data}")
+                    logger.error(f"Gemini API 응답: {data}")
                     raise HTTPException(
                         status_code=500,
                         detail="Gemini API로부터 이미지를 추출하지 못했습니다."
                     )
             else:
-                print(f"Gemini API 응답: {data}")
+                logger.error(f"Gemini API 응답: {data}")
                 raise HTTPException(
                     status_code=500,
                     detail="Gemini API로부터 유효한 응답을 받지 못했습니다."
                 )
 
             used_nanovana_api = True
-            print("✅ 나노바나나 이미지 생성 완료!")
+            logger.info("Nanovana 이미지 생성 완료")
 
         # Gemini + Stable Diffusion 2.1
         elif request.model == "gemini":
@@ -216,8 +219,8 @@ async def generate_image(request: ImageGenerateRequest):
                 optimized_prompt = await optimize_prompt_with_gemini(request.prompt)
                 used_claude_optimization = True
 
-            print(f"🎨 Stable Diffusion 2.1로 이미지 생성 중...")
-            print(f"프롬프트: {optimized_prompt}")
+            logger.info("Stable Diffusion 2.1 이미지 생성 시작")
+            logger.debug(f"프롬프트: {optimized_prompt}")
 
             async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
@@ -248,7 +251,7 @@ async def generate_image(request: ImageGenerateRequest):
             # 이미지를 base64로 인코딩
             image_data = base64.b64encode(response.content).decode('utf-8')
             image_url = f"data:image/png;base64,{image_data}"
-            print("✅ Stable Diffusion 이미지 생성 완료!")
+            logger.info("Stable Diffusion 이미지 생성 완료")
 
         else:
             raise HTTPException(
@@ -268,12 +271,13 @@ async def generate_image(request: ImageGenerateRequest):
     except HTTPException:
         raise
     except httpx.TimeoutException:
+        logger.error("이미지 생성 요청 시간 초과")
         raise HTTPException(
             status_code=504,
             detail="요청 시간이 초과되었습니다."
         )
     except Exception as e:
-        print(f"이미지 생성 실패: {e}")
+        logger.error(f"이미지 생성 실패: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"이미지 생성 중 오류가 발생했습니다: {str(e)}"

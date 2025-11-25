@@ -16,6 +16,7 @@ import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
 import VideoCreator from './pages/content/VideoCreator';
 import MyPage from './pages/profile/MyPage';
+import ChatHistory from './pages/ChatHistory';
 import './App.css';
 
 function App() {
@@ -142,6 +143,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <MyPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chat-history"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ChatHistory />
                 </Layout>
               </ProtectedRoute>
             }
