@@ -14,6 +14,7 @@ import Templates from './pages/content/Templates';
 import Analytics from './pages/analytics/Analytics';
 import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
+import ImageStudio from './pages/content/ImageStudio';
 import VideoCreator from './pages/content/VideoCreator';
 import MyPage from './pages/profile/MyPage';
 import './App.css';
@@ -76,6 +77,16 @@ function App() {
             }
           />
               
+          <Route
+            path="/image-studio"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ImageStudio />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/cardnews"
             element={
