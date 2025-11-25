@@ -36,13 +36,6 @@ function Header() {
     setShowDropdown(false);
   };
 
-  const menuItems = [
-    { path: '/contents', icon: '📝', label: '콘텐츠 관리' },
-    { path: '/templates', icon: '📋', label: '템플릿' },
-    { path: '/analytics', icon: '📈', label: '분석' },
-    { path: '/mypage', icon: '👤', label: '마이페이지' },
-    { path: '/settings', icon: '⚙️', label: '설정' },
-  ];
 
   const handleHomeClick = () => {
     navigate('/home');
@@ -78,17 +71,6 @@ function Header() {
                     <p className="user-info-link">마이페이지 보기</p>
                   </div>
                 </button>
-                <div className="dropdown-divider"></div>
-                {menuItems.filter(item => item.path !== '/mypage').map((item) => (
-                  <button
-                    key={item.path}
-                    onClick={() => handleMenuClick(item.path)}
-                    className="dropdown-item menu-item"
-                  >
-                    <span className="dropdown-icon">{item.icon}</span>
-                    <span>{item.label}</span>
-                  </button>
-                ))}
                 <div className="dropdown-divider"></div>
                 <button onClick={handleLogout} className="dropdown-item logout-btn">
                   <span className="dropdown-icon">🚪</span>

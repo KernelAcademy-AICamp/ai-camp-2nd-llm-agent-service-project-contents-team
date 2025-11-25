@@ -1,50 +1,7 @@
-.image-generator {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
+/* AI 이미지 생성 페이지 고유 스타일 */
+/* 공통 스타일은 ContentCommon.css 참조 */
 
-.page-header {
-  margin-bottom: 32px;
-}
-
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.page-description {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.image-generator-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-
-/* 폼 섹션 */
-.form-section {
-  background: var(--bg-primary);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-}
-
-.section {
-  margin-bottom: 24px;
-}
-
-.section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-}
-
+/* 모델 선택 */
 .model-select {
   width: 100%;
   padding: 12px;
@@ -193,156 +150,7 @@
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
-/* 생성 버튼 */
-.btn-generate {
-  width: 100%;
-  padding: 14px 24px;
-  background: var(--gradient-accent);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.2s;
-}
-
-.btn-generate:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-}
-
-.btn-generate:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* 안내 박스 */
-.info-box {
-  margin-top: 24px;
-  padding: 20px;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
-  border-left: 4px solid var(--primary-color);
-}
-
-.info-box h4 {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 12px 0;
-}
-
-.info-box ul {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.info-box li {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.8;
-}
-
-/* 결과 섹션 */
-.result-section {
-  background: var(--bg-primary);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.result-container {
-  width: 100%;
-  animation: fadeIn 0.4s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.result-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid var(--border-color);
-}
-
-.result-header h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.result-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.btn-download,
-.btn-reset {
-  padding: 10px 20px;
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-download {
-  background: var(--primary-color);
-  color: white;
-}
-
-.btn-download:hover {
-  background: var(--primary-hover);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.btn-reset {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.btn-reset:hover {
-  background: var(--bg-tertiary);
-}
-
+/* 생성된 이미지 */
 .generated-image-wrapper {
   display: flex;
   justify-content: center;
@@ -356,63 +164,346 @@
   box-shadow: var(--shadow-lg);
 }
 
-.placeholder-result {
+/* 반응형 */
+@media (max-width: 768px) {
+  .mode-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================================
+   카드뉴스 탭 고유 스타일
+   ======================================== */
+
+.cardnews-content {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.cardnews-header-info {
+  margin-bottom: 24px;
+}
+
+.cardnews-header-info p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
+}
+
+.agentic-mode-badge {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* 스타일 선택 섹션 */
+.style-section {
+  margin-bottom: 24px;
+}
+
+.style-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.section-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.style-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.style-group {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.style-group h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
+}
+
+.style-buttons {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  color: var(--text-secondary);
+  gap: 8px;
 }
 
-.placeholder-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
+.style-btn {
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.placeholder-result p {
+.style-btn:hover {
+  border-color: var(--primary-color);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.style-btn.active {
+  border-color: var(--primary-color);
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--primary-color);
+}
+
+.btn-hint {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 24px 0;
+}
+
+/* 입력 섹션 */
+.input-section {
+  margin-bottom: 24px;
+}
+
+.input-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.cardnews-input {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
   font-size: 14px;
+  font-family: inherit;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  resize: vertical;
+  min-height: 150px;
+  transition: all 0.2s;
+}
+
+.cardnews-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* 생성 섹션 */
+.generate-section {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.cardnews-generate {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-size: 17px;
+  padding: 16px 32px;
+}
+
+.generating-status {
+  margin-top: 16px;
+  font-size: 15px;
+  color: #FF8B5A;
+  font-weight: 600;
+}
+
+/* AI 분석 결과 */
+.analysis-result {
+  background: #f0f8ff;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+}
+
+.analysis-result h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+}
+
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.analysis-item {
+  padding: 12px 16px;
+  background: white;
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.pages-info {
+  margin-top: 16px;
+}
+
+.pages-info h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
+}
+
+.page-info-item {
+  padding: 12px 16px;
+  background: white;
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  font-size: 14px;
+}
+
+.page-content {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* 카드 결과 */
+.cards-result {
+  margin-top: 24px;
+}
+
+.cards-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.cards-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
   margin: 0;
 }
 
-/* 반응형 */
-@media (max-width: 1024px) {
-  .image-generator-content {
-    grid-template-columns: 1fr;
-  }
+.btn-download-all {
+  padding: 10px 20px;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
 
-  .result-section {
-    min-height: 400px;
+.btn-download-all:hover {
+  background: var(--primary-hover);
+  transform: translateY(-2px);
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.card-item {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.card-item:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-item.generating {
+  opacity: 0.8;
+}
+
+.card-image {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.card-label {
+  text-align: center;
+  padding: 12px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.btn-card-download {
+  width: 100%;
+  padding: 12px;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-card-download:hover {
+  background: var(--primary-hover);
+}
+
+/* 카드뉴스 반응형 */
+@media (max-width: 1024px) {
+  .style-options {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 768px) {
-  .image-generator {
+  .cardnews-content {
     padding: 16px;
   }
 
-  .page-header h1 {
-    font-size: 24px;
-  }
-
-  .mode-buttons {
+  .analysis-grid {
     grid-template-columns: 1fr;
   }
 
-  .result-header {
+  .cards-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
 
-  .result-actions {
+  .btn-download-all {
     width: 100%;
-    flex-direction: column;
   }
 
-  .btn-download,
-  .btn-reset {
-    width: 100%;
+  .cards-grid {
+    grid-template-columns: 1fr;
   }
 }

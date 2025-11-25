@@ -1,26 +1,5 @@
-.ai-content-generator {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
-}
-
-.page-header {
-  margin-bottom: 32px;
-}
-
-.page-header h1 {
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 8px 0;
-}
-
-.page-description {
-  font-size: 16px;
-  color: var(--text-tertiary);
-  margin: 0;
-  line-height: 1.5;
-}
+/* AI 글 생성 페이지 고유 스타일 */
+/* 공통 스타일은 ContentCommon.css 참조 */
 
 /* 진행 상태 배너 */
 .progress-banner {
@@ -32,17 +11,6 @@
   animation: slideDown 0.3s ease-out;
 }
 
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .progress-content {
   display: flex;
   align-items: center;
@@ -52,15 +20,6 @@
 .progress-icon {
   font-size: 32px;
   animation: bounce 1s ease-in-out infinite;
-}
-
-@keyframes bounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
 }
 
 .progress-text {
@@ -88,12 +47,6 @@
   animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* 콘텐츠 영역 */
 .generator-content {
   margin-bottom: 40px;
@@ -108,10 +61,10 @@
 }
 
 .feature-info h3 {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 24px 0;
+  margin: 0 0 20px 0;
   text-align: center;
 }
 
@@ -141,33 +94,21 @@
 }
 
 .feature-card h4 {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 8px 0;
 }
 
 .feature-card p {
-  font-size: 14px;
-  color: var(--text-tertiary);
+  font-size: 13px;
+  color: var(--text-secondary);
   line-height: 1.6;
   margin: 0;
 }
 
 /* 반응형 */
 @media (max-width: 768px) {
-  .ai-content-generator {
-    padding: 16px;
-  }
-
-  .page-header h1 {
-    font-size: 24px;
-  }
-
-  .page-description {
-    font-size: 14px;
-  }
-
   .progress-banner {
     padding: 16px;
   }

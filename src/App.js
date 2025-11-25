@@ -12,11 +12,9 @@ import ContentList from './pages/content/ContentList';
 import Templates from './pages/content/Templates';
 import Analytics from './pages/analytics/Analytics';
 import Settings from './pages/settings/Settings';
-import CardNews from './pages/content/CardNews';
 import VideoCreator from './pages/content/VideoCreator';
 import MyPage from './pages/profile/MyPage';
 import AIContentGenerator from './pages/content/AIContentGenerator';
-import VideoScript from './pages/content/VideoScript';
 import ImageGenerator from './pages/content/ImageGenerator';
 import './App.css';
 
@@ -78,31 +76,11 @@ function App() {
             }
           />
           <Route
-            path="/video-script"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <VideoScript />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/image"
             element={
               <ProtectedRoute>
                 <Layout>
                   <ImageGenerator />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cardnews"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <CardNews />
                 </Layout>
               </ProtectedRoute>
             }

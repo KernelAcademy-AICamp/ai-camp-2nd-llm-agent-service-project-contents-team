@@ -14,10 +14,15 @@ function Sidebar() {
 
   const contentMenuItems = [
     { path: '/ai-content', icon: '🤖', label: 'AI 글 생성' },
-    { path: '/video-script', icon: '🎥', label: '비디오 스크립트' },
     { path: '/image', icon: '🎨', label: 'AI 이미지 생성' },
-    { path: '/cardnews', icon: '📰', label: '카드뉴스 생성' },
     { path: '/video', icon: '🎬', label: 'AI 동영상 생성' },
+  ];
+
+  const managementMenuItems = [
+    { path: '/contents', icon: '📝', label: '콘텐츠 관리' },
+    { path: '/templates', icon: '📋', label: '템플릿' },
+    { path: '/analytics', icon: '📈', label: '분석' },
+    { path: '/settings', icon: '⚙️', label: '설정' },
   ];
 
   const isContentMenuActive = contentMenuItems.some(item =>
@@ -80,6 +85,19 @@ function Sidebar() {
             </div>
           )}
         </div>
+
+        {/* 관리 메뉴 */}
+        <div className="sidebar-divider"></div>
+        {managementMenuItems.map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
+          >
+            <span className="sidebar-icon">{item.icon}</span>
+            <span className="sidebar-label">{item.label}</span>
+          </Link>
+        ))}
       </nav>
     </aside>
   );
