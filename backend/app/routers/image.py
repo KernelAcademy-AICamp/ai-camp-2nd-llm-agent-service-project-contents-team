@@ -71,9 +71,28 @@ async def generate_image(request: ImageGenerateRequest):
             print(f"✨ Whisk AI (Pollinations)로 창의적인 이미지 생성 중...")
             print(f"📝 받은 프롬프트: {request.prompt}")
 
+            # 한글 프롬프트를 영어로 번역 (Gemini 사용)
+            translated_prompt = request.prompt
+            google_api_key = os.getenv('REACT_APP_GEMINI_API_KEY')
+            if google_api_key:
+                try:
+                    # 한글이 포함되어 있는지 확인
+                    import re
+                    if re.search(r'[가-힣]', request.prompt):
+                        print("🌐 한글 프롬프트 감지 - 영어로 번역 중...")
+                        genai.configure(api_key=google_api_key)
+                        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                        translation_response = model.generate_content(
+                            f"Translate this Korean text to English for an image generation prompt. Only return the English translation, nothing else:\n\n{request.prompt}"
+                        )
+                        translated_prompt = translation_response.text.strip()
+                        print(f"🌐 번역된 프롬프트: {translated_prompt}")
+                except Exception as e:
+                    print(f"번역 실패 (원본 프롬프트 사용): {e}")
+
             # URL 인코딩된 프롬프트
             import urllib.parse
-            encoded_prompt = urllib.parse.quote(request.prompt)
+            encoded_prompt = urllib.parse.quote(translated_prompt)
             print(f"🔗 인코딩된 프롬프트: {encoded_prompt}")
 
             # Pollinations AI는 GET 요청으로 이미지를 직접 반환합니다
