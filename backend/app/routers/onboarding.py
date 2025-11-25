@@ -40,6 +40,47 @@ async def update_business_info(
     if onboarding_data.target_audience is not None:
         current_user.target_audience = onboarding_data.target_audience
 
+    # ✅ BrandAnalysis 테이블도 함께 업데이트
+    brand_analysis = db.query(models.BrandAnalysis).filter(
+        models.BrandAnalysis.user_id == current_user.id
+    ).first()
+
+    if brand_analysis:
+        # 기존 레코드 업데이트
+        if onboarding_data.brand_name is not None:
+            brand_analysis.brand_name = onboarding_data.brand_name
+        if onboarding_data.business_type is not None:
+            # business_type을 업종명으로 변환 (예: 'food' -> '베이커리 / 카페')
+            business_type_map = {
+                'food': '음식 / 카페',
+                'tech': 'IT / 기술',
+                'fashion': '패션 / 뷰티',
+                'education': '교육',
+                'health': '건강 / 의료'
+            }
+            brand_analysis.business_type = business_type_map.get(
+                onboarding_data.business_type,
+                onboarding_data.business_type
+            )
+    else:
+        # 새 레코드 생성
+        business_type_map = {
+            'food': '음식 / 카페',
+            'tech': 'IT / 기술',
+            'fashion': '패션 / 뷰티',
+            'education': '교육',
+            'health': '건강 / 의료'
+        }
+        brand_analysis = models.BrandAnalysis(
+            user_id=current_user.id,
+            brand_name=onboarding_data.brand_name,
+            business_type=business_type_map.get(
+                onboarding_data.business_type,
+                onboarding_data.business_type
+            ) if onboarding_data.business_type else None
+        )
+        db.add(brand_analysis)
+
     db.commit()
     db.refresh(current_user)
 
@@ -203,6 +244,47 @@ async def complete_onboarding(
     온보딩 완료 처리
     """
     current_user.onboarding_completed = True
+
+    # ✅ BrandAnalysis 테이블 생성 또는 업데이트
+    brand_analysis = db.query(models.BrandAnalysis).filter(
+        models.BrandAnalysis.user_id == current_user.id
+    ).first()
+
+    if not brand_analysis:
+        # BrandAnalysis 레코드가 없으면 생성하고 users 테이블 정보 복사
+        business_type_map = {
+            'food': '음식 / 카페',
+            'tech': 'IT / 기술',
+            'fashion': '패션 / 뷰티',
+            'education': '교육',
+            'health': '건강 / 의료'
+        }
+        brand_analysis = models.BrandAnalysis(
+            user_id=current_user.id,
+            brand_name=current_user.brand_name,
+            business_type=business_type_map.get(
+                current_user.business_type,
+                current_user.business_type
+            ) if current_user.business_type else None
+        )
+        db.add(brand_analysis)
+    else:
+        # 기존 레코드가 있지만 brand_name이나 business_type이 None이면 users 테이블에서 복사
+        if not brand_analysis.brand_name and current_user.brand_name:
+            brand_analysis.brand_name = current_user.brand_name
+        if not brand_analysis.business_type and current_user.business_type:
+            business_type_map = {
+                'food': '음식 / 카페',
+                'tech': 'IT / 기술',
+                'fashion': '패션 / 뷰티',
+                'education': '교육',
+                'health': '건강 / 의료'
+            }
+            brand_analysis.business_type = business_type_map.get(
+                current_user.business_type,
+                current_user.business_type
+            )
+
     db.commit()
     db.refresh(current_user)
 

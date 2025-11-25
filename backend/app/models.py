@@ -171,6 +171,8 @@ class BrandAnalysis(Base):
 
     # ===== 전반적인 브랜드 요소 (Overall Brand Elements) =====
     # 모든 플랫폼에 공통으로 적용되는 브랜드 특성
+    brand_name = Column(String, nullable=True)  # 블로그에서 추론한 브랜드명
+    business_type = Column(String, nullable=True)  # 업종 (예: 카페/베이커리, IT/소프트웨어)
     brand_tone = Column(String, nullable=True)  # 브랜드 톤앤매너 (예: 친근하고 전문적인)
     brand_values = Column(JSON, nullable=True)  # 브랜드 가치 ["진정성", "혁신"]
     target_audience = Column(String, nullable=True)  # 타겟 고객층 (예: 20-30대 여성)
