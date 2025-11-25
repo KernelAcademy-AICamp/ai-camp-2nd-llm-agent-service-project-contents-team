@@ -1,51 +1,97 @@
 import React, { useState } from 'react';
 import './CardNews.css'; // 별도의 CSS 파일이 있다고 가정
 
+const MAX_IMAGES = 5;
+
 function CardNews() {
-  const [titles, setTitles] = useState(['']);
   const [generatedCards, setGeneratedCards] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingStatus, setGeneratingStatus] = useState('');
-  const [previewCards, setPreviewCards] = useState([]);
-
-  // AI Agentic 모드 상태
-  const [agenticAnalysis, setAgenticAnalysis] = useState(null);
-  const [pagePlans, setPagePlans] = useState([]);
 
   // 스타일 옵션
   const [colorTheme, setColorTheme] = useState('black'); // 'black' | 'blue' | 'orange'
   const [layoutStyle, setLayoutStyle] = useState('center'); // 'top' | 'center' | 'bottom'
   const [fontWeight, setFontWeight] = useState('bold'); // 'light' | 'medium' | 'bold'
 
-  const handleTitleChange = (index, value) => {
-    const newTitles = [...titles];
-    newTitles[index] = value;
-    setTitles(newTitles);
+  // 이미지 업로드 (최대 5개)
+  const [uploadedImages, setUploadedImages] = useState([]);
+  const [customTexts, setCustomTexts] = useState([]);
+
+  // 이미지 업로드 핸들러 (최대 5개 제한)
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    const remainingSlots = MAX_IMAGES - uploadedImages.length;
+
+    if (remainingSlots <= 0) {
+      alert(`최대 ${MAX_IMAGES}개의 이미지만 업로드할 수 있습니다.`);
+      return;
+    }
+
+    const filesToAdd = files.slice(0, remainingSlots);
+
+    if (files.length > remainingSlots) {
+      alert(`최대 ${MAX_IMAGES}개까지만 업로드 가능합니다. ${filesToAdd.length}개만 추가됩니다.`);
+    }
+
+    filesToAdd.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setUploadedImages(prev => {
+          if (prev.length >= MAX_IMAGES) return prev;
+          return [...prev, {
+            file: file,
+            preview: event.target.result,
+            name: file.name
+          }];
+        });
+        setCustomTexts(prev => [...prev, '']);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // input 초기화 (같은 파일 다시 선택 가능하도록)
+    e.target.value = '';
   };
 
-  // AI Agentic 모드로 카드뉴스 생성 (스트리밍)
-  const handleGenerateAgenticCardNews = async () => {
-    if (titles[0].trim().length < 10) {
-      alert('카드뉴스로 만들고 싶은 내용을 최소 10자 이상 입력해주세요.');
+  // 업로드된 이미지 삭제
+  const handleRemoveImage = (index) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
+    setCustomTexts(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // 커스텀 텍스트 변경
+  const handleCustomTextChange = (index, value) => {
+    const newTexts = [...customTexts];
+    newTexts[index] = value;
+    setCustomTexts(newTexts);
+  };
+
+  // 카드뉴스 생성
+  const handleGenerateCards = async () => {
+    if (uploadedImages.length === 0) {
+      alert('이미지를 먼저 업로드해주세요.');
       return;
     }
 
     setIsGenerating(true);
     setGeneratedCards([]);
-    setPreviewCards([]);
-    setAgenticAnalysis(null);
-    setPagePlans([]);
-    setGeneratingStatus('🤖 AI 작업 시작...');
+    setGeneratingStatus('🖼️ 카드뉴스 생성 중...');
 
     try {
       const formData = new FormData();
-      formData.append('prompt', titles[0]);
+
+      // 이미지 파일들 추가
+      uploadedImages.forEach((img) => {
+        formData.append('images', img.file);
+      });
+
+      // 텍스트 배열 추가
+      formData.append('texts', JSON.stringify(customTexts));
       formData.append('colorTheme', colorTheme);
       formData.append('fontWeight', fontWeight);
       formData.append('layoutType', layoutStyle);
-      formData.append('generateImages', 'true');
 
-      const response = await fetch('/api/generate-agentic-cardnews-stream', {
+      const response = await fetch('/api/generate-custom-cardnews', {
         method: 'POST',
         body: formData,
       });
@@ -54,79 +100,20 @@ function CardNews() {
         throw new Error(`서버 오류: HTTP ${response.status}`);
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      const cards = [];
+      const result = await response.json();
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-
-          const raw = line.slice(6).trim();
-          if (!(raw.startsWith('{') && raw.endsWith('}'))) continue;
-
-          let data;
-          try {
-            data = JSON.parse(raw);
-          } catch (err) {
-            console.error('JSON 파싱 실패:', err);
-            continue;
-          }
-
-          // 상태 메시지
-          if (data.type === 'status') {
-            setGeneratingStatus(data.message);
-          }
-
-          // 페이지 기획
-          else if (data.type === 'page_planned') {
-            setPagePlans(prev => [...prev, { page: data.page, title: data.title, content: data.content }]);
-          }
-
-          // 카드 생성 완료
-          else if (data.type === 'card') {
-            cards.push(data.card);
-            setPreviewCards([...cards]);
-          }
-
-          // 완료
-          else if (data.type === 'complete') {
-            setGeneratedCards(cards);
-            setAgenticAnalysis({
-              pageCount: data.count,
-              targetAudience: data.target_audience,
-              tone: data.tone,
-              qualityScore: data.quality_score,
-              pagesInfo: pagePlans
-            });
-            setGeneratingStatus('');
-
-            alert(`✅ ${data.count}장의 AI 카드뉴스가 생성되었습니다!\n\n` +
-                  `📊 품질 점수: ${data.quality_score ? data.quality_score.toFixed(1) : 'N/A'}/10\n` +
-                  `🎯 타겟: ${data.target_audience || 'N/A'}\n` +
-                  `🎨 톤: ${data.tone || 'N/A'}`);
-          }
-
-          // 오류
-          else if (data.type === 'error') {
-            throw new Error(data.message);
-          }
-        }
+      if (result.success) {
+        setGeneratedCards(result.cards);
+        alert(`✅ ${result.cards.length}장의 카드뉴스가 생성되었습니다!`);
+      } else {
+        throw new Error(result.error || '카드 생성 실패');
       }
     } catch (error) {
-      console.error('AI 카드뉴스 생성 오류:', error);
-      alert(`AI 카드뉴스 생성 중 오류가 발생했습니다:\n${error.message}`);
-      setGeneratingStatus('');
+      console.error('카드뉴스 생성 오류:', error);
+      alert(`카드뉴스 생성 중 오류가 발생했습니다:\n${error.message}`);
     } finally {
       setIsGenerating(false);
+      setGeneratingStatus('');
     }
   };
 
@@ -141,25 +128,15 @@ function CardNews() {
     generatedCards.forEach((card, index) => {
       setTimeout(() => {
         handleDownloadCard(card, index);
-      }, index * 200); // 각 다운로드 사이 200ms 지연
+      }, index * 200);
     });
   };
 
   return (
     <div className="cardnews-page">
       <div className="cardnews-header">
-        <h2>📰 AI 카드뉴스 생성기</h2>
-        <p>🤖 AI가 프롬프트만으로 자동으로 페이지별 내용을 구성하고 카드뉴스를 생성합니다</p>
-
-        {/* AI Agentic 모드 안내 */}
-        <div style={{ marginTop: '20px', padding: '15px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '8px', color: 'white' }}>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
-            🚀 AI Agentic 모드
-          </div>
-          <p style={{ fontSize: '14px', margin: 0, opacity: 0.95 }}>
-            ✅ AI가 페이지 수, 제목, 내용, 이미지를 모두 자동으로 생성합니다
-          </p>
-        </div>
+        <h2>📰 카드뉴스 생성기</h2>
+        <p>🖼️ 이미지를 업로드하고 텍스트를 추가하여 카드뉴스를 만드세요 (최대 {MAX_IMAGES}장)</p>
       </div>
 
       <div className="cardnews-content">
@@ -254,37 +231,149 @@ function CardNews() {
             </div>
           </div>
         </div>
-        
+
         <hr/>
 
-        {/* 2. 내용 입력 섹션 */}
+        {/* 2. 이미지 업로드 섹션 */}
         <div className="upload-section">
-          <h3>2. 카드뉴스 내용 입력</h3>
+          <h3>2. 이미지 업로드 및 텍스트 입력</h3>
           <p className="section-desc">
-            🤖 간단한 프롬프트만 입력하세요. AI가 페이지별 제목, 내용, 이미지를 모두 자동으로 생성합니다
+            🖼️ 카드뉴스로 만들 이미지를 업로드하세요. 각 이미지에 텍스트를 추가할 수 있습니다. (최대 {MAX_IMAGES}장)
           </p>
-          <div className="uploaded-images">
-            <div className="image-list">
-              <div className="image-item">
-                <div className="image-info">
-                  <textarea
-                    placeholder="예시:
-• 새로운 카페 오픈 홍보
-• 여름 세일 50% 할인 이벤트
-• 딸기 시즌 신메뉴 3종 출시
-• 강남역 필라테스 개업 50% 할인
 
-프롬프트가 구체적일수록 더 좋은 결과가 나옵니다!"
-                    value={titles[0]}
-                    onChange={(e) => handleTitleChange(0, e.target.value)}
-                    className="title-input-small"
-                    rows="6"
-                    style={{ resize: 'vertical', minHeight: '150px' }}
-                  />
-                </div>
+          {/* 이미지 업로드 버튼 */}
+          <div style={{ marginBottom: '20px' }}>
+            <label
+              htmlFor="image-upload"
+              style={{
+                display: 'inline-block',
+                padding: '15px 30px',
+                background: uploadedImages.length >= MAX_IMAGES
+                  ? '#ccc'
+                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                borderRadius: '8px',
+                cursor: uploadedImages.length >= MAX_IMAGES ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold'
+              }}
+            >
+              📁 이미지 선택하기 ({uploadedImages.length}/{MAX_IMAGES})
+            </label>
+            <input
+              id="image-upload"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleImageUpload}
+              disabled={uploadedImages.length >= MAX_IMAGES}
+              style={{ display: 'none' }}
+            />
+            <span style={{ marginLeft: '15px', color: '#666' }}>
+              여러 이미지를 한 번에 선택할 수 있습니다
+            </span>
+          </div>
+
+          {/* 업로드된 이미지 목록 */}
+          {uploadedImages.length > 0 && (
+            <div style={{ marginTop: '20px' }}>
+              <h4>업로드된 이미지 ({uploadedImages.length}/{MAX_IMAGES}장)</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px', marginTop: '15px' }}>
+                {uploadedImages.map((img, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      border: '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '15px',
+                      background: '#fafafa'
+                    }}
+                  >
+                    <div style={{ position: 'relative' }}>
+                      <img
+                        src={img.preview}
+                        alt={`Upload ${index + 1}`}
+                        style={{
+                          width: '100%',
+                          height: '200px',
+                          objectFit: 'cover',
+                          borderRadius: '8px'
+                        }}
+                      />
+                      <button
+                        onClick={() => handleRemoveImage(index)}
+                        style={{
+                          position: 'absolute',
+                          top: '10px',
+                          right: '10px',
+                          background: 'rgba(255,0,0,0.8)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '30px',
+                          height: '30px',
+                          cursor: 'pointer',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        X
+                      </button>
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: '10px',
+                          left: '10px',
+                          background: 'rgba(0,0,0,0.7)',
+                          color: 'white',
+                          padding: '5px 10px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        카드 {index + 1}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: '10px' }}>
+                      <label style={{ fontWeight: 'bold', fontSize: '14px' }}>
+                        텍스트 입력:
+                      </label>
+                      <textarea
+                        placeholder="이미지에 추가할 텍스트를 입력하세요..."
+                        value={customTexts[index] || ''}
+                        onChange={(e) => handleCustomTextChange(index, e.target.value)}
+                        style={{
+                          width: '100%',
+                          marginTop: '8px',
+                          padding: '10px',
+                          borderRadius: '8px',
+                          border: '1px solid #ddd',
+                          resize: 'vertical',
+                          minHeight: '80px',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
+
+          {/* 이미지가 없을 때 안내 메시지 */}
+          {uploadedImages.length === 0 && (
+            <div style={{
+              padding: '40px',
+              textAlign: 'center',
+              background: '#f5f5f5',
+              borderRadius: '8px',
+              color: '#666',
+              marginTop: '20px'
+            }}>
+              <p style={{ fontSize: '48px', margin: '0 0 10px 0' }}>🖼️</p>
+              <p>이미지를 업로드해주세요</p>
+              <p style={{ fontSize: '14px', color: '#999' }}>최대 {MAX_IMAGES}장까지 업로드 가능합니다</p>
+            </div>
+          )}
         </div>
 
         <hr/>
@@ -292,15 +381,17 @@ function CardNews() {
         {/* 생성 버튼 */}
         <div className="generate-section">
           <button
-            onClick={handleGenerateAgenticCardNews}
-            disabled={isGenerating || titles[0].trim().length < 10}
+            onClick={handleGenerateCards}
+            disabled={isGenerating || uploadedImages.length === 0}
             className="btn-generate"
             style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: uploadedImages.length === 0
+                ? '#ccc'
+                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               fontSize: '18px'
             }}
           >
-            {isGenerating ? '🔄 AI가 열심히 생성 중...' : '🚀 AI가 자동으로 카드뉴스 생성하기'}
+            {isGenerating ? '🔄 카드뉴스 생성 중...' : `🎨 카드뉴스 생성하기 (${uploadedImages.length}장)`}
           </button>
           {generatingStatus && (
             <p className="generating-status" style={{ marginTop: '20px', fontSize: '16px', color: '#FF8B5A', fontWeight: 'bold' }}>
@@ -310,59 +401,6 @@ function CardNews() {
         </div>
 
         <hr/>
-
-        {/* AI 분석 결과 표시 */}
-        {agenticAnalysis && !isGenerating && (
-          <div className="result-section" style={{ background: '#f0f8ff', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
-            <h3>📊 AI 분석 결과</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginTop: '15px' }}>
-              <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                <strong>📄 생성된 페이지 수:</strong> {agenticAnalysis.pageCount}장
-              </div>
-              <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                <strong>⭐ 품질 점수:</strong> {agenticAnalysis.qualityScore ? `${agenticAnalysis.qualityScore.toFixed(1)}/10` : 'N/A'}
-              </div>
-              <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                <strong>🎯 타겟 청중:</strong> {agenticAnalysis.targetAudience || 'N/A'}
-              </div>
-              <div style={{ padding: '15px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                <strong>🎨 톤앤매너:</strong> {agenticAnalysis.tone || 'N/A'}
-              </div>
-            </div>
-            {agenticAnalysis.pagesInfo && agenticAnalysis.pagesInfo.length > 0 && (
-              <div style={{ marginTop: '20px' }}>
-                <h4>📝 페이지 구성</h4>
-                <div style={{ marginTop: '10px' }}>
-                  {agenticAnalysis.pagesInfo.map((page, index) => (
-                    <div key={index} style={{ padding: '10px', background: 'white', borderRadius: '8px', marginBottom: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-                      <strong>페이지 {page.page}:</strong> {page.title}
-                      <br />
-                      <span style={{ color: '#666', fontSize: '14px' }}>{page.content}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 생성 중 미리보기 */}
-        {isGenerating && previewCards.length > 0 && (
-          <div className="result-section">
-            <div className="result-header">
-              <h3>생성 중 미리보기</h3>
-            </div>
-            <div className="cards-grid">
-              {previewCards.map((card, index) => (
-                <div key={index} className="card-item generating">
-                  {/* Base64 이미지 데이터 사용 */}
-                  <img src={card} alt={`Preview Card ${index + 1}`} className="card-image" /> 
-                  <p style={{ textAlign: 'center', marginTop: '10px' }}>카드 {index + 1}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* 생성된 카드뉴스 결과 */}
         {!isGenerating && generatedCards.length > 0 && (

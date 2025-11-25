@@ -1002,3 +1002,91 @@ def create_fallback_background(color_theme: str) -> str:
     buffer = io.BytesIO()
     img.save(buffer, format="PNG")
     return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+
+
+# ==================== 커스텀 이미지 + 텍스트 카드뉴스 생성 ====================
+
+@router.post("/generate-custom-cardnews")
+async def generate_custom_cardnews(
+    images: List[UploadFile] = File(...),
+    texts: str = Form(...),
+    colorTheme: str = Form(default="black"),
+    fontWeight: str = Form(default="bold"),
+    layoutType: str = Form(default="center")
+):
+    """
+    사용자가 업로드한 이미지에 텍스트를 추가하여 카드뉴스 생성
+
+    Args:
+        images: 업로드된 이미지 파일들
+        texts: JSON 배열 형태의 텍스트 목록 (각 이미지에 추가할 텍스트)
+        colorTheme: 색상 테마 (텍스트 색상에 영향)
+        fontWeight: 폰트 굵기 (light/medium/bold)
+        layoutType: 텍스트 위치 (top/center/bottom)
+    """
+    try:
+        print("\n" + "="*80)
+        print("🖼️ 커스텀 이미지 카드뉴스 생성 시작")
+        print(f"📸 업로드된 이미지 수: {len(images)}")
+        print("="*80 + "\n")
+
+        # 텍스트 파싱
+        text_list = json.loads(texts)
+
+        if not images or len(images) == 0:
+            raise HTTPException(status_code=400, detail="최소 1개 이상의 이미지가 필요합니다.")
+
+        # 테마 선택
+        theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["black"])
+
+        # 카드 빌더 생성 (purpose는 'info'로 기본값)
+        builder = CardNewsBuilder(theme, "rounded", "info", layoutType, fontWeight)
+
+        final_cards = []
+
+        for i, image_file in enumerate(images):
+            print(f"  🎨 카드 {i+1}/{len(images)} 처리 중...")
+
+            # 이미지 로드
+            image_data = await image_file.read()
+            original_image = Image.open(io.BytesIO(image_data))
+
+            # 해당 인덱스의 텍스트 가져오기 (없으면 빈 문자열)
+            card_text = text_list[i] if i < len(text_list) else ""
+
+            # 카드 생성 (텍스트 추가)
+            card = builder.build_card(
+                original_image,
+                card_text,  # 제목으로 사용
+                "",  # 설명은 비워둠
+                i + 1
+            )
+
+            # Base64 변환
+            buffer = io.BytesIO()
+            card.save(buffer, format="PNG")
+            card_base64 = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+            final_cards.append(card_base64)
+
+            print(f"  ✅ 카드 {i+1} 완성")
+
+        print("\n" + "="*80)
+        print(f"✅ {len(final_cards)}장의 커스텀 카드뉴스 생성 완료!")
+        print("="*80 + "\n")
+
+        return {
+            "success": True,
+            "cards": final_cards,
+            "count": len(final_cards)
+        }
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"텍스트 형식이 올바르지 않습니다: {str(e)}")
+    except Exception as e:
+        print(f"\n❌ 커스텀 카드뉴스 생성 실패: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"카드뉴스 생성 중 오류: {str(e)}"
+        )
