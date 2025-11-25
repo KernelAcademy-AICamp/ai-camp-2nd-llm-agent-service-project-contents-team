@@ -209,19 +209,18 @@
 }
 
 .welcome-avatar {
-  width: 80px;
-  height: 80px;
-  margin: 0 auto 24px;
-  background: var(--gradient-secondary);
-  border-radius: var(--radius-full);
+  width: 180px;
+  height: auto;
+  margin: 0 auto 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow-xl);
 }
 
-.avatar-icon {
-  font-size: 48px;
+.avatar-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .welcome-title {
@@ -335,9 +334,15 @@
   background: var(--gradient-secondary);
 }
 
-.user-icon,
-.ai-icon {
+.user-icon {
   display: block;
+}
+
+.ai-logo-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
 }
 
 .message-content {

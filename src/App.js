@@ -8,7 +8,6 @@ import OAuthCallback from './pages/auth/OAuthCallback';
 import DynamicOnboarding from './pages/onboarding/DynamicOnboarding';
 import Home from './pages/Home';
 import Dashboard from './pages/dashboard/Dashboard';
-import ContentCreator from './pages/content/ContentCreator';
 import ContentList from './pages/content/ContentList';
 import Templates from './pages/content/Templates';
 import Analytics from './pages/analytics/Analytics';
@@ -16,7 +15,9 @@ import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
 import VideoCreator from './pages/content/VideoCreator';
 import MyPage from './pages/profile/MyPage';
-import ChatHistory from './pages/ChatHistory';
+import AIContentGenerator from './pages/content/AIContentGenerator';
+import VideoScript from './pages/content/VideoScript';
+import ImageGenerator from './pages/content/ImageGenerator';
 import './App.css';
 
 function App() {
@@ -67,16 +68,35 @@ function App() {
             }
           />
           <Route
-            path="/create"
+            path="/ai-content"
             element={
               <ProtectedRoute>
                 <Layout>
-                  <ContentCreator />
+                  <AIContentGenerator />
                 </Layout>
               </ProtectedRoute>
             }
           />
-              
+          <Route
+            path="/video-script"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <VideoScript />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/image"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ImageGenerator />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/cardnews"
             element={
@@ -143,16 +163,6 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <MyPage />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/chat-history"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <ChatHistory />
                 </Layout>
               </ProtectedRoute>
             }

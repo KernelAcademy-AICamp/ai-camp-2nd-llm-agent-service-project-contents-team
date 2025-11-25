@@ -40,11 +40,11 @@ yarn-error.log*
 /backend/ENV
 
 # Python cache
-/backend/__pycache__
-/backend/*.pyc
-/backend/*.py[cod]
-/backend/*$py.class
-/backend/*.so
+__pycache__/
+*.pyc
+*.py[cod]
+*$py.class
+*.so
 
 # Database
 /backend/*.db
@@ -57,6 +57,14 @@ yarn-error.log*
 /backend/*.egg-info/
 /backend/.Python
 
+# Logs
+/backend/logs/
+*.log
+
+# Backup files
+*.backup
+*~
+
 # ==============================================
 # IDEs
 # ==============================================
@@ -65,7 +73,6 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
-*~
 
 # ==============================================
 # OS

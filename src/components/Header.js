@@ -51,9 +51,9 @@ function Header() {
   return (
     <header className="header">
       <div className="header-content">
-        <h1 className="header-title" onClick={handleHomeClick} style={{ cursor: 'pointer' }}>
-          콘텐츠 크리에이터
-        </h1>
+        <div className="header-logo" onClick={handleHomeClick} style={{ cursor: 'pointer' }}>
+          <img src="/ddukddak_colored.png" alt="콘텐츠 크리에이터" />
+        </div>
         <div className="header-actions">
           <button className="btn-notification">
             <span className="notification-icon">🔔</span>
