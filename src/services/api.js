@@ -89,4 +89,175 @@ export const imageAPI = {
   },
 };
 
+// ==========================================
+// YouTube API
+// ==========================================
+export const youtubeAPI = {
+  // 연동 상태 확인
+  getStatus: async () => {
+    const response = await api.get('/api/youtube/status');
+    return response.data;
+  },
+
+  // 연동 해제
+  disconnect: async () => {
+    const response = await api.delete('/api/youtube/disconnect');
+    return response.data;
+  },
+
+  // 채널 정보 새로고침
+  refreshChannel: async () => {
+    const response = await api.post('/api/youtube/refresh-channel');
+    return response.data;
+  },
+
+  // 동영상 목록 조회
+  getVideos: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/youtube/videos?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 동영상 동기화
+  syncVideos: async () => {
+    const response = await api.post('/api/youtube/videos/sync');
+    return response.data;
+  },
+
+  // 동영상 상세 조회
+  getVideoDetail: async (videoId) => {
+    const response = await api.get(`/api/youtube/videos/${videoId}`);
+    return response.data;
+  },
+
+  // 동영상 업로드
+  uploadVideo: async (formData) => {
+    const response = await api.post('/api/youtube/videos/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 600000, // 10분 타임아웃
+    });
+    return response.data;
+  },
+
+  // 동영상 수정
+  updateVideo: async (videoId, data) => {
+    const response = await api.put(`/api/youtube/videos/${videoId}`, data);
+    return response.data;
+  },
+
+  // 동영상 삭제
+  deleteVideo: async (videoId) => {
+    const response = await api.delete(`/api/youtube/videos/${videoId}`);
+    return response.data;
+  },
+
+  // 채널 분석 데이터
+  getChannelAnalytics: async (startDate, endDate) => {
+    const response = await api.get(`/api/youtube/analytics/channel?start_date=${startDate}&end_date=${endDate}`);
+    return response.data;
+  },
+
+  // 동영상 분석 데이터
+  getVideoAnalytics: async (videoId, startDate, endDate) => {
+    const response = await api.get(`/api/youtube/analytics/video/${videoId}?start_date=${startDate}&end_date=${endDate}`);
+    return response.data;
+  },
+
+  // 트래픽 소스
+  getTrafficSources: async (startDate, endDate, videoId = null) => {
+    let url = `/api/youtube/analytics/traffic?start_date=${startDate}&end_date=${endDate}`;
+    if (videoId) url += `&video_id=${videoId}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  // 인구통계
+  getDemographics: async (startDate, endDate) => {
+    const response = await api.get(`/api/youtube/analytics/demographics?start_date=${startDate}&end_date=${endDate}`);
+    return response.data;
+  },
+
+  // 인기 동영상
+  getTopVideos: async (startDate, endDate, maxResults = 10) => {
+    const response = await api.get(`/api/youtube/analytics/top-videos?start_date=${startDate}&end_date=${endDate}&max_results=${maxResults}`);
+    return response.data;
+  },
+
+  // 분석 요약 (최근 30일)
+  getAnalyticsSummary: async () => {
+    const response = await api.get('/api/youtube/analytics/summary');
+    return response.data;
+  },
+};
+
+// ==========================================
+// Facebook API
+// ==========================================
+export const facebookAPI = {
+  // 연동 상태 확인
+  getStatus: async () => {
+    const response = await api.get('/api/facebook/status');
+    return response.data;
+  },
+
+  // 연동 해제
+  disconnect: async () => {
+    const response = await api.delete('/api/facebook/disconnect');
+    return response.data;
+  },
+
+  // 관리하는 페이지 목록
+  getPages: async () => {
+    const response = await api.get('/api/facebook/pages');
+    return response.data;
+  },
+
+  // 페이지 선택
+  selectPage: async (pageId) => {
+    const response = await api.post(`/api/facebook/select-page/${pageId}`);
+    return response.data;
+  },
+
+  // 페이지 정보 새로고침
+  refreshPage: async () => {
+    const response = await api.post('/api/facebook/refresh-page');
+    return response.data;
+  },
+
+  // 게시물 목록 조회
+  getPosts: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/facebook/posts?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 게시물 동기화
+  syncPosts: async () => {
+    const response = await api.post('/api/facebook/posts/sync');
+    return response.data;
+  },
+
+  // 게시물 작성
+  createPost: async (data) => {
+    const response = await api.post('/api/facebook/posts/create', data);
+    return response.data;
+  },
+
+  // 사진 게시물 작성
+  createPhotoPost: async (data) => {
+    const response = await api.post('/api/facebook/posts/create-photo', data);
+    return response.data;
+  },
+
+  // 게시물 삭제
+  deletePost: async (postId) => {
+    const response = await api.delete(`/api/facebook/posts/${postId}`);
+    return response.data;
+  },
+
+  // 페이지 인사이트
+  getInsights: async (period = 'day', datePreset = 'last_30d') => {
+    const response = await api.get(`/api/facebook/insights?period=${period}&date_preset=${datePreset}`);
+    return response.data;
+  },
+};
+
 export default api;
