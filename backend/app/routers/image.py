@@ -1,11 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 import httpx
 import os
 import base64
 from typing import Optional
 import google.generativeai as genai
 from ..logger import get_logger
+from ..database import get_db
+from ..models import BrandAnalysis
 
 logger = get_logger(__name__)
 
@@ -19,6 +22,7 @@ class ImageGenerateRequest(BaseModel):
     prompt: str
     model: str = "nanovana"
     referenceImage: Optional[str] = None  # Base64 encoded image for image-to-image
+    userId: Optional[int] = None  # 사용자 ID (브랜드 분석 정보 조회용)
 
 
 class ImageGenerateResponse(BaseModel):
@@ -28,10 +32,51 @@ class ImageGenerateResponse(BaseModel):
     usedClaudeOptimization: bool = False
     usedNanovanaAPI: bool = False
     usedWhiskAPI: bool = False
+    usedBrandAnalysis: bool = False
 
 
-async def optimize_prompt_with_gemini(user_prompt: str) -> str:
-    """Gemini를 사용하여 프롬프트 최적화"""
+def get_brand_analysis(db: Session, user_id: int) -> Optional[BrandAnalysis]:
+    """사용자의 브랜드 분석 정보 조회"""
+    return db.query(BrandAnalysis).filter(BrandAnalysis.user_id == user_id).first()
+
+
+def enhance_prompt_with_brand(prompt: str, brand_analysis: BrandAnalysis) -> str:
+    """브랜드 분석 정보를 프롬프트에 반영"""
+    brand_elements = []
+
+    # emotional_tone: 감정적 톤 (예: 따뜻한, 유머러스한)
+    if brand_analysis.emotional_tone:
+        brand_elements.append(f"emotional mood: {brand_analysis.emotional_tone}")
+
+    # brand_personality: 브랜드 성격 종합 설명
+    if brand_analysis.brand_personality:
+        # 너무 길면 요약
+        personality = brand_analysis.brand_personality[:100] if len(brand_analysis.brand_personality) > 100 else brand_analysis.brand_personality
+        brand_elements.append(f"brand personality: {personality}")
+
+    # brand_tone: 브랜드 톤앤매너 (예: 친근하고 전문적인)
+    if brand_analysis.brand_tone:
+        brand_elements.append(f"style tone: {brand_analysis.brand_tone}")
+
+    # 인스타그램 이미지 스타일이 있으면 추가
+    if brand_analysis.instagram_image_style:
+        brand_elements.append(f"visual style: {brand_analysis.instagram_image_style}")
+
+    # 색상 팔레트가 있으면 추가
+    if brand_analysis.instagram_color_palette:
+        colors = ", ".join(brand_analysis.instagram_color_palette[:3])  # 최대 3개 색상
+        brand_elements.append(f"color palette: {colors}")
+
+    if brand_elements:
+        brand_context = ", ".join(brand_elements)
+        enhanced_prompt = f"{prompt}. Brand context: {brand_context}"
+        return enhanced_prompt
+
+    return prompt
+
+
+async def optimize_prompt_with_gemini(user_prompt: str, brand_analysis: Optional[BrandAnalysis] = None) -> str:
+    """Gemini를 사용하여 프롬프트 최적화 (브랜드 분석 정보 반영)"""
     try:
         google_api_key = os.getenv('REACT_APP_GEMINI_API_KEY')
         if not google_api_key:
@@ -40,11 +85,34 @@ async def optimize_prompt_with_gemini(user_prompt: str) -> str:
         genai.configure(api_key=google_api_key)
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
-        optimization_prompt = f"""You are an expert at creating detailed, high-quality image generation prompts for Stable Diffusion.
+        # 브랜드 분석 정보가 있으면 프롬프트에 반영
+        brand_context = ""
+        if brand_analysis:
+            brand_elements = []
+            if brand_analysis.emotional_tone:
+                brand_elements.append(f"감정적 톤: {brand_analysis.emotional_tone}")
+            if brand_analysis.brand_personality:
+                brand_elements.append(f"브랜드 성격: {brand_analysis.brand_personality[:150]}")
+            if brand_analysis.brand_tone:
+                brand_elements.append(f"톤앤매너: {brand_analysis.brand_tone}")
+            if brand_analysis.instagram_image_style:
+                brand_elements.append(f"이미지 스타일: {brand_analysis.instagram_image_style}")
+            if brand_analysis.instagram_color_palette:
+                colors = ", ".join(brand_analysis.instagram_color_palette[:3])
+                brand_elements.append(f"색상 팔레트: {colors}")
 
-User's prompt: "{user_prompt}"
+            if brand_elements:
+                brand_context = "\n\nBrand Identity to reflect:\n" + "\n".join(brand_elements)
 
-Transform this into an optimized Stable Diffusion prompt with style, lighting, quality, and composition. Under 75 words. English only. Return ONLY the optimized prompt."""
+        optimization_prompt = f"""You are an expert at creating detailed, high-quality image generation prompts for AI image generators.
+
+User's prompt: "{user_prompt}"{brand_context}
+
+Transform this into an optimized image generation prompt that:
+1. Reflects the brand identity and emotional tone if provided
+2. Includes style, lighting, quality, and composition details
+3. Maintains consistency with the brand's visual identity
+4. Under 100 words. English only. Return ONLY the optimized prompt."""
 
         response = model.generate_content(optimization_prompt)
         return response.text.strip()
@@ -54,10 +122,11 @@ Transform this into an optimized Stable Diffusion prompt with style, lighting, q
 
 
 @router.post("/generate-image", response_model=ImageGenerateResponse)
-async def generate_image(request: ImageGenerateRequest):
+async def generate_image(request: ImageGenerateRequest, db: Session = Depends(get_db)):
     """
     이미지 생성 엔드포인트
     - model: 'whisk' (Imagen 3), 'nanovana' (Gemini 2.0 Flash) 또는 'gemini' (Stable Diffusion 2.1)
+    - userId: 사용자 ID를 전달하면 브랜드 분석 정보가 이미지 생성에 반영됩니다.
     """
     if not request.prompt:
         raise HTTPException(status_code=400, detail="프롬프트가 필요합니다.")
@@ -67,55 +136,78 @@ async def generate_image(request: ImageGenerateRequest):
         used_claude_optimization = False
         used_nanovana_api = False
         used_whisk_api = False
+        used_brand_analysis = False
         image_url = None
+
+        # 브랜드 분석 정보 조회
+        brand_analysis = None
+        if request.userId:
+            brand_analysis = get_brand_analysis(db, request.userId)
+            if brand_analysis:
+                print(f"🏷️ 브랜드 분석 정보 발견!")
+                print(f"   - emotional_tone: {brand_analysis.emotional_tone}")
+                print(f"   - brand_personality: {brand_analysis.brand_personality[:50] if brand_analysis.brand_personality else 'N/A'}...")
+                print(f"   - brand_tone: {brand_analysis.brand_tone}")
+                used_brand_analysis = True
 
         # Whisk AI (Pollinations - 무료, API 키 불필요)
         if request.model == "whisk":
             logger.info(f"Whisk AI 이미지 생성 시작")
             logger.debug(f"프롬프트: {request.prompt}")
 
+            # 브랜드 분석 정보가 있으면 프롬프트 강화
+            enhanced_prompt = request.prompt
+            if brand_analysis:
+                enhanced_prompt = enhance_prompt_with_brand(request.prompt, brand_analysis)
+                print(f"🏷️ 브랜드 반영 프롬프트: {enhanced_prompt}")
+
             # 한글 프롬프트를 영어로 번역 (Gemini 사용)
-            translated_prompt = request.prompt
-            google_api_key = os.getenv('REACT_APP_GEMINI_API_KEY')
+            translated_prompt = enhanced_prompt
+            google_api_key = os.getenv('REACT_APP_GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
             if google_api_key:
                 try:
                     # 한글이 포함되어 있는지 확인
                     import re
-                    if re.search(r'[가-힣]', request.prompt):
-                        logger.info("한글 프롬프트 감지 - 영어로 번역 중...")
+                    if re.search(r'[가-힣]', enhanced_prompt):
+                        print("🌐 한글 프롬프트 감지 - 영어로 번역 중...")
                         genai.configure(api_key=google_api_key)
                         model = genai.GenerativeModel('gemini-2.0-flash-exp')
                         translation_response = model.generate_content(
-                            f"Translate this Korean text to English for an image generation prompt. Only return the English translation, nothing else:\n\n{request.prompt}"
+                            f"Translate this Korean text to English for an image generation prompt. Only return the English translation, nothing else:\n\n{enhanced_prompt}"
                         )
                         translated_prompt = translation_response.text.strip()
                         logger.info(f"번역된 프롬프트: {translated_prompt}")
                 except Exception as e:
-                    logger.warning(f"번역 실패 (원본 프롬프트 사용): {e}")
+                    print(f"번역 실패 (원본 프롬프트 사용): {e}")
 
-            # URL 인코딩된 프롬프트
+            # URL 인코딩 (UTF-8로 명시적 인코딩)
             import urllib.parse
             encoded_prompt = urllib.parse.quote(translated_prompt)
-            logger.debug(f"인코딩된 프롬프트: {encoded_prompt}")
+            print(f"🔗 인코딩된 프롬프트: {encoded_prompt}")
 
             # Pollinations AI는 GET 요청으로 이미지를 직접 반환합니다
-            # enhance=false로 설정하여 사용자의 정확한 프롬프트를 사용합니다
             image_generation_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&model=flux&nologo=true&enhance=false"
+            print(f"🔗 요청 URL: {image_generation_url}")
 
             async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
                 response = await client.get(image_generation_url)
 
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"Whisk AI (Pollinations) 오류: 상태 코드 {response.status_code}"
-                )
+                print(f"📡 응답 상태 코드: {response.status_code}")
+                print(f"📡 응답 Content-Type: {response.headers.get('content-type', 'unknown')}")
+
+                if response.status_code != 200:
+                    error_text = response.text[:500] if response.text else "No error message"
+                    print(f"❌ Pollinations 오류 응답: {error_text}")
+                    raise HTTPException(
+                        status_code=response.status_code,
+                        detail=f"Whisk AI (Pollinations) 오류: 상태 코드 {response.status_code}"
+                    )
 
             # 이미지를 base64로 인코딩
             image_data = base64.b64encode(response.content).decode('utf-8')
             image_url = f"data:image/png;base64,{image_data}"
             used_whisk_api = True
-            logger.info("Whisk AI 이미지 생성 완료")
+            print("✅ Whisk AI (Pollinations) 이미지 생성 완료!")
 
         # Nanovana (Gemini 2.5 Flash Image with Thinking)
         elif request.model == "nanovana":
@@ -125,6 +217,12 @@ async def generate_image(request: ImageGenerateRequest):
                     status_code=500,
                     detail="Google API 키가 필요합니다. (Gemini 2.5 Flash Image)"
                 )
+
+            # 브랜드 분석 정보가 있으면 프롬프트 강화
+            enhanced_prompt = request.prompt
+            if brand_analysis:
+                enhanced_prompt = enhance_prompt_with_brand(request.prompt, brand_analysis)
+                print(f"🏷️ 브랜드 반영 프롬프트: {enhanced_prompt}")
 
             # 레퍼런스 이미지가 있는지 확인
             if request.referenceImage:
@@ -148,20 +246,20 @@ async def generate_image(request: ImageGenerateRequest):
                                 }
                             },
                             {
-                                "text": f"Based on this reference image, generate a new image: {request.prompt}"
+                                "text": f"Based on this reference image, generate a new image: {enhanced_prompt}"
                             }
                         ]
                     }]
                 }
             else:
-                logger.info("Nanovana (Gemini 2.5 Flash) Text-to-Image 생성 시작")
-                logger.debug(f"프롬프트: {request.prompt}")
+                print("🍌 나노바나나(Gemini 2.5 Flash Image - Text-to-Image)로 이미지 생성 중...")
+                print(f"📝 받은 프롬프트: {request.prompt}")
 
                 # 텍스트만 사용
                 request_body = {
                     "contents": [{
                         "parts": [{
-                            "text": f"Generate an image: {request.prompt}"
+                            "text": f"Generate an image: {enhanced_prompt}"
                         }]
                     }]
                 }
@@ -233,10 +331,12 @@ async def generate_image(request: ImageGenerateRequest):
                     detail="Hugging Face API 키가 없습니다."
                 )
 
-            # Gemini로 프롬프트 최적화
+            # Gemini로 프롬프트 최적화 (브랜드 분석 정보 포함)
             if os.getenv('REACT_APP_GEMINI_API_KEY'):
-                optimized_prompt = await optimize_prompt_with_gemini(request.prompt)
+                optimized_prompt = await optimize_prompt_with_gemini(request.prompt, brand_analysis)
                 used_claude_optimization = True
+                if brand_analysis:
+                    print(f"🏷️ 브랜드 분석 정보가 프롬프트 최적화에 반영됨")
 
             logger.info("Stable Diffusion 2.1 이미지 생성 시작")
             logger.debug(f"프롬프트: {optimized_prompt}")
@@ -284,7 +384,8 @@ async def generate_image(request: ImageGenerateRequest):
             optimizedPrompt=optimized_prompt if optimized_prompt != request.prompt else None,
             usedClaudeOptimization=used_claude_optimization,
             usedNanovanaAPI=used_nanovana_api,
-            usedWhiskAPI=used_whisk_api
+            usedWhiskAPI=used_whisk_api,
+            usedBrandAnalysis=used_brand_analysis
         )
 
     except HTTPException:

@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "콘텐츠 크리에이터",
+  "name": "콘텐츠 크리에이터 - AI 기반 콘텐츠 생성 플랫폼",
   "icons": [
     {
       "src": "favicon.ico",
