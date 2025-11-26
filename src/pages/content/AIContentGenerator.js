@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import AgenticContentForm from '../../components/AgenticContentForm';
 import AgenticContentResult from '../../components/AgenticContentResult';
 import { generateAgenticContent } from '../../services/agenticService';
@@ -6,10 +7,20 @@ import './ContentCommon.css';
 import './AIContentGenerator.css';
 
 function AIContentGenerator() {
+  const location = useLocation();
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState(null);
   const [progressMessage, setProgressMessage] = useState('');
   const [currentStep, setCurrentStep] = useState('');
+  const [templateText, setTemplateText] = useState('');
+
+  // 템플릿에서 넘어온 경우 프롬프트 적용
+  useEffect(() => {
+    if (location.state?.template) {
+      const template = location.state.template;
+      setTemplateText(template.prompt || '');
+    }
+  }, [location.state]);
 
   const handleGenerate = async (formData) => {
     setIsGenerating(true);
@@ -100,6 +111,7 @@ function AIContentGenerator() {
           <AgenticContentForm
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
+            initialText={templateText}
           />
         )}
 

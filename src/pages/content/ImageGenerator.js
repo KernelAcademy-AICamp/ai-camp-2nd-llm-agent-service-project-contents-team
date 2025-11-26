@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import './ContentCommon.css';
 import './ImageGenerator.css';
 
 function ImageGenerator() {
+  const location = useLocation();
+
   // 탭 상태: 'image' (AI 이미지 생성) 또는 'cardnews' (카드뉴스)
   const [activeTab, setActiveTab] = useState('image');
 
@@ -26,11 +29,23 @@ function ImageGenerator() {
   const [layoutStyle, setLayoutStyle] = useState('center');
   const [fontWeight, setFontWeight] = useState('bold');
 
+  // 카드뉴스 이미지 업로드 상태
+  const MAX_CARDNEWS_IMAGES = 5;
+  const [cardnewsImages, setCardnewsImages] = useState([]);
+  const [cardnewsTexts, setCardnewsTexts] = useState([]);
+  const [cardnewsMode, setCardnewsMode] = useState('ai'); // 'ai' or 'custom'
+
   const aiModels = [
-    { id: 'whisk', label: 'Whisk AI (무료)', provider: 'Pollinations' },
-    { id: 'nanovana', label: '나노바나나 (Nanovana)', provider: 'Anthropic' },
-    { id: 'gemini', label: '제미나이 (Gemini)', provider: 'Google' },
+    { id: 'nanovana', label: '나노바나나 (Nanovana)', provider: 'Google' },
   ];
+
+  // 템플릿에서 넘어온 경우 프롬프트 적용
+  useEffect(() => {
+    if (location.state?.template) {
+      const template = location.state.template;
+      setImagePrompt(template.prompt || '');
+    }
+  }, [location.state]);
 
   // AI 이미지 생성 핸들러
   const handleImageUpload = (e) => {
@@ -120,6 +135,103 @@ function ImageGenerator() {
     const newTitles = [...titles];
     newTitles[index] = value;
     setTitles(newTitles);
+  };
+
+  // 카드뉴스 이미지 업로드 핸들러
+  const handleCardnewsImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    const remainingSlots = MAX_CARDNEWS_IMAGES - cardnewsImages.length;
+
+    if (remainingSlots <= 0) {
+      alert(`최대 ${MAX_CARDNEWS_IMAGES}개의 이미지만 업로드할 수 있습니다.`);
+      return;
+    }
+
+    const filesToAdd = files.slice(0, remainingSlots);
+
+    if (files.length > remainingSlots) {
+      alert(`최대 ${MAX_CARDNEWS_IMAGES}개까지만 업로드 가능합니다. ${filesToAdd.length}개만 추가됩니다.`);
+    }
+
+    filesToAdd.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setCardnewsImages(prev => {
+          if (prev.length >= MAX_CARDNEWS_IMAGES) return prev;
+          return [...prev, {
+            file: file,
+            preview: event.target.result,
+            name: file.name
+          }];
+        });
+        setCardnewsTexts(prev => [...prev, '']);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  // 업로드된 이미지 삭제
+  const handleRemoveCardnewsImage = (index) => {
+    setCardnewsImages(prev => prev.filter((_, i) => i !== index));
+    setCardnewsTexts(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // 커스텀 텍스트 변경
+  const handleCardnewsTextChange = (index, value) => {
+    const newTexts = [...cardnewsTexts];
+    newTexts[index] = value;
+    setCardnewsTexts(newTexts);
+  };
+
+  // 커스텀 카드뉴스 생성 (이미지 업로드 방식)
+  const handleGenerateCustomCardNews = async () => {
+    if (cardnewsImages.length === 0) {
+      alert('이미지를 먼저 업로드해주세요.');
+      return;
+    }
+
+    setIsCardGenerating(true);
+    setGeneratedCards([]);
+    setGeneratingStatus('카드뉴스 생성 중...');
+
+    try {
+      const formData = new FormData();
+
+      cardnewsImages.forEach((img) => {
+        formData.append('images', img.file);
+      });
+
+      formData.append('texts', JSON.stringify(cardnewsTexts));
+      formData.append('colorTheme', colorTheme);
+      formData.append('fontWeight', fontWeight);
+      formData.append('layoutType', layoutStyle);
+
+      const response = await fetch('/api/generate-custom-cardnews', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`서버 오류: HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        setGeneratedCards(result.cards);
+        alert(`${result.cards.length}장의 카드뉴스가 생성되었습니다!`);
+      } else {
+        throw new Error(result.error || '카드 생성 실패');
+      }
+    } catch (error) {
+      console.error('카드뉴스 생성 오류:', error);
+      alert(`카드뉴스 생성 중 오류가 발생했습니다:\n${error.message}`);
+    } finally {
+      setIsCardGenerating(false);
+      setGeneratingStatus('');
+    }
   };
 
   const handleGenerateAgenticCardNews = async () => {
@@ -369,9 +481,7 @@ function ImageGenerator() {
             <div className="info-box">
               <h4>AI 모델 안내</h4>
               <ul>
-                <li><strong>Whisk AI</strong>: 무료, Pollinations 기반 (FLUX 모델)</li>
                 <li><strong>Nanovana</strong>: Gemini 2.5 Flash Image (Text/Image-to-Image)</li>
-                <li><strong>Gemini</strong>: Gemini + Stable Diffusion 2.1 조합</li>
               </ul>
             </div>
           </div>
@@ -408,12 +518,41 @@ function ImageGenerator() {
       {/* 카드뉴스 탭 */}
       {activeTab === 'cardnews' && (
         <div className="cardnews-content">
-          <div className="cardnews-header-info">
-            <p>AI가 프롬프트만으로 자동으로 페이지별 내용을 구성하고 카드뉴스를 생성합니다</p>
-            <div className="agentic-mode-badge">
-              AI Agentic 모드 - AI가 페이지 수, 제목, 내용, 이미지를 모두 자동으로 생성합니다
+          {/* 모드 선택 */}
+          <div className="cardnews-mode-section">
+            <h3>생성 방식 선택</h3>
+            <div className="mode-buttons">
+              <button
+                className={`mode-button ${cardnewsMode === 'ai' ? 'active' : ''}`}
+                onClick={() => setCardnewsMode('ai')}
+              >
+                <div className="mode-icon">🤖</div>
+                <div className="mode-title">AI 자동 생성</div>
+                <div className="mode-desc">프롬프트만 입력하면 AI가 모두 생성</div>
+              </button>
+              <button
+                className={`mode-button ${cardnewsMode === 'custom' ? 'active' : ''}`}
+                onClick={() => setCardnewsMode('custom')}
+              >
+                <div className="mode-icon">📷</div>
+                <div className="mode-title">이미지 업로드</div>
+                <div className="mode-desc">내 이미지로 카드뉴스 만들기</div>
+              </button>
             </div>
           </div>
+
+          <hr className="section-divider" />
+
+          {cardnewsMode === 'ai' && (
+            <>
+              <div className="cardnews-header-info">
+                <p>AI가 프롬프트만으로 자동으로 페이지별 내용을 구성하고 카드뉴스를 생성합니다</p>
+                <div className="agentic-mode-badge">
+                  AI Agentic 모드 - AI가 페이지 수, 제목, 내용, 이미지를 모두 자동으로 생성합니다
+                </div>
+              </div>
+            </>
+          )}
 
           {/* 1. 스타일 선택 섹션 */}
           <div className="style-section">
@@ -509,78 +648,172 @@ function ImageGenerator() {
 
           <hr className="section-divider" />
 
-          {/* 2. 내용 입력 섹션 */}
-          <div className="input-section">
-            <h3>2. 카드뉴스 내용 입력</h3>
-            <p className="section-desc">
-              간단한 프롬프트만 입력하세요. AI가 페이지별 제목, 내용, 이미지를 모두 자동으로 생성합니다
-            </p>
-            <textarea
-              placeholder={`예시:
+          {/* AI 모드: 내용 입력 섹션 */}
+          {cardnewsMode === 'ai' && (
+            <>
+              <div className="input-section">
+                <h3>2. 카드뉴스 내용 입력</h3>
+                <p className="section-desc">
+                  간단한 프롬프트만 입력하세요. AI가 페이지별 제목, 내용, 이미지를 모두 자동으로 생성합니다
+                </p>
+                <textarea
+                  placeholder={`예시:
 - 새로운 카페 오픈 홍보
 - 여름 세일 50% 할인 이벤트
 - 딸기 시즌 신메뉴 3종 출시
 - 강남역 필라테스 개업 50% 할인
 
 프롬프트가 구체적일수록 더 좋은 결과가 나옵니다!`}
-              value={titles[0]}
-              onChange={(e) => handleTitleChange(0, e.target.value)}
-              className="cardnews-input"
-              rows="6"
-            />
-          </div>
-
-          <hr className="section-divider" />
-
-          {/* 생성 버튼 */}
-          <div className="generate-section">
-            <button
-              onClick={handleGenerateAgenticCardNews}
-              disabled={isCardGenerating || titles[0].trim().length < 10}
-              className="btn-generate cardnews-generate"
-            >
-              {isCardGenerating ? 'AI가 열심히 생성 중...' : 'AI가 자동으로 카드뉴스 생성하기'}
-            </button>
-            {generatingStatus && (
-              <p className="generating-status">
-                {generatingStatus}
-              </p>
-            )}
-          </div>
-
-          <hr className="section-divider" />
-
-          {/* AI 분석 결과 표시 */}
-          {agenticAnalysis && !isCardGenerating && (
-            <div className="analysis-result">
-              <h3>AI 분석 결과</h3>
-              <div className="analysis-grid">
-                <div className="analysis-item">
-                  <strong>생성된 페이지 수:</strong> {agenticAnalysis.pageCount}장
-                </div>
-                <div className="analysis-item">
-                  <strong>품질 점수:</strong> {agenticAnalysis.qualityScore ? `${agenticAnalysis.qualityScore.toFixed(1)}/10` : 'N/A'}
-                </div>
-                <div className="analysis-item">
-                  <strong>타겟 청중:</strong> {agenticAnalysis.targetAudience || 'N/A'}
-                </div>
-                <div className="analysis-item">
-                  <strong>톤앤매너:</strong> {agenticAnalysis.tone || 'N/A'}
-                </div>
+                  value={titles[0]}
+                  onChange={(e) => handleTitleChange(0, e.target.value)}
+                  className="cardnews-input"
+                  rows="6"
+                />
               </div>
-              {agenticAnalysis.pagesInfo && agenticAnalysis.pagesInfo.length > 0 && (
-                <div className="pages-info">
-                  <h4>페이지 구성</h4>
-                  {agenticAnalysis.pagesInfo.map((page, index) => (
-                    <div key={index} className="page-info-item">
-                      <strong>페이지 {page.page}:</strong> {page.title}
-                      <br />
-                      <span className="page-content">{page.content}</span>
+
+              <hr className="section-divider" />
+
+              {/* 생성 버튼 */}
+              <div className="generate-section">
+                <button
+                  onClick={handleGenerateAgenticCardNews}
+                  disabled={isCardGenerating || titles[0].trim().length < 10}
+                  className="btn-generate cardnews-generate"
+                >
+                  {isCardGenerating ? 'AI가 열심히 생성 중...' : 'AI가 자동으로 카드뉴스 생성하기'}
+                </button>
+                {generatingStatus && (
+                  <p className="generating-status">
+                    {generatingStatus}
+                  </p>
+                )}
+              </div>
+
+              <hr className="section-divider" />
+
+              {/* AI 분석 결과 표시 */}
+              {agenticAnalysis && !isCardGenerating && (
+                <div className="analysis-result">
+                  <h3>AI 분석 결과</h3>
+                  <div className="analysis-grid">
+                    <div className="analysis-item">
+                      <strong>생성된 페이지 수:</strong> {agenticAnalysis.pageCount}장
                     </div>
-                  ))}
+                    <div className="analysis-item">
+                      <strong>품질 점수:</strong> {agenticAnalysis.qualityScore ? `${agenticAnalysis.qualityScore.toFixed(1)}/10` : 'N/A'}
+                    </div>
+                    <div className="analysis-item">
+                      <strong>타겟 청중:</strong> {agenticAnalysis.targetAudience || 'N/A'}
+                    </div>
+                    <div className="analysis-item">
+                      <strong>톤앤매너:</strong> {agenticAnalysis.tone || 'N/A'}
+                    </div>
+                  </div>
+                  {agenticAnalysis.pagesInfo && agenticAnalysis.pagesInfo.length > 0 && (
+                    <div className="pages-info">
+                      <h4>페이지 구성</h4>
+                      {agenticAnalysis.pagesInfo.map((page, index) => (
+                        <div key={index} className="page-info-item">
+                          <strong>페이지 {page.page}:</strong> {page.title}
+                          <br />
+                          <span className="page-content">{page.content}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </>
+          )}
+
+          {/* 커스텀 모드: 이미지 업로드 섹션 */}
+          {cardnewsMode === 'custom' && (
+            <>
+              <div className="upload-section">
+                <h3>2. 이미지 업로드 및 텍스트 입력</h3>
+                <p className="section-desc">
+                  카드뉴스로 만들 이미지를 업로드하세요. 각 이미지에 텍스트를 추가할 수 있습니다. (최대 {MAX_CARDNEWS_IMAGES}장)
+                </p>
+
+                {/* 이미지 업로드 버튼 */}
+                <div className="upload-button-wrapper">
+                  <label
+                    htmlFor="cardnews-image-upload"
+                    className={`upload-label-btn ${cardnewsImages.length >= MAX_CARDNEWS_IMAGES ? 'disabled' : ''}`}
+                  >
+                    📁 이미지 선택하기 ({cardnewsImages.length}/{MAX_CARDNEWS_IMAGES})
+                  </label>
+                  <input
+                    id="cardnews-image-upload"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleCardnewsImageUpload}
+                    disabled={cardnewsImages.length >= MAX_CARDNEWS_IMAGES}
+                    style={{ display: 'none' }}
+                  />
+                  <span className="upload-hint">여러 이미지를 한 번에 선택할 수 있습니다</span>
+                </div>
+
+                {/* 업로드된 이미지 목록 */}
+                {cardnewsImages.length > 0 && (
+                  <div className="uploaded-images-grid">
+                    {cardnewsImages.map((img, index) => (
+                      <div key={index} className="uploaded-image-card">
+                        <div className="image-preview-wrapper">
+                          <img src={img.preview} alt={`Upload ${index + 1}`} className="uploaded-preview-img" />
+                          <button
+                            onClick={() => handleRemoveCardnewsImage(index)}
+                            className="btn-remove-image"
+                          >
+                            ✕
+                          </button>
+                          <span className="image-number">카드 {index + 1}</span>
+                        </div>
+                        <div className="image-text-input">
+                          <label>텍스트 입력:</label>
+                          <textarea
+                            placeholder="이미지에 추가할 텍스트를 입력하세요..."
+                            value={cardnewsTexts[index] || ''}
+                            onChange={(e) => handleCardnewsTextChange(index, e.target.value)}
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 이미지가 없을 때 안내 메시지 */}
+                {cardnewsImages.length === 0 && (
+                  <div className="empty-upload-placeholder">
+                    <span className="placeholder-icon">🖼️</span>
+                    <p>이미지를 업로드해주세요</p>
+                    <p className="placeholder-hint">최대 {MAX_CARDNEWS_IMAGES}장까지 업로드 가능합니다</p>
+                  </div>
+                )}
+              </div>
+
+              <hr className="section-divider" />
+
+              {/* 생성 버튼 */}
+              <div className="generate-section">
+                <button
+                  onClick={handleGenerateCustomCardNews}
+                  disabled={isCardGenerating || cardnewsImages.length === 0}
+                  className="btn-generate cardnews-generate"
+                >
+                  {isCardGenerating ? '카드뉴스 생성 중...' : `카드뉴스 생성하기 (${cardnewsImages.length}장)`}
+                </button>
+                {generatingStatus && (
+                  <p className="generating-status">
+                    {generatingStatus}
+                  </p>
+                )}
+              </div>
+
+              <hr className="section-divider" />
+            </>
           )}
 
           {/* 생성 중 미리보기 */}

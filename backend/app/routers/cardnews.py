@@ -428,31 +428,33 @@ class CardNewsBuilder:
         return img
 
     def add_logo(self, image: Image.Image):
-        """로고 배지 추가"""
+        """로고 배지 추가 (상단 중앙)"""
         import os
 
-        # 로고 파일 경로
-        logo_path = os.path.join(os.path.dirname(__file__), "../../../public/logo192.png")
+        # 로고 파일 경로 (ddukddak_white-Photoroom.png 사용)
+        logo_path = os.path.join(os.path.dirname(__file__), "../../../public/ddukddak_white-Photoroom.png")
 
         # 프로젝트 루트 기준 경로도 시도
         if not os.path.exists(logo_path):
-            logo_path = os.path.join(os.path.dirname(__file__), "../../../../public/logo192.png")
+            logo_path = os.path.join(os.path.dirname(__file__), "../../../../public/ddukddak_white-Photoroom.png")
 
         if not os.path.exists(logo_path):
             # 절대 경로로 시도
-            logo_path = "/Users/ohhwayoung/Desktop/ai-content/ai-camp-2nd-llm-agent-service-project-contents-team/public/logo192.png"
+            logo_path = "/Users/ohhwayoung/Desktop/ai-content/ai-camp-2nd-llm-agent-service-project-contents-team/public/ddukddak_white-Photoroom.png"
 
         try:
             # 로고 이미지 로드
             logo = Image.open(logo_path).convert("RGBA")
 
-            # 로고 크기 조정 (60x60)
-            logo_size = 60
-            logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+            # 로고 크기 조정 (가로 비율 유지, 높이 50px 기준)
+            logo_height = 50
+            aspect_ratio = logo.width / logo.height
+            logo_width = int(logo_height * aspect_ratio)
+            logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
 
-            # 로고 위치 (상단 가운데)
-            logo_x = (CARD_WIDTH - logo_size) // 2
-            logo_y = 40
+            # 로고 위치 (상단 중앙)
+            logo_x = (CARD_WIDTH - logo_width) // 2
+            logo_y = 30
 
             # 로고 붙이기 (투명도 유지)
             image.paste(logo, (logo_x, logo_y), logo)
@@ -460,50 +462,71 @@ class CardNewsBuilder:
             print(f"로고 로드 실패: {e}")
 
     def add_content(self, image: Image.Image, title: str, description: str, page_num: int = 1):
-        """콘텐츠 텍스트 추가 (위치 선택 가능)"""
+        """콘텐츠 텍스트 추가 (정중앙 배치)"""
 
-        # 폰트 사이즈 축소
-        title_font = FontManager.get_font(self.font_style, 48, weight=self.font_weight)
-        desc_font = FontManager.get_font(self.font_style, 28, weight=self.font_weight)
+        # 폰트 사이즈 축소 (36px로 줄임)
+        title_font = FontManager.get_font(self.font_style, 36, weight=self.font_weight)
+        desc_font = FontManager.get_font(self.font_style, 22, weight=self.font_weight)
 
-        # 위치에 따른 Y 좌표 설정
+        # 텍스트 높이 계산을 위한 임시 draw 객체
+        draw = ImageDraw.Draw(image)
+
+        # 제목 텍스트 줄바꿈 처리
+        max_width = CARD_WIDTH - 160
+        title_lines = TextRenderer.wrap_text(title, title_font, max_width, draw) if title else []
+        desc_lines = TextRenderer.wrap_text(description, desc_font, max_width, draw) if description else []
+
+        # 각 줄의 높이 계산
+        title_line_height = 44  # 폰트 크기 + 여백
+        desc_line_height = 30
+
+        # 전체 텍스트 블록 높이 계산
+        total_height = 0
+        if title_lines:
+            total_height += len(title_lines) * title_line_height
+        if desc_lines:
+            total_height += 20  # 제목과 설명 사이 간격
+            total_height += len(desc_lines) * desc_line_height
+
+        # 정중앙 Y 좌표 계산
+        start_y = (CARD_HEIGHT - total_height) // 2
+
+        # 위치에 따른 Y 좌표 조정
         if self.layout_type == "top":
-            title_y = 150
-            desc_y = 220
+            start_y = 150
         elif self.layout_type == "bottom":
-            title_y = CARD_HEIGHT - 250
-            desc_y = CARD_HEIGHT - 180
-        else:  # center (기본값)
-            title_y = CARD_HEIGHT // 2 - 30
-            desc_y = CARD_HEIGHT // 2 + 40
+            start_y = CARD_HEIGHT - total_height - 150
 
         align = "center"
+        current_y = start_y
 
         # 제목 (중앙 정렬)
-        TextRenderer.draw_text_with_shadow(
-            image,
-            title,
-            (80, title_y),
-            title_font,
-            color=self.theme["text"],
-            max_width=CARD_WIDTH - 160,
-            shadow=False,
-            align=align,
-            line_spacing=12
-        )
+        if title:
+            TextRenderer.draw_text_with_shadow(
+                image,
+                title,
+                (80, current_y),
+                title_font,
+                color=self.theme["text"],
+                max_width=max_width,
+                shadow=False,
+                align=align,
+                line_spacing=8
+            )
+            current_y += len(title_lines) * title_line_height + 20
 
         # 설명 (중앙 정렬)
         if description:
             TextRenderer.draw_text_with_shadow(
                 image,
                 description,
-                (80, desc_y),
+                (80, current_y),
                 desc_font,
                 color=self.theme["text"],
-                max_width=CARD_WIDTH - 160,
+                max_width=max_width,
                 shadow=False,
                 align=align,
-                line_spacing=8
+                line_spacing=6
             )
 
     def build_card(
@@ -1002,3 +1025,91 @@ def create_fallback_background(color_theme: str) -> str:
     buffer = io.BytesIO()
     img.save(buffer, format="PNG")
     return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+
+
+# ==================== 커스텀 이미지 + 텍스트 카드뉴스 생성 ====================
+
+@router.post("/generate-custom-cardnews")
+async def generate_custom_cardnews(
+    images: List[UploadFile] = File(...),
+    texts: str = Form(...),
+    colorTheme: str = Form(default="black"),
+    fontWeight: str = Form(default="bold"),
+    layoutType: str = Form(default="center")
+):
+    """
+    사용자가 업로드한 이미지에 텍스트를 추가하여 카드뉴스 생성
+
+    Args:
+        images: 업로드된 이미지 파일들
+        texts: JSON 배열 형태의 텍스트 목록 (각 이미지에 추가할 텍스트)
+        colorTheme: 색상 테마 (텍스트 색상에 영향)
+        fontWeight: 폰트 굵기 (light/medium/bold)
+        layoutType: 텍스트 위치 (top/center/bottom)
+    """
+    try:
+        print("\n" + "="*80)
+        print("🖼️ 커스텀 이미지 카드뉴스 생성 시작")
+        print(f"📸 업로드된 이미지 수: {len(images)}")
+        print("="*80 + "\n")
+
+        # 텍스트 파싱
+        text_list = json.loads(texts)
+
+        if not images or len(images) == 0:
+            raise HTTPException(status_code=400, detail="최소 1개 이상의 이미지가 필요합니다.")
+
+        # 테마 선택
+        theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["black"])
+
+        # 카드 빌더 생성 (purpose는 'info'로 기본값)
+        builder = CardNewsBuilder(theme, "rounded", "info", layoutType, fontWeight)
+
+        final_cards = []
+
+        for i, image_file in enumerate(images):
+            print(f"  🎨 카드 {i+1}/{len(images)} 처리 중...")
+
+            # 이미지 로드
+            image_data = await image_file.read()
+            original_image = Image.open(io.BytesIO(image_data))
+
+            # 해당 인덱스의 텍스트 가져오기 (없으면 빈 문자열)
+            card_text = text_list[i] if i < len(text_list) else ""
+
+            # 카드 생성 (텍스트 추가)
+            card = builder.build_card(
+                original_image,
+                card_text,  # 제목으로 사용
+                "",  # 설명은 비워둠
+                i + 1
+            )
+
+            # Base64 변환
+            buffer = io.BytesIO()
+            card.save(buffer, format="PNG")
+            card_base64 = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+            final_cards.append(card_base64)
+
+            print(f"  ✅ 카드 {i+1} 완성")
+
+        print("\n" + "="*80)
+        print(f"✅ {len(final_cards)}장의 커스텀 카드뉴스 생성 완료!")
+        print("="*80 + "\n")
+
+        return {
+            "success": True,
+            "cards": final_cards,
+            "count": len(final_cards)
+        }
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"텍스트 형식이 올바르지 않습니다: {str(e)}")
+    except Exception as e:
+        print(f"\n❌ 커스텀 카드뉴스 생성 실패: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"카드뉴스 생성 중 오류: {str(e)}"
+        )

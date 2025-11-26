@@ -59,6 +59,7 @@ __pycache__/
 
 # Logs
 /backend/logs/
+backend/logs/
 *.log
 
 # Backup files
@@ -73,6 +74,9 @@ __pycache__/
 .idea/
 *.swp
 *.swo
+
+# Claude Code
+.claude/settings.local.json
 
 # ==============================================
 # OS

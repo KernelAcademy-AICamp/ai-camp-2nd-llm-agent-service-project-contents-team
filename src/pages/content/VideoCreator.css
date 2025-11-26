@@ -1,7 +1,91 @@
 /* AI 동영상 생성 페이지 고유 스타일 */
 /* 공통 스타일은 ContentCommon.css 참조 */
 
-/* 이미지 업로드 섹션 */
+/* 폼 힌트 텍스트 */
+.form-hint {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin: 4px 0 12px 0;
+}
+
+/* 이미지 업로드 영역 */
+.image-upload-area {
+  position: relative;
+}
+
+.image-upload-area .file-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.image-upload-area .upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  gap: 8px;
+}
+
+.image-upload-area .upload-label:hover {
+  border-color: var(--accent-color);
+  background: var(--bg-tertiary);
+}
+
+.image-upload-area .upload-icon {
+  font-size: 36px;
+}
+
+.image-upload-area .upload-hint {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* 이미지 미리보기 컨테이너 */
+.image-preview-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 2px solid var(--accent-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.image-preview-container .image-preview {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+}
+
+.btn-remove-image {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.btn-remove-image:hover {
+  background: #ef4444;
+  color: white;
+}
+
+/* 기존 이미지 업로드 섹션 (호환성 유지) */
 .image-upload-section {
   margin-bottom: 16px;
 }
@@ -131,6 +215,28 @@
   border-color: var(--accent-color);
   background: var(--gradient-secondary);
   color: white;
+}
+
+/* Premium 모델 버튼 스타일 */
+.model-btn.premium {
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.model-btn.premium:hover {
+  border-color: #d97706;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.model-btn.premium.active {
+  border-color: #d97706;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+}
+
+.model-btn.premium .model-name::after {
+  content: '✨';
+  margin-left: 6px;
 }
 
 .model-icon {
