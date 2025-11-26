@@ -34,14 +34,14 @@ class VideoGenerateRequest(BaseModel):
 class VideoResponse(BaseModel):
     id: int
     title: str
-    description: str = None
+    description: Optional[str] = None
     prompt: str
     model: str
-    source_image_url: str = None
-    video_url: str = None
-    thumbnail_url: str = None
+    source_image_url: Optional[str] = None
+    video_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
     status: str
-    error_message: str = None
+    error_message: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -621,3 +621,205 @@ async def delete_video(
     db.commit()
 
     return {"message": "Video deleted successfully"}
+
+
+# ===== Veo 3.1 (Google Gemini) 동영상 생성 =====
+class Veo31VideoRequest(BaseModel):
+    prompt: str
+    title: str = "AI 생성 동영상"
+    description: Optional[str] = None
+    image_data: Optional[str] = None  # Base64 인코딩된 이미지 (이미지 → 동영상 생성 시)
+
+
+class Veo31VideoResponse(BaseModel):
+    success: bool
+    video_url: Optional[str] = None
+    title: str
+    prompt: str
+    translated_prompt: Optional[str] = None
+    status: str
+    message: Optional[str] = None
+
+
+@router.post("/generate-veo31", response_model=Veo31VideoResponse)
+async def generate_veo31_video(
+    request: Veo31VideoRequest,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Veo 3.1 (Google Gemini) AI 동영상 생성
+
+    - Google의 최신 비디오 생성 모델 Veo 3.1 사용
+    - 텍스트 프롬프트로 고품질 동영상 생성
+    - 한글 프롬프트 자동 번역 지원
+    """
+    google_api_key = os.getenv('REACT_APP_GEMINI_API_KEY')
+    if not google_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Google API 키가 설정되지 않았습니다."
+        )
+
+    if not request.prompt.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="프롬프트를 입력해주세요."
+        )
+
+    has_image = request.image_data is not None and len(request.image_data) > 0
+    logger.info(f"Veo 3.1 동영상 생성 시작 (user_id: {current_user.id}, prompt: {request.prompt[:50]}..., has_image: {has_image})")
+
+    try:
+        from google import genai
+        from google.genai import types
+        import base64
+
+        # 한글 프롬프트 영어로 번역
+        translated_prompt = request.prompt
+        if re.search(r'[가-힣]', request.prompt):
+            logger.info("한글 프롬프트 감지 - 영어로 번역 중...")
+            try:
+                genai.configure(api_key=google_api_key)
+                model = genai.GenerativeModel('gemini-2.0-flash-exp')
+                translation_response = model.generate_content(
+                    f"Translate this Korean text to English for a video generation prompt. "
+                    f"Make it descriptive and cinematic. Only return the English translation:\n\n{request.prompt}"
+                )
+                translated_prompt = translation_response.text.strip()
+                logger.info(f"번역된 프롬프트: {translated_prompt}")
+            except Exception as e:
+                logger.warning(f"번역 실패 (원본 프롬프트 사용): {e}")
+
+        # Veo 3.1 클라이언트 생성
+        client = genai.Client(api_key=google_api_key)
+
+        # 이미지 데이터 처리 (있는 경우)
+        image_obj = None
+        if has_image:
+            logger.info("이미지 데이터 처리 중...")
+            image_data = request.image_data
+            # data:image/xxx;base64, prefix 제거
+            if image_data.startswith('data:'):
+                # MIME 타입 추출
+                mime_match = re.match(r'data:(image/[^;]+);base64,', image_data)
+                if mime_match:
+                    mime_type = mime_match.group(1)
+                    image_data = image_data.split(',')[1]
+                else:
+                    mime_type = "image/png"
+                    image_data = image_data.split(',')[1] if ',' in image_data else image_data
+            else:
+                mime_type = "image/png"
+
+            # Base64 디코딩
+            image_bytes = base64.b64decode(image_data)
+
+            # Veo 3.1 이미지 객체 생성
+            image_obj = types.Image(image_bytes=image_bytes, mime_type=mime_type)
+            logger.info(f"이미지 객체 생성 완료 (mime_type: {mime_type}, size: {len(image_bytes)} bytes)")
+
+        # 비디오 생성 시작
+        logger.info("Veo 3.1 비디오 생성 요청 중...")
+        if image_obj:
+            # 이미지 → 동영상 생성
+            operation = client.models.generate_videos(
+                model="veo-3.1-generate-preview",
+                prompt=translated_prompt,
+                image=image_obj,
+            )
+        else:
+            # 텍스트 → 동영상 생성
+            operation = client.models.generate_videos(
+                model="veo-3.1-generate-preview",
+                prompt=translated_prompt,
+            )
+
+        # 비동기 작업 대기 (최대 5분)
+        import time
+        max_wait_time = 300  # 5분
+        wait_interval = 10  # 10초마다 체크
+        elapsed_time = 0
+
+        while not operation.done and elapsed_time < max_wait_time:
+            logger.info(f"비디오 생성 대기 중... ({elapsed_time}초 경과)")
+            time.sleep(wait_interval)
+            operation = client.operations.get(operation)
+            elapsed_time += wait_interval
+
+        if not operation.done:
+            # 타임아웃 - DB에 진행 중 상태로 저장
+            video = models.Video(
+                user_id=current_user.id,
+                title=request.title,
+                description=request.description,
+                prompt=request.prompt,
+                model="veo-3.1",
+                status="processing"
+            )
+            db.add(video)
+            db.commit()
+
+            return Veo31VideoResponse(
+                success=False,
+                title=request.title,
+                prompt=request.prompt,
+                translated_prompt=translated_prompt if translated_prompt != request.prompt else None,
+                status="processing",
+                message="비디오 생성이 진행 중입니다. 히스토리에서 확인해주세요."
+            )
+
+        # 비디오 생성 완료
+        generated_video = operation.response.generated_videos[0]
+
+        # 비디오 파일 다운로드 및 저장
+        import tempfile
+        import base64
+
+        # 임시 파일에 저장
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_file:
+            client.files.download(file=generated_video.video)
+            generated_video.video.save(tmp_file.name)
+            video_path = tmp_file.name
+
+        # 비디오 URL 생성 (로컬 파일 경로 또는 업로드 후 URL)
+        # 여기서는 간단히 base64로 인코딩하여 data URL로 반환
+        with open(video_path, 'rb') as f:
+            video_data = base64.b64encode(f.read()).decode('utf-8')
+        video_url = f"data:video/mp4;base64,{video_data}"
+
+        # 임시 파일 삭제
+        os.unlink(video_path)
+
+        # DB에 저장
+        video = models.Video(
+            user_id=current_user.id,
+            title=request.title,
+            description=request.description,
+            prompt=request.prompt,
+            model="veo-3.1",
+            video_url=video_url[:500] if len(video_url) > 500 else video_url,  # URL이 너무 길면 잘라서 저장
+            status="completed"
+        )
+        db.add(video)
+        db.commit()
+
+        logger.info(f"Veo 3.1 동영상 생성 완료 (user_id: {current_user.id})")
+
+        return Veo31VideoResponse(
+            success=True,
+            video_url=video_url,
+            title=request.title,
+            prompt=request.prompt,
+            translated_prompt=translated_prompt if translated_prompt != request.prompt else None,
+            status="completed"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Veo 3.1 동영상 생성 실패: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"동영상 생성 중 오류가 발생했습니다: {str(e)}"
+        )

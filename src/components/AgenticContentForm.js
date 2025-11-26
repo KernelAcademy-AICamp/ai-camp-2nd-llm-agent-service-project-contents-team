@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './AgenticContentForm.css';
 
-function AgenticContentForm({ onGenerate, isGenerating }) {
-  const [textInput, setTextInput] = useState('');
+function AgenticContentForm({ onGenerate, isGenerating, initialText = '' }) {
+  const [textInput, setTextInput] = useState(initialText);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
+
+  // initialText가 변경되면 textInput 업데이트
+  useEffect(() => {
+    if (initialText) {
+      setTextInput(initialText);
+    }
+  }, [initialText]);
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);

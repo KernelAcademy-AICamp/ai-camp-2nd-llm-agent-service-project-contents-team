@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 import './ContentCommon.css';
 import './VideoCreator.css';
 
 function VideoCreator() {
+  const location = useLocation();
+
   // 탭 상태: 'video' (AI 동영상 생성), 'script' (비디오 스크립트), 'history' (생성 히스토리)
   const [activeTab, setActiveTab] = useState('video');
 
@@ -11,15 +14,16 @@ function VideoCreator() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    prompt: '',
-    model: 'wan-2.1',  // 기본값을 Wan 2.1 모델로 변경
-    source_image_url: ''
+    prompt: ''
   });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [translatedPrompt, setTranslatedPrompt] = useState(null);
-  const [uploadedImage, setUploadedImage] = useState(null);  // 업로드된 이미지 (base64)
+
+  // 이미지 업로드 상태
+  const [sourceImage, setSourceImage] = useState(null);
+  const [sourceImagePreview, setSourceImagePreview] = useState(null);
 
   // 생성 히스토리 상태
   const [videoHistory, setVideoHistory] = useState([]);
@@ -31,6 +35,19 @@ function VideoCreator() {
       loadVideoHistory();
     }
   }, [activeTab]);
+
+  // 템플릿에서 넘어온 경우 프롬프트 적용
+  useEffect(() => {
+    if (location.state?.template) {
+      const template = location.state.template;
+      setFormData(prev => ({
+        ...prev,
+        prompt: template.prompt || '',
+        title: template.name || '',
+        description: template.description || ''
+      }));
+    }
+  }, [location.state]);
 
   // 비디오 히스토리 로드
   const loadVideoHistory = async () => {
@@ -86,6 +103,31 @@ function VideoCreator() {
   const [generatedScript, setGeneratedScript] = useState(null);
   const [scriptError, setScriptError] = useState(null);
 
+  // 이미지 업로드 핸들러
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // 파일 크기 체크 (10MB 제한)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('이미지 파일 크기는 10MB 이하여야 합니다.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSourceImage(reader.result);
+        setSourceImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // 이미지 제거 핸들러
+  const handleRemoveImage = () => {
+    setSourceImage(null);
+    setSourceImagePreview(null);
+  };
+
   // AI 동영상 생성 핸들러
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -93,35 +135,6 @@ function VideoCreator() {
       ...prev,
       [name]: value
     }));
-  };
-
-  const handleModelChange = (model) => {
-    setFormData(prev => ({
-      ...prev,
-      model
-    }));
-    // 모델 변경 시 업로드된 이미지 초기화
-    if (model !== 'stable-video-diffusion') {
-      setUploadedImage(null);
-    }
-  };
-
-  // 이미지 파일 업로드 핸들러
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // 파일 크기 체크 (10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        alert('이미지 파일은 10MB 이하로 업로드해주세요.');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadedImage(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -134,73 +147,40 @@ function VideoCreator() {
     try {
       const token = localStorage.getItem('access_token');
 
-      // 무료 모델인 경우 다른 API 사용
-      if (formData.model === 'wan-2.1') {
-        const response = await axios.post(
-          'http://localhost:8000/api/video/generate-free',
-          {
-            prompt: formData.prompt,
-            title: formData.title || 'AI 생성 동영상',
-            description: formData.description || null
+      // 나노바나나 (Veo 3.1) API 호출
+      const requestData = {
+        prompt: formData.prompt,
+        title: formData.title || 'AI 생성 동영상',
+        description: formData.description || null
+      };
+
+      // 이미지가 있으면 추가
+      if (sourceImage) {
+        requestData.image_data = sourceImage;
+      }
+
+      const response = await axios.post(
+        'http://localhost:8000/api/video/generate-veo31',
+        requestData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           },
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        setResult({
-          title: response.data.title,
-          video_url: response.data.video_url,
-          status: 'completed',
-          model: 'wan-2.1'
-        });
-
-        if (response.data.translated_prompt) {
-          setTranslatedPrompt(response.data.translated_prompt);
+          timeout: 360000  // 6분 타임아웃
         }
-      } else if (formData.model === 'stable-video-diffusion' && uploadedImage) {
-        // 업로드된 이미지로 동영상 생성
-        const response = await axios.post(
-          'http://localhost:8000/api/video/generate-from-image',
-          {
-            title: formData.title || 'AI 생성 동영상',
-            description: formData.description || null,
-            prompt: formData.prompt || null,
-            image_data: uploadedImage
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 180000  // 3분 타임아웃
-          }
-        );
+      );
 
-        setResult({
-          title: response.data.title,
-          video_url: response.data.video_url,
-          status: response.data.status,
-          model: 'stable-video-diffusion'
-        });
-      } else {
-        // 기존 Replicate API (URL 기반)
-        const response = await axios.post(
-          'http://localhost:8000/api/video/generate',
-          formData,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 180000  // 3분 타임아웃
-          }
-        );
+      setResult({
+        title: response.data.title,
+        video_url: response.data.video_url,
+        status: response.data.status,
+        model: 'nanobanana',
+        message: response.data.message
+      });
 
-        setResult(response.data);
+      if (response.data.translated_prompt) {
+        setTranslatedPrompt(response.data.translated_prompt);
       }
     } catch (err) {
       setError(err.response?.data?.detail || '동영상 생성 중 오류가 발생했습니다.');
@@ -276,7 +256,7 @@ function VideoCreator() {
     <div className="content-page">
       <div className="page-header">
         <h2>AI 동영상 생성</h2>
-        <p className="page-description">AI를 활용하여 동영상을 생성하거나 비디오 스크립트를 작성하세요</p>
+        <p className="page-description">나노바나나 AI를 활용하여 고품질 동영상을 생성하세요</p>
       </div>
 
       {/* 탭 네비게이션 */}
@@ -331,112 +311,55 @@ function VideoCreator() {
                 />
               </div>
 
-              {/* 모델 선택 */}
-              <div className="form-group">
-                <label>생성 모델 선택</label>
-                <div className="model-selector">
-                  <button
-                    type="button"
-                    className={`model-btn ${formData.model === 'wan-2.1' ? 'active' : ''}`}
-                    onClick={() => handleModelChange('wan-2.1')}
-                  >
-                    <span className="model-icon">🎬</span>
-                    <div className="model-info">
-                      <div className="model-name">Wan 2.1 (저렴)</div>
-                      <div className="model-desc">텍스트 → 동영상 (한글 지원, ~$0.01)</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`model-btn ${formData.model === 'stable-video-diffusion' ? 'active' : ''}`}
-                    onClick={() => handleModelChange('stable-video-diffusion')}
-                  >
-                    <span className="model-icon">🖼️</span>
-                    <div className="model-info">
-                      <div className="model-name">Stable Video Diffusion</div>
-                      <div className="model-desc">이미지 → 동영상 변환 (고품질)</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`model-btn ${formData.model === 'text-to-video' ? 'active' : ''}`}
-                    onClick={() => handleModelChange('text-to-video')}
-                  >
-                    <span className="model-icon">✍️</span>
-                    <div className="model-info">
-                      <div className="model-name">Text-to-Video (LTX)</div>
-                      <div className="model-desc">텍스트 → 동영상 생성 (Replicate)</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* 조건부 입력: Image-to-Video */}
-              {formData.model === 'stable-video-diffusion' && (
-                <div className="form-group">
-                  <label>원본 이미지 *</label>
-
-                  {/* 이미지 업로드 영역 */}
-                  <div className="image-upload-section">
-                    <label htmlFor="video-image-upload" className="image-upload-label">
-                      <input
-                        id="video-image-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        style={{ display: 'none' }}
-                      />
-                      {uploadedImage ? (
-                        <div className="uploaded-image-preview">
-                          <img src={uploadedImage} alt="업로드된 이미지" />
-                          <p className="upload-success-text">이미지 업로드됨 (클릭하여 변경)</p>
-                        </div>
-                      ) : (
-                        <div className="upload-placeholder">
-                          <span className="upload-icon">📁</span>
-                          <p className="upload-title">이미지 파일 업로드</p>
-                          <p className="upload-hint">클릭하여 이미지 선택 (10MB 이하)</p>
-                        </div>
-                      )}
-                    </label>
-                  </div>
-
-                  <div className="divider-text">또는</div>
-
-                  {/* URL 입력 */}
-                  <input
-                    type="url"
-                    name="source_image_url"
-                    value={formData.source_image_url}
-                    onChange={handleInputChange}
-                    placeholder="이미지 URL 직접 입력 (https://...)"
-                    disabled={!!uploadedImage}
-                  />
-                  <div className="input-hint">
-                    💡 이전에 생성한 AI 이미지를 업로드하거나 URL을 붙여넣으세요
-                  </div>
-                </div>
-              )}
-
               {/* 프롬프트 */}
               <div className="form-group">
-                <label>프롬프트 {(formData.model === 'text-to-video' || formData.model === 'wan-2.1') ? '*' : ''}</label>
+                <label>프롬프트 *</label>
                 <textarea
                   name="prompt"
                   value={formData.prompt}
                   onChange={handleInputChange}
-                  placeholder={
-                    formData.model === 'stable-video-diffusion'
-                      ? "동영상 스타일 설명 (선택사항)"
-                      : formData.model === 'wan-2.1'
-                      ? "생성할 동영상을 설명해주세요 (한글 가능)\n예: 해변에서 일몰을 바라보는 풍경, 시네마틱한 느낌"
-                      : "생성할 동영상에 대한 상세한 설명을 입력하세요"
-                  }
+                  placeholder="고품질 동영상을 생성할 프롬프트를 입력하세요 (한글 가능)&#10;예: 해변에서 일몰을 바라보는 풍경, 시네마틱한 느낌"
                   rows="4"
-                  required={formData.model === 'text-to-video' || formData.model === 'wan-2.1'}
+                  required
                 />
+              </div>
+
+              {/* 이미지 업로드 (선택사항) */}
+              <div className="form-group">
+                <label>시작 이미지 (선택사항)</label>
+                <p className="form-hint">이미지를 업로드하면 해당 이미지를 첫 프레임으로 동영상을 생성합니다.</p>
+
+                {!sourceImagePreview ? (
+                  <div className="image-upload-area">
+                    <input
+                      type="file"
+                      id="source-image"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="file-input"
+                    />
+                    <label htmlFor="source-image" className="upload-label">
+                      <span className="upload-icon">🖼️</span>
+                      <span>클릭하여 이미지 업로드</span>
+                      <span className="upload-hint">PNG, JPG, WebP (최대 10MB)</span>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="image-preview-container">
+                    <img
+                      src={sourceImagePreview}
+                      alt="업로드된 이미지"
+                      className="image-preview"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="btn-remove-image"
+                    >
+                      ✕ 이미지 제거
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* 생성 버튼 */}
@@ -461,12 +384,13 @@ function VideoCreator() {
 
             {/* 안내 사항 */}
             <div className="info-box">
-              <h4>📌 주요 안내</h4>
+              <h4>📌 나노바나나 AI 동영상 생성</h4>
               <ul>
-                <li><strong>Wan 2.1 (저렴)</strong>: 텍스트로 동영상 생성, 한글 자동 번역 (~$0.01)</li>
-                <li><strong>Stable Video Diffusion</strong>: 이미지를 짧은 동영상(2-4초)으로 변환</li>
-                <li><strong>Text-to-Video (LTX)</strong>: Replicate 기반 텍스트 동영상</li>
-                <li>모든 모델은 Replicate 기반 (회당 $0.01-0.05)</li>
+                <li>Google의 최신 AI 비디오 생성 모델 (Veo 3.1) 사용</li>
+                <li>텍스트 프롬프트로 고품질 시네마틱 동영상 생성</li>
+                <li>이미지 업로드 시 해당 이미지를 첫 프레임으로 동영상 생성</li>
+                <li>한글 프롬프트 자동 번역 지원</li>
+                <li>생성 시간: 약 1-5분 소요</li>
               </ul>
             </div>
           </div>
@@ -494,9 +418,7 @@ function VideoCreator() {
                   </div>
                   <div className="info-item">
                     <span className="info-label">모델:</span>
-                    <span className="info-value">
-                      {result.model === 'wan-2.1' ? 'Wan 2.1' : result.model}
-                    </span>
+                    <span className="info-value">나노바나나 (Veo 3.1)</span>
                   </div>
                   <div className="info-item">
                     <span className="info-label">상태:</span>
@@ -804,7 +726,7 @@ function VideoCreator() {
                     <div className="info-row">
                       <span className="label">모델:</span>
                       <span className="value">
-                        {video.model === 'wan-2.1' ? 'Wan 2.1' : video.model}
+                        {video.model === 'veo-3.1' || video.model === 'nanobanana' ? '나노바나나' : video.model}
                       </span>
                     </div>
                     <div className="info-row">
