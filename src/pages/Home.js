@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import ReactMarkdown from 'react-markdown';
@@ -8,6 +8,7 @@ import './Home.css';
 function Home() {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -175,11 +176,19 @@ function Home() {
   };
 
   const suggestedPrompts = [
-    { icon: '✍️', text: '블로그 포스트 작성하기' },
-    { icon: '📱', text: '소셜 미디어 콘텐츠 생성' },
-    { icon: '🎨', text: '크리에이티브 아이디어 브레인스토밍' },
-    { icon: '📊', text: '데이터 분석 및 인사이트' },
+    { icon: '✍️', text: 'AI 콘텐츠 생성', path: '/ai-content', description: '블로그, SNS 게시물 자동 생성' },
+    { icon: '🎨', text: 'AI 이미지 생성', path: '/image', description: '텍스트로 이미지 생성' },
+    { icon: '🎬', text: 'AI 동영상 생성', path: '/video', description: '프롬프트로 동영상 생성' },
+    { icon: '📋', text: '템플릿 갤러리', path: '/templates', description: '콘텐츠 템플릿 모아보기' },
   ];
+
+  const handlePromptClick = (prompt) => {
+    if (prompt.path) {
+      navigate(prompt.path);
+    } else {
+      setInputValue(prompt.text);
+    }
+  };
 
   return (
     <div className="home-page">
@@ -253,10 +262,13 @@ function Home() {
               <button
                 key={index}
                 className="prompt-card"
-                onClick={() => setInputValue(prompt.text)}
+                onClick={() => handlePromptClick(prompt)}
               >
                 <span className="prompt-icon">{prompt.icon}</span>
                 <span className="prompt-text">{prompt.text}</span>
+                {prompt.description && (
+                  <span className="prompt-description">{prompt.description}</span>
+                )}
               </button>
             ))}
           </div>

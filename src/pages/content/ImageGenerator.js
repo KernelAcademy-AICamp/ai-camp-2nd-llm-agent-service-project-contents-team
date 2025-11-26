@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import './ContentCommon.css';
 import './ImageGenerator.css';
 
 function ImageGenerator() {
+  const location = useLocation();
+
   // 탭 상태: 'image' (AI 이미지 생성) 또는 'cardnews' (카드뉴스)
   const [activeTab, setActiveTab] = useState('image');
 
@@ -31,6 +34,14 @@ function ImageGenerator() {
     { id: 'nanovana', label: '나노바나나 (Nanovana)', provider: 'Anthropic' },
     { id: 'gemini', label: '제미나이 (Gemini)', provider: 'Google' },
   ];
+
+  // 템플릿에서 넘어온 경우 프롬프트 적용
+  useEffect(() => {
+    if (location.state?.template) {
+      const template = location.state.template;
+      setImagePrompt(template.prompt || '');
+    }
+  }, [location.state]);
 
   // AI 이미지 생성 핸들러
   const handleImageUpload = (e) => {
