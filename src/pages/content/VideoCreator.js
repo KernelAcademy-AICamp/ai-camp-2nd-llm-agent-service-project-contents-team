@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import './ContentCommon.css';
 import './VideoCreator.css';
 
 function VideoCreator() {
-  // 탭 상태: 'video' (AI 동영상 생성) 또는 'script' (비디오 스크립트)
+  // 탭 상태: 'video' (AI 동영상 생성), 'script' (비디오 스크립트), 'history' (생성 히스토리)
   const [activeTab, setActiveTab] = useState('video');
 
   // AI 동영상 생성 상태
@@ -12,12 +12,68 @@ function VideoCreator() {
     title: '',
     description: '',
     prompt: '',
-    model: 'stable-video-diffusion',
+    model: 'wan-2.1',  // 기본값을 Wan 2.1 모델로 변경
     source_image_url: ''
   });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [translatedPrompt, setTranslatedPrompt] = useState(null);
+  const [uploadedImage, setUploadedImage] = useState(null);  // 업로드된 이미지 (base64)
+
+  // 생성 히스토리 상태
+  const [videoHistory, setVideoHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // 히스토리 탭 진입 시 데이터 로드
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadVideoHistory();
+    }
+  }, [activeTab]);
+
+  // 비디오 히스토리 로드
+  const loadVideoHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await axios.get(
+        'http://localhost:8000/api/video/list',
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      setVideoHistory(response.data);
+    } catch (err) {
+      console.error('Failed to load video history:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // 비디오 삭제
+  const handleDeleteVideo = async (videoId) => {
+    if (!window.confirm('이 동영상을 삭제하시겠습니까?')) return;
+
+    try {
+      const token = localStorage.getItem('access_token');
+      await axios.delete(
+        `http://localhost:8000/api/video/${videoId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      // 목록 새로고침
+      loadVideoHistory();
+    } catch (err) {
+      console.error('Failed to delete video:', err);
+      alert('동영상 삭제에 실패했습니다.');
+    }
+  };
 
   // 비디오 스크립트 상태
   const [scriptFormData, setScriptFormData] = useState({
@@ -44,6 +100,28 @@ function VideoCreator() {
       ...prev,
       model
     }));
+    // 모델 변경 시 업로드된 이미지 초기화
+    if (model !== 'stable-video-diffusion') {
+      setUploadedImage(null);
+    }
+  };
+
+  // 이미지 파일 업로드 핸들러
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // 파일 크기 체크 (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('이미지 파일은 10MB 이하로 업로드해주세요.');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setUploadedImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -51,21 +129,79 @@ function VideoCreator() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setTranslatedPrompt(null);
 
     try {
       const token = localStorage.getItem('access_token');
-      const response = await axios.post(
-        'http://localhost:8000/api/video/generate',
-        formData,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
 
-      setResult(response.data);
+      // 무료 모델인 경우 다른 API 사용
+      if (formData.model === 'wan-2.1') {
+        const response = await axios.post(
+          'http://localhost:8000/api/video/generate-free',
+          {
+            prompt: formData.prompt,
+            title: formData.title || 'AI 생성 동영상',
+            description: formData.description || null
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        setResult({
+          title: response.data.title,
+          video_url: response.data.video_url,
+          status: 'completed',
+          model: 'wan-2.1'
+        });
+
+        if (response.data.translated_prompt) {
+          setTranslatedPrompt(response.data.translated_prompt);
+        }
+      } else if (formData.model === 'stable-video-diffusion' && uploadedImage) {
+        // 업로드된 이미지로 동영상 생성
+        const response = await axios.post(
+          'http://localhost:8000/api/video/generate-from-image',
+          {
+            title: formData.title || 'AI 생성 동영상',
+            description: formData.description || null,
+            prompt: formData.prompt || null,
+            image_data: uploadedImage
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 180000  // 3분 타임아웃
+          }
+        );
+
+        setResult({
+          title: response.data.title,
+          video_url: response.data.video_url,
+          status: response.data.status,
+          model: 'stable-video-diffusion'
+        });
+      } else {
+        // 기존 Replicate API (URL 기반)
+        const response = await axios.post(
+          'http://localhost:8000/api/video/generate',
+          formData,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 180000  // 3분 타임아웃
+          }
+        );
+
+        setResult(response.data);
+      }
     } catch (err) {
       setError(err.response?.data?.detail || '동영상 생성 중 오류가 발생했습니다.');
       console.error('Video generation error:', err);
@@ -90,33 +226,34 @@ function VideoCreator() {
     setGeneratedScript(null);
 
     try {
-      // TODO: API 호출 구현
-      // 임시 더미 데이터
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const token = localStorage.getItem('access_token');
+      const response = await axios.post(
+        'http://localhost:8000/api/video/generate-script',
+        {
+          topic: scriptFormData.topic,
+          duration: parseInt(scriptFormData.duration),
+          tone: scriptFormData.tone,
+          target_audience: scriptFormData.targetAudience || null
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
 
       setGeneratedScript({
-        title: scriptFormData.topic,
-        duration: scriptFormData.duration,
-        script: `[인트로 - 0:00-0:10]
-안녕하세요! 오늘은 ${scriptFormData.topic}에 대해 알아보겠습니다.
-
-[본문 1 - 0:10-0:30]
-${scriptFormData.topic}의 핵심 포인트를 살펴보면...
-
-[본문 2 - 0:30-0:50]
-이를 실제로 활용하는 방법은...
-
-[아웃트로 - 0:50-1:00]
-오늘 영상이 도움이 되셨다면 구독과 좋아요 부탁드립니다!`,
-        scenes: [
-          { time: '0:00-0:10', type: 'intro', description: '오프닝 멘트 및 주제 소개' },
-          { time: '0:10-0:30', type: 'content', description: '핵심 내용 설명' },
-          { time: '0:30-0:50', type: 'content', description: '활용 방법 안내' },
-          { time: '0:50-1:00', type: 'outro', description: '마무리 멘트' }
-        ]
+        title: response.data.title,
+        duration: response.data.duration,
+        script: response.data.script,
+        scenes: response.data.scenes,
+        hashtags: response.data.hashtags || [],
+        thumbnailIdeas: response.data.thumbnail_ideas || []
       });
     } catch (err) {
-      setScriptError('스크립트 생성 중 오류가 발생했습니다.');
+      const errorMessage = err.response?.data?.detail || '스크립트 생성 중 오류가 발생했습니다.';
+      setScriptError(errorMessage);
       console.error('Video script generation error:', err);
     } finally {
       setScriptLoading(false);
@@ -156,6 +293,12 @@ ${scriptFormData.topic}의 핵심 포인트를 살펴보면...
         >
           비디오 스크립트
         </button>
+        <button
+          className={`content-tab ${activeTab === 'history' ? 'active' : ''}`}
+          onClick={() => setActiveTab('history')}
+        >
+          생성 히스토리
+        </button>
       </div>
 
       {/* AI 동영상 생성 탭 */}
@@ -194,10 +337,22 @@ ${scriptFormData.topic}의 핵심 포인트를 살펴보면...
                 <div className="model-selector">
                   <button
                     type="button"
+                    className={`model-btn ${formData.model === 'wan-2.1' ? 'active' : ''}`}
+                    onClick={() => handleModelChange('wan-2.1')}
+                  >
+                    <span className="model-icon">🎬</span>
+                    <div className="model-info">
+                      <div className="model-name">Wan 2.1 (저렴)</div>
+                      <div className="model-desc">텍스트 → 동영상 (한글 지원, ~$0.01)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
                     className={`model-btn ${formData.model === 'stable-video-diffusion' ? 'active' : ''}`}
                     onClick={() => handleModelChange('stable-video-diffusion')}
                   >
-                    <span className="model-icon">🖼️→🎬</span>
+                    <span className="model-icon">🖼️</span>
                     <div className="model-info">
                       <div className="model-name">Stable Video Diffusion</div>
                       <div className="model-desc">이미지 → 동영상 변환 (고품질)</div>
@@ -209,10 +364,10 @@ ${scriptFormData.topic}의 핵심 포인트를 살펴보면...
                     className={`model-btn ${formData.model === 'text-to-video' ? 'active' : ''}`}
                     onClick={() => handleModelChange('text-to-video')}
                   >
-                    <span className="model-icon">✍️→🎬</span>
+                    <span className="model-icon">✍️</span>
                     <div className="model-info">
                       <div className="model-name">Text-to-Video (LTX)</div>
-                      <div className="model-desc">텍스트 → 동영상 생성</div>
+                      <div className="model-desc">텍스트 → 동영상 생성 (Replicate)</div>
                     </div>
                   </button>
                 </div>
@@ -221,24 +376,53 @@ ${scriptFormData.topic}의 핵심 포인트를 살펴보면...
               {/* 조건부 입력: Image-to-Video */}
               {formData.model === 'stable-video-diffusion' && (
                 <div className="form-group">
-                  <label>원본 이미지 URL *</label>
+                  <label>원본 이미지 *</label>
+
+                  {/* 이미지 업로드 영역 */}
+                  <div className="image-upload-section">
+                    <label htmlFor="video-image-upload" className="image-upload-label">
+                      <input
+                        id="video-image-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        style={{ display: 'none' }}
+                      />
+                      {uploadedImage ? (
+                        <div className="uploaded-image-preview">
+                          <img src={uploadedImage} alt="업로드된 이미지" />
+                          <p className="upload-success-text">이미지 업로드됨 (클릭하여 변경)</p>
+                        </div>
+                      ) : (
+                        <div className="upload-placeholder">
+                          <span className="upload-icon">📁</span>
+                          <p className="upload-title">이미지 파일 업로드</p>
+                          <p className="upload-hint">클릭하여 이미지 선택 (10MB 이하)</p>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+
+                  <div className="divider-text">또는</div>
+
+                  {/* URL 입력 */}
                   <input
                     type="url"
                     name="source_image_url"
                     value={formData.source_image_url}
                     onChange={handleInputChange}
-                    placeholder="https://example.com/image.jpg"
-                    required={formData.model === 'stable-video-diffusion'}
+                    placeholder="이미지 URL 직접 입력 (https://...)"
+                    disabled={!!uploadedImage}
                   />
                   <div className="input-hint">
-                    💡 이전에 생성한 AI 이미지의 URL을 붙여넣으세요
+                    💡 이전에 생성한 AI 이미지를 업로드하거나 URL을 붙여넣으세요
                   </div>
                 </div>
               )}
 
               {/* 프롬프트 */}
               <div className="form-group">
-                <label>프롬프트 {formData.model === 'text-to-video' ? '*' : ''}</label>
+                <label>프롬프트 {(formData.model === 'text-to-video' || formData.model === 'wan-2.1') ? '*' : ''}</label>
                 <textarea
                   name="prompt"
                   value={formData.prompt}
@@ -246,10 +430,12 @@ ${scriptFormData.topic}의 핵심 포인트를 살펴보면...
                   placeholder={
                     formData.model === 'stable-video-diffusion'
                       ? "동영상 스타일 설명 (선택사항)"
+                      : formData.model === 'wan-2.1'
+                      ? "생성할 동영상을 설명해주세요 (한글 가능)\n예: 해변에서 일몰을 바라보는 풍경, 시네마틱한 느낌"
                       : "생성할 동영상에 대한 상세한 설명을 입력하세요"
                   }
                   rows="4"
-                  required={formData.model === 'text-to-video'}
+                  required={formData.model === 'text-to-video' || formData.model === 'wan-2.1'}
                 />
               </div>
 
@@ -277,10 +463,10 @@ ${scriptFormData.topic}의 핵심 포인트를 살펴보면...
             <div className="info-box">
               <h4>📌 주요 안내</h4>
               <ul>
+                <li><strong>Wan 2.1 (저렴)</strong>: 텍스트로 동영상 생성, 한글 자동 번역 (~$0.01)</li>
                 <li><strong>Stable Video Diffusion</strong>: 이미지를 짧은 동영상(2-4초)으로 변환</li>
-                <li><strong>Text-to-Video</strong>: 텍스트 설명으로 동영상 생성 (실험적)</li>
-                <li>생성 시간: 약 1-2분 소요</li>
-                <li>첫 50회 무료, 이후 회당 $0.01-0.02</li>
+                <li><strong>Text-to-Video (LTX)</strong>: Replicate 기반 텍스트 동영상</li>
+                <li>모든 모델은 Replicate 기반 (회당 $0.01-0.05)</li>
               </ul>
             </div>
           </div>
@@ -308,14 +494,22 @@ ${scriptFormData.topic}의 핵심 포인트를 살펴보면...
                   </div>
                   <div className="info-item">
                     <span className="info-label">모델:</span>
-                    <span className="info-value">{result.model}</span>
+                    <span className="info-value">
+                      {result.model === 'wan-2.1' ? 'Wan 2.1' : result.model}
+                    </span>
                   </div>
                   <div className="info-item">
                     <span className="info-label">상태:</span>
                     <span className={`status-badge ${result.status}`}>
-                      {result.status}
+                      {result.status === 'completed' ? '완료' : result.status}
                     </span>
                   </div>
+                  {translatedPrompt && (
+                    <div className="info-item translated-prompt">
+                      <span className="info-label">번역된 프롬프트:</span>
+                      <span className="info-value">{translatedPrompt}</span>
+                    </div>
+                  )}
                 </div>
 
                 {result.video_url && (
@@ -512,6 +706,9 @@ ${scriptFormData.topic}의 핵심 포인트를 살펴보면...
                       <div className="scene-content">
                         <span className="scene-type">{scene.type}</span>
                         <p className="scene-description">{scene.description}</p>
+                        {scene.visual_suggestion && (
+                          <p className="scene-visual">🎬 {scene.visual_suggestion}</p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -525,6 +722,131 @@ ${scriptFormData.topic}의 핵심 포인트를 살펴보면...
                   {generatedScript.script}
                 </div>
               </div>
+
+              {/* 해시태그 */}
+              {generatedScript.hashtags && generatedScript.hashtags.length > 0 && (
+                <div className="hashtags-section">
+                  <h4>#️⃣ 추천 해시태그</h4>
+                  <div className="hashtags-list">
+                    {generatedScript.hashtags.map((tag, index) => (
+                      <span key={index} className="hashtag">#{tag}</span>
+                    ))}
+                  </div>
+                  <button
+                    className="btn-copy-hashtags"
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedScript.hashtags.map(t => `#${t}`).join(' '));
+                      alert('해시태그가 복사되었습니다.');
+                    }}
+                  >
+                    해시태그 복사
+                  </button>
+                </div>
+              )}
+
+              {/* 썸네일 아이디어 */}
+              {generatedScript.thumbnailIdeas && generatedScript.thumbnailIdeas.length > 0 && (
+                <div className="thumbnail-ideas-section">
+                  <h4>🖼️ 썸네일 아이디어</h4>
+                  <ul className="thumbnail-ideas-list">
+                    {generatedScript.thumbnailIdeas.map((idea, index) => (
+                      <li key={index}>{idea}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 생성 히스토리 탭 */}
+      {activeTab === 'history' && (
+        <div className="history-content">
+          <div className="history-header">
+            <h3>생성된 동영상 목록</h3>
+            <button className="btn-refresh" onClick={loadVideoHistory} disabled={historyLoading}>
+              {historyLoading ? '로딩 중...' : '새로고침'}
+            </button>
+          </div>
+
+          {historyLoading ? (
+            <div className="history-loading">
+              <span className="spinner"></span>
+              <p>동영상 목록을 불러오는 중...</p>
+            </div>
+          ) : videoHistory.length === 0 ? (
+            <div className="history-empty">
+              <span className="empty-icon">🎬</span>
+              <p>아직 생성된 동영상이 없습니다.</p>
+              <button onClick={() => setActiveTab('video')} className="btn-create-first">
+                첫 동영상 생성하기
+              </button>
+            </div>
+          ) : (
+            <div className="history-grid">
+              {videoHistory.map((video) => (
+                <div key={video.id} className="history-card">
+                  <div className="history-card-header">
+                    <h4>{video.title}</h4>
+                    <span className={`status-badge ${video.status}`}>
+                      {video.status === 'completed' ? '완료' : video.status === 'processing' ? '처리 중' : '실패'}
+                    </span>
+                  </div>
+
+                  {video.video_url && video.status === 'completed' && (
+                    <div className="history-video-preview">
+                      <video src={video.video_url} controls preload="metadata" />
+                    </div>
+                  )}
+
+                  <div className="history-card-info">
+                    <div className="info-row">
+                      <span className="label">모델:</span>
+                      <span className="value">
+                        {video.model === 'wan-2.1' ? 'Wan 2.1' : video.model}
+                      </span>
+                    </div>
+                    <div className="info-row">
+                      <span className="label">생성일:</span>
+                      <span className="value">
+                        {new Date(video.created_at).toLocaleDateString('ko-KR', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    {video.prompt && (
+                      <div className="info-row prompt-row">
+                        <span className="label">프롬프트:</span>
+                        <span className="value prompt-text">{video.prompt}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="history-card-actions">
+                    {video.video_url && (
+                      <a
+                        href={video.video_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-action btn-download"
+                      >
+                        다운로드
+                      </a>
+                    )}
+                    <button
+                      onClick={() => handleDeleteVideo(video.id)}
+                      className="btn-action btn-delete"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
