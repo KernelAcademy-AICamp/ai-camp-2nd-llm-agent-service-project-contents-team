@@ -28,6 +28,11 @@
   transition: all 0.2s;
   font-size: 14px;
   font-weight: 500;
+  border: none;
+  background: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
 }
 
 .sidebar-item:hover {
@@ -53,43 +58,86 @@
   flex: 1;
 }
 
-.expand-icon {
+/* 드롭다운 스타일 */
+.sidebar-dropdown {
+  position: relative;
+}
+
+.sidebar-dropdown-trigger {
+  position: relative;
+}
+
+.sidebar-dropdown-arrow {
   font-size: 10px;
-  color: var(--text-secondary);
-  transition: transform 0.2s;
+  transition: transform 0.3s ease;
+  margin-left: auto;
 }
 
-.sidebar-item.parent {
-  cursor: pointer;
+.sidebar-dropdown-arrow.open {
+  transform: rotate(180deg);
 }
 
-.sidebar-item.parent:hover .expand-icon {
-  color: var(--text-primary);
-}
-
-.sidebar-item.parent.active .expand-icon {
-  color: #ffffff;
-}
-
-.submenu {
+.sidebar-dropdown-menu {
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin-left: 12px;
   margin-top: 4px;
-  margin-bottom: 4px;
   padding-left: 12px;
   border-left: 2px solid var(--border-color);
+  animation: slideDown 0.2s ease;
 }
 
-.sidebar-item.sub {
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sidebar-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 10px 12px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--text-secondary);
+  transition: all 0.2s;
   font-size: 13px;
+  font-weight: 500;
+  border: none;
+  background: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
 }
 
-.sidebar-item.sub .sidebar-icon {
+.sidebar-dropdown-item:hover {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.sidebar-dropdown-item.active {
+  background: var(--gradient-accent);
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebar-dropdown-item .sidebar-icon {
   font-size: 16px;
   width: 20px;
+}
+
+/* 구분선 */
+.sidebar-divider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 12px 16px;
 }
 
 @media (max-width: 768px) {
@@ -103,5 +151,13 @@
 
   .sidebar-item {
     justify-content: center;
+  }
+
+  .sidebar-dropdown-arrow {
+    display: none;
+  }
+
+  .sidebar-dropdown-menu {
+    display: none;
   }
 }

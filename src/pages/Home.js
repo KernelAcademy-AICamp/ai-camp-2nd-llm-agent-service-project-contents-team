@@ -238,7 +238,7 @@ function Home() {
         <div className="home-welcome">
           <div className="welcome-header">
             <div className="welcome-avatar">
-              <span className="avatar-icon">✨</span>
+              <img src="/ddukddak_colored.png" alt="로고" className="avatar-logo" />
             </div>
             <h1 className="welcome-title">
               안녕하세요, {user?.username || 'User'}님!
@@ -269,7 +269,7 @@ function Home() {
                 {message.type === 'user' ? (
                   <span className="user-icon">👤</span>
                 ) : (
-                  <span className="ai-icon">✨</span>
+                  <img src="/ddukddak_colored.png" alt="AI" className="ai-logo-icon" />
                 )}
               </div>
               <div className="message-content">
@@ -282,7 +282,7 @@ function Home() {
           {isLoading && (
             <div className="message ai">
               <div className="message-avatar">
-                <span className="ai-icon">✨</span>
+                <img src="/ddukddak_colored.png" alt="AI" className="ai-logo-icon" />
               </div>
               <div className="message-content">
                 <div className="typing-indicator">

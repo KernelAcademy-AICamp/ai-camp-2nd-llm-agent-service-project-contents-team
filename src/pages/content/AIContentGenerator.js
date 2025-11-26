@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import AgenticContentForm from '../../components/AgenticContentForm';
 import AgenticContentResult from '../../components/AgenticContentResult';
 import { generateAgenticContent } from '../../services/agenticService';
+import './ContentCommon.css';
 import './AIContentGenerator.css';
 
 function AIContentGenerator() {
@@ -67,7 +68,7 @@ function AIContentGenerator() {
   };
 
   return (
-    <div className="ai-content-generator">
+    <div className="content-page">
       <div className="page-header">
         <div>
           <h1>AI 글 생성</h1>
