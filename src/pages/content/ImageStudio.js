@@ -1,11 +1,11 @@
-import React, { useState, useContext } from 'react';
-import { AuthContext } from '../../contexts/AuthContext';
+import React, { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import './ImageStudio.css';
 
 const MAX_IMAGES = 5;
 
 function ImageStudio() {
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
   // 탭 상태: 'image' (이미지 생성) or 'cardnews' (카드뉴스)
   const [activeTab, setActiveTab] = useState('image');
 
