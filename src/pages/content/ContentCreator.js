@@ -19,22 +19,36 @@ function ContentCreator() {
     { id: 'ai', label: 'AI 글 생성', icon: '🤖' },
     { id: 'social', label: '소셜 미디어', icon: '📱' },
     { id: 'blog', label: '블로그 포스트', icon: '📝' },
-    { id: 'video', label: '비디오 스크립트', icon: '🎥' },
+    { id: 'video-script', label: '비디오 스크립트', icon: '🎥' },
     { id: 'email', label: '이메일', icon: '✉️' },
     { id: 'image-studio', label: '이미지 스튜디오', icon: '🎨' },
+    { id: 'image', label: '이미지 생성', icon: '🎨' },
+    { id: 'cardnews', label: '카드뉴스', icon: '📰' },
+    { id: 'ai-video', label: 'AI 동영상', icon: '🎬' },
   ];
 
   const platforms = {
     social: ['Instagram', 'Facebook', 'Twitter', 'LinkedIn'],
     blog: ['WordPress', 'Naver Blog', 'Tistory', 'Medium'],
-    video: ['YouTube', 'TikTok', 'Reels'],
+    'video-script': ['YouTube', 'TikTok', 'Reels'],
     email: ['Newsletter', 'Promotion', 'Announcement'],
+    image: ['Instagram', 'Pinterest', 'Blog', 'Social Media'],
+    cardnews: ['Instagram', 'Facebook', 'Blog', 'Kakao'],
+    'ai-video': ['YouTube', 'Instagram Reels', 'TikTok', 'Short Form'],
   };
 
-  // 이미지 스튜디오 선택 시 /image-studio로 이동
+  const aiModels = [
+    { id: 'whisk', label: '✨ Whisk AI (무료)', provider: 'Pollinations' },
+    { id: 'nanovana', label: '나노바나나 (Nanovana)', provider: 'Anthropic' },
+    { id: 'gemini', label: '제미나이 (Gemini)', provider: 'Google' },
+  ];
+
+  // AI 동영상 또는 카드뉴스 선택 시 해당 페이지로 이동
   useEffect(() => {
-    if (contentType === 'image-studio') {
-      navigate('/image-studio');
+    if (contentType === 'ai-video') {
+      navigate('/video');
+    } else if (contentType === 'cardnews') {
+      navigate('/cardnews');
     }
   }, [contentType, navigate]);
 

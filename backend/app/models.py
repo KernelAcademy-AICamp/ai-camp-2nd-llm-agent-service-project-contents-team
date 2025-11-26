@@ -41,6 +41,7 @@ class User(Base):
     preferences = relationship("UserPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
     contents = relationship("Content", back_populates="user", cascade="all, delete-orphan")
     brand_analysis = relationship("BrandAnalysis", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserPreference(Base):
@@ -171,6 +172,8 @@ class BrandAnalysis(Base):
 
     # ===== 전반적인 브랜드 요소 (Overall Brand Elements) =====
     # 모든 플랫폼에 공통으로 적용되는 브랜드 특성
+    brand_name = Column(String, nullable=True)  # 블로그에서 추론한 브랜드명
+    business_type = Column(String, nullable=True)  # 업종 (예: 카페/베이커리, IT/소프트웨어)
     brand_tone = Column(String, nullable=True)  # 브랜드 톤앤매너 (예: 친근하고 전문적인)
     brand_values = Column(JSON, nullable=True)  # 브랜드 가치 ["진정성", "혁신"]
     target_audience = Column(String, nullable=True)  # 타겟 고객층 (예: 20-30대 여성)
@@ -213,3 +216,41 @@ class BrandAnalysis(Base):
 
     # Relationship
     user = relationship("User", back_populates="brand_analysis")
+
+
+class ChatSession(Base):
+    """
+    채팅 세션 모델
+    """
+    __tablename__ = "chat_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=True)  # 세션 제목 (첫 메시지 기반)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="chat_sessions")
+    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+
+
+class ChatMessage(Base):
+    """
+    채팅 메시지 모델
+    """
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("chat_sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    role = Column(String, nullable=False)  # user, assistant
+    content = Column(Text, nullable=False)
+    model = Column(String, nullable=True)  # AI 모델명 (gemini-1.5-pro 등)
+    tokens_used = Column(Integer, nullable=True)  # 사용된 토큰 수
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    # Relationships
+    session = relationship("ChatSession", back_populates="messages")
