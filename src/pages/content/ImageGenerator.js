@@ -33,9 +33,7 @@ function ImageGenerator() {
   const [cardnewsMode, setCardnewsMode] = useState('ai'); // 'ai' or 'custom'
 
   const aiModels = [
-    { id: 'whisk', label: 'Whisk AI (무료)', provider: 'Pollinations' },
-    { id: 'nanovana', label: '나노바나나 (Nanovana)', provider: 'Anthropic' },
-    { id: 'gemini', label: '제미나이 (Gemini)', provider: 'Google' },
+    { id: 'nanovana', label: '나노바나나 (Nanovana)', provider: 'Google' },
   ];
 
   // AI 이미지 생성 핸들러
@@ -472,9 +470,7 @@ function ImageGenerator() {
             <div className="info-box">
               <h4>AI 모델 안내</h4>
               <ul>
-                <li><strong>Whisk AI</strong>: 무료, Pollinations 기반 (FLUX 모델)</li>
                 <li><strong>Nanovana</strong>: Gemini 2.5 Flash Image (Text/Image-to-Image)</li>
-                <li><strong>Gemini</strong>: Gemini + Stable Diffusion 2.1 조합</li>
               </ul>
             </div>
           </div>

@@ -42,3 +42,7 @@
 2025-11-26 15:15:21 - app.routers.chat - INFO - 채팅 세션 목록 조회 완료 (total: 1, returned: 1)
 2025-11-26 15:15:21 - app.routers.chat - INFO - 채팅 세션 목록 조회 (user_id: 3, limit: 50, offset: 0)
 2025-11-26 15:15:21 - app.routers.chat - INFO - 채팅 세션 목록 조회 완료 (total: 1, returned: 1)
+2025-11-26 16:03:39 - app.routers.chat - INFO - 채팅 세션 목록 조회 (user_id: 3, limit: 50, offset: 0)
+2025-11-26 16:03:39 - app.routers.chat - INFO - 채팅 세션 목록 조회 완료 (total: 1, returned: 1)
+2025-11-26 16:03:39 - app.routers.chat - INFO - 채팅 세션 목록 조회 (user_id: 3, limit: 50, offset: 0)
+2025-11-26 16:03:39 - app.routers.chat - INFO - 채팅 세션 목록 조회 완료 (total: 1, returned: 1)
