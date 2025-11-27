@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user, blog, chat, brand_analysis
+from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user, blog, chat, brand_analysis, youtube, facebook, instagram
 from .database import engine, Base
 
 # 루트 .env 파일 먼저 로드 (프로젝트 루트)
@@ -52,6 +52,9 @@ app.include_router(ai_recommendations.router)
 app.include_router(blog.router)
 app.include_router(chat.router)
 app.include_router(brand_analysis.router)
+app.include_router(youtube.router)
+app.include_router(facebook.router)
+app.include_router(instagram.router)
 
 
 @app.get("/")

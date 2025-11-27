@@ -18,6 +18,12 @@ function Sidebar() {
     { path: '/video', icon: '🎬', label: 'AI 동영상 생성' },
   ];
 
+  const platformMenuItems = [
+    { path: '/youtube', icon: '📺', label: 'YouTube' },
+    { path: '/facebook', icon: '📘', label: 'Facebook' },
+    { path: '/instagram', icon: '📸', label: 'Instagram' },
+  ];
+
   const managementMenuItems = [
     { path: '/contents', icon: '📝', label: '콘텐츠 관리' },
     { path: '/templates', icon: '📋', label: '템플릿' },
@@ -85,6 +91,20 @@ function Sidebar() {
             </div>
           )}
         </div>
+
+        {/* 플랫폼 연동 메뉴 */}
+        <div className="sidebar-divider"></div>
+        <div className="sidebar-section-label">플랫폼</div>
+        {platformMenuItems.map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
+          >
+            <span className="sidebar-icon">{item.icon}</span>
+            <span className="sidebar-label">{item.label}</span>
+          </Link>
+        ))}
 
         {/* 관리 메뉴 */}
         <div className="sidebar-divider"></div>
