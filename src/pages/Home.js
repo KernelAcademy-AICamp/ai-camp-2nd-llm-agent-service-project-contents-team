@@ -17,6 +17,7 @@ function Home() {
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [followUpPrompts, setFollowUpPrompts] = useState([]);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -132,6 +133,9 @@ function Home() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, aiMessage]);
+
+      // 팔로우업 프롬프트 생성
+      generateFollowUpPrompts(userInput, response.data.response);
     } catch (error) {
       console.error('AI 응답 실패:', error);
       const errorMessage = {
@@ -181,6 +185,221 @@ function Home() {
     { icon: '🎬', text: 'AI 동영상 생성', path: '/video', description: '프롬프트로 동영상 생성' },
     { icon: '📋', text: '템플릿 갤러리', path: '/templates', description: '콘텐츠 템플릿 모아보기' },
   ];
+
+  // 콘텐츠 생성 도구 바로가기
+  const contentTools = [
+    { icon: '✍️', label: '글 생성', path: '/ai-content' },
+    { icon: '🎨', label: '이미지', path: '/image' },
+    { icon: '🎬', label: '동영상', path: '/video' },
+  ];
+
+  // AI 응답에서 콘텐츠 생성 관련 키워드 감지
+  const shouldShowContentTools = (content) => {
+    const keywords = [
+      '콘텐츠', '생성', '만들', '작성', '블로그', '포스트', '게시물',
+      '이미지', '사진', '그림', '동영상', '영상', '비디오',
+      'SNS', '인스타', '페이스북', '유튜브', '마케팅', '홍보',
+      '카드뉴스', '배너', '썸네일'
+    ];
+    return keywords.some(keyword => content.includes(keyword));
+  };
+
+  // 팔로우업 프롬프트 생성 함수
+  const generateFollowUpPrompts = async (userMessage, aiResponse) => {
+    try {
+      const response = await api.post('/api/chat/follow-up-prompts', {
+        user_message: userMessage,
+        ai_response: aiResponse,
+        user_info: user
+      });
+
+      if (response.data.prompts && response.data.prompts.length > 0) {
+        setFollowUpPrompts(response.data.prompts);
+      } else {
+        // API가 없거나 실패시 기본 프롬프트 생성
+        generateDefaultFollowUpPrompts(userMessage);
+      }
+    } catch (error) {
+      console.error('팔로우업 프롬프트 생성 실패:', error);
+      // 에러 시 기본 프롬프트 생성
+      generateDefaultFollowUpPrompts(userMessage);
+    }
+  };
+
+  // 기본 팔로우업 프롬프트 생성 (API 실패 시)
+  const generateDefaultFollowUpPrompts = (userMessage) => {
+    // 사용자 프로필 정보 추출 (문자열인지 확인)
+    const getStringValue = (value) => {
+      if (!value) return '';
+      if (typeof value === 'string') return value;
+      if (typeof value === 'object') return '';
+      return String(value);
+    };
+
+    const industry = getStringValue(user?.industry) || getStringValue(user?.business_type);
+    const target = getStringValue(user?.target_audience) || getStringValue(user?.target);
+    const brandName = getStringValue(user?.brand_name) || getStringValue(user?.company_name);
+
+    const industryText = industry ? `${industry} 업종` : '';
+    const targetText = target ? `${target}` : '';
+    const brandText = brandName ? `${brandName}` : '';
+
+    // 사용자 메시지에서 핵심 키워드 추출
+    const extractKeyTopic = (message) => {
+      const stopWords = ['을', '를', '이', '가', '은', '는', '에', '의', '로', '으로', '와', '과', '도', '만', '까지', '부터', '에서', '해줘', '알려줘', '뭐야', '어떻게'];
+      const words = message.split(/\s+/).filter(word => word.length > 1 && !stopWords.some(sw => word.endsWith(sw) && word.length <= sw.length + 2));
+      return words.slice(0, 3).join(' ') || '이 주제';
+    };
+    const keyTopic = extractKeyTopic(userMessage);
+
+    // 배열 랜덤 셔플 함수
+    const shuffleArray = (array) => {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+
+    // 카테고리별 다양한 프롬프트 풀
+    let promptPool = [];
+
+    if (userMessage.includes('콘텐츠') || userMessage.includes('마케팅')) {
+      promptPool = [
+        industryText && targetText ? `${industryText}에서 ${targetText}을 위한 효과적인 콘텐츠 전략은 뭐야?` : `${keyTopic}에 효과적인 콘텐츠 전략을 더 자세히 알려줘`,
+        brandText ? `${brandText}의 마케팅 효과를 높이는 SNS 채널별 콘텐츠 차별화 방법을 알려줘` : `SNS 채널별 콘텐츠 차별화 방법을 알려줘`,
+        `${keyTopic}를 활용한 시즌별 마케팅 캠페인 아이디어를 더 알려줘`,
+        `${keyTopic} 관련 경쟁사와 차별화되는 콘텐츠 전략은?`,
+        `${keyTopic}로 바이럴 마케팅을 할 수 있는 방법은?`,
+        `콘텐츠 성과를 측정하는 핵심 지표(KPI)를 알려줘`,
+        `${keyTopic} 관련 월별 콘텐츠 캘린더 예시를 만들어줘`,
+        `저예산으로 효과적인 ${keyTopic} 마케팅 방법은?`,
+      ];
+    } else if (userMessage.includes('이미지') || userMessage.includes('사진') || userMessage.includes('디자인')) {
+      promptPool = [
+        industryText && targetText ? `${industryText}에 어울리는 ${targetText} 취향의 이미지 스타일을 추천해줘` : `${keyTopic}에 어울리는 이미지 스타일을 추천해줘`,
+        brandText ? `${brandText}만의 차별화된 비주얼 아이덴티티를 만드는 방법은?` : `차별화된 비주얼 아이덴티티를 만드는 방법은?`,
+        `${keyTopic} 관련 이미지에 효과적인 텍스트 배치와 폰트 선택법을 알려줘`,
+        `${keyTopic}에 어울리는 색상 팔레트를 추천해줘`,
+        `SNS별 최적의 이미지 사이즈와 비율을 알려줘`,
+        `${keyTopic} 관련 무료로 사용 가능한 이미지 소스를 알려줘`,
+        `이미지 생성 AI 프롬프트 작성 팁을 알려줘`,
+        `${keyTopic}를 표현하는 다양한 비주얼 컨셉 아이디어를 제안해줘`,
+      ];
+    } else if (userMessage.includes('영상') || userMessage.includes('동영상') || userMessage.includes('비디오')) {
+      promptPool = [
+        industryText && targetText ? `${industryText}에서 ${targetText}이 좋아하는 영상 콘텐츠 유형은 뭐가 있어?` : `${keyTopic} 관련 인기 있는 영상 콘텐츠 유형은 뭐가 있어?`,
+        brandText ? `${brandText}를 홍보하는 30초 숏폼 영상 시나리오를 만들어줘` : `${keyTopic}를 홍보하는 30초 숏폼 영상 시나리오를 만들어줘`,
+        `${keyTopic}를 소재로 한 바이럴 영상 아이디어를 더 제안해줘`,
+        `틱톡/릴스에서 인기 있는 ${keyTopic} 관련 트렌드를 알려줘`,
+        `영상 초반 3초에 시선을 끄는 후킹 기법을 알려줘`,
+        `${keyTopic} 관련 유튜브 쇼츠 콘텐츠 아이디어 5가지를 알려줘`,
+        `영상 편집 없이 쉽게 만들 수 있는 콘텐츠 형식은?`,
+        `${keyTopic}를 브이로그 형식으로 제작하는 방법을 알려줘`,
+      ];
+    } else if (userMessage.includes('블로그') || userMessage.includes('글') || userMessage.includes('포스트')) {
+      promptPool = [
+        industryText && targetText ? `${industryText}에서 ${targetText}이 검색할 만한 블로그 키워드를 추천해줘` : `${keyTopic} 관련 검색량 높은 블로그 키워드를 추천해줘`,
+        brandText ? `${brandText}의 전문성을 보여줄 수 있는 시리즈 글 주제를 제안해줘` : `${keyTopic}에 대한 시리즈 글 주제를 제안해줘`,
+        `${keyTopic}에 대해 더 깊이 있는 내용을 다룬 글을 작성해줘`,
+        `SEO에 최적화된 ${keyTopic} 블로그 글 구조를 알려줘`,
+        `${keyTopic} 관련 클릭을 유도하는 제목 작성법을 알려줘`,
+        `${keyTopic}를 리스티클 형식으로 작성하면 어떨까?`,
+        `${keyTopic} 관련 FAQ 형식의 글을 작성해줘`,
+        `독자 참여를 유도하는 CTA(행동유도) 문구 예시를 알려줘`,
+      ];
+    } else if (userMessage.includes('홍보') || userMessage.includes('광고') || userMessage.includes('프로모션')) {
+      promptPool = [
+        industryText && targetText ? `${industryText}에서 ${targetText}에게 효과적인 프로모션 전략은?` : `${keyTopic}에 효과적인 프로모션 전략은?`,
+        brandText ? `${brandText}의 신규 고객 유치를 위한 이벤트 아이디어를 알려줘` : `신규 고객 유치를 위한 이벤트 아이디어를 알려줘`,
+        `${keyTopic}를 활용한 저비용 고효율 홍보 방법을 더 알려줘`,
+        `${keyTopic} 관련 입소문 마케팅 전략을 알려줘`,
+        `시즌별 ${keyTopic} 프로모션 아이디어를 제안해줘`,
+        `${keyTopic} 관련 콜라보레이션 마케팅 아이디어는?`,
+        `오프라인과 온라인을 연계한 ${keyTopic} 홍보 방법은?`,
+        `${keyTopic} 광고 카피라이팅 예시를 보여줘`,
+      ];
+    } else if (userMessage.includes('SNS') || userMessage.includes('인스타') || userMessage.includes('소셜')) {
+      promptPool = [
+        industryText && targetText ? `${industryText}의 ${targetText}이 활발히 활동하는 SNS 채널과 최적 게시 시간은?` : `${keyTopic} 관련 최적의 SNS 채널과 게시 시간은?`,
+        brandText ? `${brandText}의 SNS 팔로워를 늘리는 구체적인 전략을 알려줘` : `SNS 팔로워를 늘리는 구체적인 전략을 알려줘`,
+        `${keyTopic} 관련 SNS 해시태그와 캡션 작성 팁을 더 알려줘`,
+        `${keyTopic} 관련 인스타그램 스토리 활용법을 알려줘`,
+        `SNS 알고리즘에 유리한 게시물 작성법을 알려줘`,
+        `${keyTopic} 관련 인플루언서 마케팅 전략을 알려줘`,
+        `SNS에서 팔로워와 소통하는 효과적인 방법은?`,
+        `${keyTopic} 관련 SNS 이벤트/챌린지 아이디어를 알려줘`,
+      ];
+    } else {
+      promptPool = [
+        `${keyTopic}에 대해 더 자세히 설명해줘`,
+        `${keyTopic}를 실제로 적용할 수 있는 구체적인 예시를 알려줘`,
+        `${keyTopic}와 관련된 추가 팁이나 주의사항이 있어?`,
+        `${keyTopic}의 장단점을 비교해서 알려줘`,
+        `${keyTopic}를 초보자도 쉽게 시작하는 방법은?`,
+        `${keyTopic} 관련 자주 하는 실수와 해결 방법을 알려줘`,
+        `${keyTopic}의 최신 트렌드를 알려줘`,
+        `${keyTopic}를 더 효과적으로 활용하는 고급 팁을 알려줘`,
+      ];
+    }
+
+    // 랜덤으로 섞어서 3개 선택
+    const shuffledPrompts = shuffleArray(promptPool);
+    setFollowUpPrompts(shuffledPrompts.slice(0, 3));
+  };
+
+  // 팔로우업 프롬프트 클릭 핸들러 (클릭 시 바로 전송)
+  const handleFollowUpClick = async (prompt) => {
+    setFollowUpPrompts([]);
+
+    const userMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: prompt,
+      timestamp: new Date(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      const response = await api.post('/api/chat', {
+        message: prompt,
+        session_id: currentSessionId,
+        history: messages.map(msg => ({
+          role: msg.type === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        }))
+      });
+
+      if (!currentSessionId && response.data.session_id) {
+        setCurrentSessionId(response.data.session_id);
+        loadSessions();
+      }
+
+      const aiMessage = {
+        id: Date.now() + 1,
+        type: 'ai',
+        content: response.data.response,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+
+      generateFollowUpPrompts(prompt, response.data.response);
+    } catch (error) {
+      console.error('AI 응답 실패:', error);
+      const errorMessage = {
+        id: Date.now() + 1,
+        type: 'ai',
+        content: '죄송합니다. 응답을 생성하는 중 오류가 발생했습니다. 다시 시도해주세요.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handlePromptClick = (prompt) => {
     if (prompt.path) {
@@ -288,6 +507,23 @@ function Home() {
                 <div className="message-text">
                   <ReactMarkdown>{message.content}</ReactMarkdown>
                 </div>
+                {/* AI 응답에 콘텐츠 생성 관련 내용이 있으면 도구 버튼 표시 */}
+                {message.type === 'ai' && shouldShowContentTools(message.content) && (
+                  <div className="content-tools-bar">
+                    <span className="tools-label">도구 제안:</span>
+                    {contentTools.map((tool, idx) => (
+                      <button
+                        key={idx}
+                        className="tool-btn"
+                        onClick={() => navigate(tool.path)}
+                        title={tool.label}
+                      >
+                        <span className="tool-icon">{tool.icon}</span>
+                        <span className="tool-label">{tool.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -310,6 +546,23 @@ function Home() {
       )}
 
         <div className="chat-input-container">
+          {/* 팔로우업 프롬프트 추천 */}
+          {followUpPrompts.length > 0 && messages.length > 0 && (
+            <div className="follow-up-prompts">
+              <span className="follow-up-label">💡 이런 질문은 어떨까요?</span>
+              <div className="follow-up-buttons">
+                {followUpPrompts.map((prompt, index) => (
+                  <button
+                    key={index}
+                    className="follow-up-btn"
+                    onClick={() => handleFollowUpClick(prompt)}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="chat-input-form">
             <div className="input-wrapper">
               <textarea
