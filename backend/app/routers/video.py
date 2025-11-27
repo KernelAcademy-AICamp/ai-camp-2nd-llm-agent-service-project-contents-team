@@ -727,12 +727,18 @@ async def generate_veo31_video(
                 model="veo-3.1-generate-preview",
                 prompt=translated_prompt,
                 image=image_obj,
+                config=types.GenerateVideosConfig(
+                    aspect_ratio="9:16",
+                ),
             )
         else:
             # 텍스트 → 동영상 생성
             operation = client.models.generate_videos(
                 model="veo-3.1-generate-preview",
                 prompt=translated_prompt,
+                config=types.GenerateVideosConfig(
+                    aspect_ratio="9:16",
+                ),
             )
 
         # 비동기 작업 대기 (최대 5분)
