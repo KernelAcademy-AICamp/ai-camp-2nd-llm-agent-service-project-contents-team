@@ -3,11 +3,6 @@
 """
 import logging
 import sys
-from pathlib import Path
-
-# 로그 디렉토리 생성
-LOG_DIR = Path(__file__).parent.parent / "logs"
-LOG_DIR.mkdir(exist_ok=True)
 
 # 로그 포맷 설정
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -83,24 +78,15 @@ def setup_logger(name: str, level: str = "INFO") -> logging.Logger:
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
 
-    # 파일 핸들러 (전체 로그)
-    file_handler = logging.FileHandler(
-        LOG_DIR / f"{name}.log",
-        encoding="utf-8"
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_formatter = logging.Formatter(LOG_FORMAT, DATE_FORMAT)
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
-
-    # 에러 전용 파일 핸들러
-    error_handler = logging.FileHandler(
-        LOG_DIR / f"{name}_error.log",
-        encoding="utf-8"
-    )
-    error_handler.setLevel(logging.ERROR)
-    error_handler.setFormatter(file_formatter)
-    logger.addHandler(error_handler)
+    # 파일 로깅은 비활성화 (콘솔 출력만 사용)
+    # 파일 로깅이 필요한 경우 아래 주석을 해제하세요
+    # from pathlib import Path
+    # LOG_DIR = Path(__file__).parent.parent / "logs"
+    # LOG_DIR.mkdir(exist_ok=True)
+    # file_handler = logging.FileHandler(LOG_DIR / f"{name}.log", encoding="utf-8")
+    # file_handler.setLevel(logging.DEBUG)
+    # file_handler.setFormatter(logging.Formatter(LOG_FORMAT, DATE_FORMAT))
+    # logger.addHandler(file_handler)
 
     return logger
 

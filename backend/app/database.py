@@ -8,17 +8,13 @@ load_dotenv()
 
 # 환경 변수 설정
 ENV = os.getenv("ENV", "development")  # development, production, test
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# 데이터베이스 연결 설정
-if DATABASE_URL.startswith("sqlite"):
-    # SQLite 설정 (개발 환경)
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False}
-    )
-elif DATABASE_URL.startswith("postgresql"):
-    # PostgreSQL 설정 (프로덕션 환경)
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL 환경 변수가 설정되지 않았습니다. .env 파일을 확인하세요.")
+
+# PostgreSQL 데이터베이스 연결 설정
+if DATABASE_URL.startswith("postgresql"):
     engine = create_engine(
         DATABASE_URL,
         pool_size=10,              # 연결 풀 크기
@@ -28,8 +24,7 @@ elif DATABASE_URL.startswith("postgresql"):
         echo=ENV == "development"  # 개발 환경에서만 SQL 로그 출력
     )
 else:
-    # 기본 설정
-    engine = create_engine(DATABASE_URL)
+    raise ValueError(f"지원하지 않는 데이터베이스입니다: {DATABASE_URL.split('://')[0]}. PostgreSQL만 지원합니다.")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

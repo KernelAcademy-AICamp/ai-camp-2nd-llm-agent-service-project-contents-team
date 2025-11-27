@@ -294,6 +294,19 @@
   cursor: not-allowed;
 }
 
+.platform-item.connected {
+  border-color: var(--success-color);
+  background: var(--success-light);
+}
+
+.platform-item.connected .platform-status {
+  color: var(--success-dark);
+}
+
+a.platform-item {
+  text-decoration: none;
+}
+
 .platform-icon {
   font-size: 32px;
   margin-right: 16px;

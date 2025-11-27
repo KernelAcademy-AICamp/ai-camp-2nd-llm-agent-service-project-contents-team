@@ -1,43 +1,100 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { youtubeAPI, facebookAPI, instagramAPI } from '../../services/api';
 import './Settings.css';
 
 function Settings() {
+  const [youtubeConnection, setYoutubeConnection] = useState(null);
+  const [facebookConnection, setFacebookConnection] = useState(null);
+  const [instagramConnection, setInstagramConnection] = useState(null);
+
+  useEffect(() => {
+    const fetchYoutubeStatus = async () => {
+      try {
+        const data = await youtubeAPI.getStatus();
+        setYoutubeConnection(data);
+      } catch (err) {
+        console.error('Failed to fetch YouTube status:', err);
+      }
+    };
+
+    const fetchFacebookStatus = async () => {
+      try {
+        const data = await facebookAPI.getStatus();
+        setFacebookConnection(data);
+      } catch (err) {
+        console.error('Failed to fetch Facebook status:', err);
+      }
+    };
+
+    const fetchInstagramStatus = async () => {
+      try {
+        const data = await instagramAPI.getStatus();
+        setInstagramConnection(data);
+      } catch (err) {
+        console.error('Failed to fetch Instagram status:', err);
+      }
+    };
+
+    fetchYoutubeStatus();
+    fetchFacebookStatus();
+    fetchInstagramStatus();
+  }, []);
+
   return (
     <div className="settings-page">
       <div className="settings-header">
-        <h2>⚙️ 설정</h2>
+        <h2>설정</h2>
         <p>플랫폼 연동 및 계정 설정을 관리하세요</p>
       </div>
 
       {/* 기타 플랫폼 */}
       <div className="settings-section">
-        <h3>🌐 소셜 미디어 플랫폼</h3>
-        <p className="section-description">향후 소셜 미디어 자동 발행 기능이 추가될 예정입니다.</p>
+        <h3>소셜 미디어 플랫폼</h3>
+        <p className="section-description">소셜 미디어 플랫폼을 연동하여 콘텐츠를 관리하세요.</p>
         <div className="platform-list">
-          <div className="platform-item disabled">
-            <div className="platform-icon">📸</div>
+          <Link to="/youtube" className={`platform-item ${youtubeConnection ? 'connected' : ''}`}>
+            <div className="platform-icon">📺</div>
             <div className="platform-info">
-              <div className="platform-name">Instagram</div>
-              <div className="platform-status">개발 예정</div>
+              <div className="platform-name">YouTube</div>
+              <div className="platform-status">
+                {youtubeConnection
+                  ? `연동됨 - ${youtubeConnection.channel_title}`
+                  : '연동 가능'}
+              </div>
             </div>
-            <button className="btn-connect" disabled>준비 중</button>
-          </div>
-          <div className="platform-item disabled">
+            <span className="btn-connect">
+              {youtubeConnection ? '관리하기' : '연동하기'}
+            </span>
+          </Link>
+          <Link to="/facebook" className={`platform-item ${facebookConnection ? 'connected' : ''}`}>
             <div className="platform-icon">📘</div>
             <div className="platform-info">
               <div className="platform-name">Facebook</div>
-              <div className="platform-status">개발 예정</div>
+              <div className="platform-status">
+                {facebookConnection
+                  ? `연동됨 - ${facebookConnection.page_name || facebookConnection.facebook_user_name}`
+                  : '연동 가능'}
+              </div>
             </div>
-            <button className="btn-connect" disabled>준비 중</button>
-          </div>
-          <div className="platform-item disabled">
-            <div className="platform-icon">🎥</div>
+            <span className="btn-connect">
+              {facebookConnection ? '관리하기' : '연동하기'}
+            </span>
+          </Link>
+          <Link to="/instagram" className={`platform-item ${instagramConnection ? 'connected' : ''}`}>
+            <div className="platform-icon">📸</div>
             <div className="platform-info">
-              <div className="platform-name">YouTube</div>
-              <div className="platform-status">개발 예정</div>
+              <div className="platform-name">Instagram</div>
+              <div className="platform-status">
+                {instagramConnection
+                  ? `연동됨 - @${instagramConnection.instagram_username}`
+                  : '연동 가능'}
+              </div>
             </div>
-            <button className="btn-connect" disabled>준비 중</button>
-          </div>
+            <span className="btn-connect">
+              {instagramConnection ? '관리하기' : '연동하기'}
+            </span>
+          </Link>
           <div className="platform-item disabled">
             <div className="platform-icon">🐦</div>
             <div className="platform-info">
