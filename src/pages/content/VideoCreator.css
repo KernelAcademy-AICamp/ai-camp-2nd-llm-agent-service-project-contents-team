@@ -264,10 +264,12 @@
 }
 
 .generated-video {
-  width: 100%;
+  max-width: 225px;
+  max-height: 400px;
+  margin: 0 auto;
+  display: block;
   border-radius: var(--radius-lg);
   background: #000;
-  max-height: 400px;
   object-fit: contain;
 }
 
