@@ -175,12 +175,29 @@ async def facebook_callback(
         # 페이지 정보 (첫 번째 페이지 사용, 또는 페이지 선택 UI 필요)
         page_data = pages[0] if pages else None
 
+        # 페이지 목록을 캐싱용으로 변환
+        cached_pages = None
+        if pages:
+            cached_pages = [
+                {
+                    'id': p['id'],
+                    'name': p.get('name', ''),
+                    'category': p.get('category'),
+                    'picture_url': p.get('picture', {}).get('data', {}).get('url'),
+                    'fan_count': p.get('fan_count'),
+                    'followers_count': p.get('followers_count'),
+                    'access_token': p.get('access_token', '')
+                }
+                for p in pages
+            ]
+
         if existing:
             # 업데이트
             existing.facebook_user_id = me['id']
             existing.facebook_user_name = me.get('name')
             existing.user_access_token = access_token
             existing.is_active = True
+            existing.available_pages = cached_pages  # 페이지 목록 캐싱
 
             if page_data:
                 existing.page_id = page_data['id']
@@ -197,7 +214,8 @@ async def facebook_callback(
                 facebook_user_id=me['id'],
                 facebook_user_name=me.get('name'),
                 user_access_token=access_token,
-                is_active=True
+                is_active=True,
+                available_pages=cached_pages  # 페이지 목록 캐싱
             )
 
             if page_data:
@@ -262,23 +280,63 @@ async def get_facebook_status(
 
 @router.get('/pages', response_model=List[FacebookPageInfo])
 async def get_my_pages(
+    refresh: bool = False,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_active_user)
 ):
-    """사용자가 관리하는 Facebook 페이지 목록"""
+    """사용자가 관리하는 Facebook 페이지 목록 (캐시 우선)"""
+    logger.info(f"Getting pages for user: {current_user.id}, refresh: {refresh}")
+
     connection = db.query(models.FacebookConnection).filter(
         models.FacebookConnection.user_id == current_user.id
     ).first()
 
     if not connection:
+        logger.error(f"No Facebook connection found for user: {current_user.id}")
         raise HTTPException(status_code=404, detail="Facebook not connected")
 
+    # 캐시된 페이지가 있고 refresh가 아니면 바로 반환
+    if not refresh and connection.available_pages:
+        logger.info(f"Returning cached pages: {len(connection.available_pages)} pages")
+        return [
+            FacebookPageInfo(
+                id=p['id'],
+                name=p.get('name', ''),
+                category=p.get('category'),
+                picture_url=p.get('picture_url'),
+                fan_count=p.get('fan_count'),
+                followers_count=p.get('followers_count'),
+                access_token=p.get('access_token', '')
+            )
+            for p in connection.available_pages
+        ]
+
+    # 캐시가 없거나 refresh 요청이면 API 호출
+    logger.info(f"Fetching pages from Facebook API")
     fb_service = FacebookService(connection.user_access_token)
     pages = await fb_service.get_my_pages()
     await fb_service.close()
 
+    logger.info(f"Pages from Facebook API: {pages}")
+
     if not pages:
+        logger.warning("No pages returned from Facebook API")
         return []
+
+    # 캐시 업데이트
+    connection.available_pages = [
+        {
+            'id': p['id'],
+            'name': p.get('name', ''),
+            'category': p.get('category'),
+            'picture_url': p.get('picture', {}).get('data', {}).get('url'),
+            'fan_count': p.get('fan_count'),
+            'followers_count': p.get('followers_count'),
+            'access_token': p.get('access_token', '')
+        }
+        for p in pages
+    ]
+    db.commit()
 
     return [
         FacebookPageInfo(

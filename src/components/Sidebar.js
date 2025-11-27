@@ -21,6 +21,7 @@ function Sidebar() {
   const platformMenuItems = [
     { path: '/youtube', icon: '📺', label: 'YouTube' },
     { path: '/facebook', icon: '📘', label: 'Facebook' },
+    { path: '/instagram', icon: '📸', label: 'Instagram' },
   ];
 
   const managementMenuItems = [

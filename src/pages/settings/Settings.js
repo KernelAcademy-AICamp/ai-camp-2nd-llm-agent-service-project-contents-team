@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { youtubeAPI, facebookAPI } from '../../services/api';
+import { youtubeAPI, facebookAPI, instagramAPI } from '../../services/api';
 import './Settings.css';
 
 function Settings() {
   const [youtubeConnection, setYoutubeConnection] = useState(null);
   const [facebookConnection, setFacebookConnection] = useState(null);
+  const [instagramConnection, setInstagramConnection] = useState(null);
 
   useEffect(() => {
     const fetchYoutubeStatus = async () => {
@@ -26,8 +27,18 @@ function Settings() {
       }
     };
 
+    const fetchInstagramStatus = async () => {
+      try {
+        const data = await instagramAPI.getStatus();
+        setInstagramConnection(data);
+      } catch (err) {
+        console.error('Failed to fetch Instagram status:', err);
+      }
+    };
+
     fetchYoutubeStatus();
     fetchFacebookStatus();
+    fetchInstagramStatus();
   }, []);
 
   return (
@@ -70,14 +81,20 @@ function Settings() {
               {facebookConnection ? '관리하기' : '연동하기'}
             </span>
           </Link>
-          <div className="platform-item disabled">
+          <Link to="/instagram" className={`platform-item ${instagramConnection ? 'connected' : ''}`}>
             <div className="platform-icon">📸</div>
             <div className="platform-info">
               <div className="platform-name">Instagram</div>
-              <div className="platform-status">개발 예정</div>
+              <div className="platform-status">
+                {instagramConnection
+                  ? `연동됨 - @${instagramConnection.instagram_username}`
+                  : '연동 가능'}
+              </div>
             </div>
-            <button className="btn-connect" disabled>준비 중</button>
-          </div>
+            <span className="btn-connect">
+              {instagramConnection ? '관리하기' : '연동하기'}
+            </span>
+          </Link>
           <div className="platform-item disabled">
             <div className="platform-icon">🐦</div>
             <div className="platform-info">

@@ -44,6 +44,7 @@ class User(Base):
     chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
     youtube_connection = relationship("YouTubeConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     facebook_connection = relationship("FacebookConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    instagram_connection = relationship("InstagramConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class UserPreference(Base):
@@ -408,6 +409,9 @@ class FacebookConnection(Base):
     page_access_token = Column(Text, nullable=True)  # 페이지 액세스 토큰 (장기 토큰)
     token_expires_at = Column(DateTime(timezone=True), nullable=True)  # 토큰 만료 시간
 
+    # 관리 가능한 페이지 목록 (캐싱)
+    available_pages = Column(JSON, nullable=True)  # [{"id": "...", "name": "...", ...}, ...]
+
     # 연동 상태
     is_active = Column(Boolean, default=True)
     last_synced_at = Column(DateTime(timezone=True), nullable=True)
@@ -458,3 +462,89 @@ class FacebookPost(Base):
 
     # Relationships
     connection = relationship("FacebookConnection", back_populates="posts")
+
+
+class InstagramConnection(Base):
+    """
+    Instagram 비즈니스 계정 연동 정보 모델
+    - Facebook 페이지와 연결된 Instagram 비즈니스/크리에이터 계정
+    """
+    __tablename__ = "instagram_connections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+
+    # Facebook 사용자 정보
+    facebook_user_id = Column(String, nullable=True)  # Facebook 사용자 ID
+    facebook_user_name = Column(String, nullable=True)  # Facebook 사용자 이름
+
+    # 연동된 Facebook 페이지 정보
+    page_id = Column(String, nullable=True, index=True)  # Facebook 페이지 ID
+    page_name = Column(String, nullable=True)  # 페이지 이름
+
+    # Instagram 계정 정보
+    instagram_account_id = Column(String, nullable=True, index=True)  # Instagram 비즈니스 계정 ID
+    instagram_username = Column(String, nullable=True)  # Instagram 사용자명 (@username)
+    instagram_name = Column(String, nullable=True)  # 표시 이름
+    instagram_profile_picture_url = Column(String, nullable=True)  # 프로필 사진 URL
+    instagram_biography = Column(Text, nullable=True)  # 자기소개
+    instagram_website = Column(String, nullable=True)  # 웹사이트 URL
+
+    # 계정 통계
+    followers_count = Column(Integer, default=0)  # 팔로워 수
+    follows_count = Column(Integer, default=0)  # 팔로잉 수
+    media_count = Column(Integer, default=0)  # 게시물 수
+
+    # OAuth 토큰 정보
+    user_access_token = Column(Text, nullable=True)  # 사용자 액세스 토큰
+    page_access_token = Column(Text, nullable=True)  # 페이지 액세스 토큰
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    # 연동 상태
+    is_active = Column(Boolean, default=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="instagram_connection")
+    posts = relationship("InstagramPost", back_populates="connection", cascade="all, delete-orphan")
+
+
+class InstagramPost(Base):
+    """
+    Instagram 게시물 모델
+    - 연동된 비즈니스 계정의 게시물 목록 및 통계
+    """
+    __tablename__ = "instagram_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    connection_id = Column(Integer, ForeignKey("instagram_connections.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Instagram 게시물 기본 정보
+    media_id = Column(String, nullable=False, unique=True, index=True)  # Instagram 미디어 ID
+    media_type = Column(String, nullable=True)  # IMAGE, VIDEO, CAROUSEL_ALBUM
+    media_url = Column(String, nullable=True)  # 미디어 URL
+    thumbnail_url = Column(String, nullable=True)  # 썸네일 URL (비디오용)
+    permalink = Column(String, nullable=True)  # 게시물 링크
+    caption = Column(Text, nullable=True)  # 캡션
+    timestamp = Column(DateTime(timezone=True), nullable=True)  # 게시 시간
+
+    # 게시물 통계
+    like_count = Column(Integer, default=0)
+    comments_count = Column(Integer, default=0)
+    saved_count = Column(Integer, default=0)  # 저장 수 (비즈니스 계정만)
+    reach_count = Column(Integer, default=0)  # 도달 수 (비즈니스 계정만)
+    impressions_count = Column(Integer, default=0)  # 노출 수 (비즈니스 계정만)
+    engagement_count = Column(Integer, default=0)  # 참여 수
+
+    # 동기화 정보
+    last_stats_updated_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    connection = relationship("InstagramConnection", back_populates="posts")

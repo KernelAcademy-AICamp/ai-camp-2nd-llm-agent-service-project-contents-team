@@ -77,14 +77,48 @@ class FacebookService:
 
     async def get_my_pages(self) -> Optional[List[Dict]]:
         """사용자가 관리하는 페이지 목록 조회"""
+        logger.info("Fetching user's pages from Facebook API")
+
+        # 먼저 me/accounts 시도
         result = await self._make_request(
             'GET',
             'me/accounts',
             params={'fields': 'id,name,category,picture,access_token,fan_count,followers_count'}
         )
-        if result and 'data' in result:
+        logger.info(f"get_my_pages (me/accounts) result: {result}")
+
+        if result and 'data' in result and len(result['data']) > 0:
             return result['data']
-        return None
+
+        # me/accounts가 비어있으면 비즈니스를 통해 페이지 조회
+        logger.info("No pages from me/accounts, trying me/businesses")
+        businesses = await self._make_request(
+            'GET',
+            'me/businesses',
+            params={'fields': 'id,name'}
+        )
+        logger.info(f"get_my_businesses result: {businesses}")
+
+        if not businesses or 'data' not in businesses:
+            return None
+
+        all_pages = []
+        for business in businesses['data']:
+            business_id = business['id']
+            logger.info(f"Fetching pages for business: {business_id}")
+
+            # 비즈니스의 소유 페이지 조회
+            pages_result = await self._make_request(
+                'GET',
+                f'{business_id}/owned_pages',
+                params={'fields': 'id,name,category,picture,access_token,fan_count,followers_count'}
+            )
+            logger.info(f"Business {business_id} owned_pages: {pages_result}")
+
+            if pages_result and 'data' in pages_result:
+                all_pages.extend(pages_result['data'])
+
+        return all_pages if all_pages else None
 
     # ===== 페이지 정보 =====
 

@@ -56,15 +56,48 @@ oauth.register(
     client_id=os.getenv('FACEBOOK_CLIENT_ID', ''),
     client_secret=os.getenv('FACEBOOK_CLIENT_SECRET', ''),
     authorize_url='https://www.facebook.com/v18.0/dialog/oauth',
-    authorize_params=None,
+    authorize_params={
+        'auth_type': 'rerequest',  # 권한 재요청 (거부된 권한 다시 요청)
+    },
     access_token_url='https://graph.facebook.com/v18.0/oauth/access_token',
     access_token_params=None,
     redirect_uri=os.getenv('FACEBOOK_PAGES_REDIRECT_URI', 'http://localhost:8000/api/facebook/callback'),
     client_kwargs={
         'scope': ' '.join([
             'public_profile',
+            'email',
             'pages_show_list',              # 페이지 목록 조회 (기본 권한)
             'pages_read_engagement',        # 페이지 인사이트 읽기 (기본 권한)
+            'pages_read_user_content',      # 페이지 콘텐츠 읽기
+            'business_management',          # 비즈니스 관리 (페이지 접근용)
+        ]),
+    }
+)
+
+# Instagram OAuth (Facebook Graph API 사용)
+# Instagram 비즈니스 계정은 Facebook 페이지와 연결되어 있어야 함
+oauth.register(
+    name='instagram',
+    client_id=os.getenv('FACEBOOK_CLIENT_ID', ''),
+    client_secret=os.getenv('FACEBOOK_CLIENT_SECRET', ''),
+    authorize_url='https://www.facebook.com/v18.0/dialog/oauth',
+    authorize_params={
+        'auth_type': 'rerequest',
+    },
+    access_token_url='https://graph.facebook.com/v18.0/oauth/access_token',
+    access_token_params=None,
+    redirect_uri=os.getenv('INSTAGRAM_REDIRECT_URI', 'http://localhost:8000/api/instagram/callback'),
+    client_kwargs={
+        'scope': ' '.join([
+            'public_profile',
+            'email',
+            'pages_show_list',
+            'pages_read_engagement',
+            'business_management',
+            'instagram_basic',                  # Instagram 기본 정보 읽기
+            'instagram_content_publish',        # Instagram 콘텐츠 게시
+            'instagram_manage_comments',        # 댓글 관리
+            'instagram_manage_insights',        # 인사이트 조회
         ]),
     }
 )

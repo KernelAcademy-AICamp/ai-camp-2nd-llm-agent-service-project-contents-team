@@ -260,4 +260,57 @@ export const facebookAPI = {
   },
 };
 
+// ==========================================
+// Instagram API
+// ==========================================
+export const instagramAPI = {
+  // 연동 상태 확인
+  getStatus: async () => {
+    const response = await api.get('/api/instagram/status');
+    return response.data;
+  },
+
+  // 연동 해제
+  disconnect: async () => {
+    const response = await api.delete('/api/instagram/disconnect');
+    return response.data;
+  },
+
+  // 연결 가능한 Instagram 계정 목록
+  getAccounts: async (refresh = false) => {
+    const response = await api.get(`/api/instagram/accounts?refresh=${refresh}`);
+    return response.data;
+  },
+
+  // 계정 선택
+  selectAccount: async (instagramUserId) => {
+    const response = await api.post(`/api/instagram/select-account/${instagramUserId}`);
+    return response.data;
+  },
+
+  // 계정 정보 새로고침
+  refresh: async () => {
+    const response = await api.post('/api/instagram/refresh');
+    return response.data;
+  },
+
+  // 게시물 목록 조회
+  getPosts: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/instagram/posts?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 게시물 동기화
+  syncPosts: async () => {
+    const response = await api.post('/api/instagram/posts/sync');
+    return response.data;
+  },
+
+  // 계정 인사이트
+  getInsights: async (period = 'day') => {
+    const response = await api.get(`/api/instagram/insights?period=${period}`);
+    return response.data;
+  },
+};
+
 export default api;

@@ -18,8 +18,9 @@ import VideoCreator from './pages/content/VideoCreator';
 import MyPage from './pages/profile/MyPage';
 import AIContentGenerator from './pages/content/AIContentGenerator';
 import ImageGenerator from './pages/content/ImageGenerator';
-import YouTube from './pages/youtube/YouTube';
-import Facebook from './pages/facebook/Facebook';
+import YouTube from './pages/connection_SNS/youtube/YouTube';
+import Facebook from './pages/connection_SNS/facebook/Facebook';
+import Instagram from './pages/connection_SNS/instagram/Instagram';
 import './App.css';
 
 function App() {
@@ -185,6 +186,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Facebook />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/instagram"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Instagram />
                 </Layout>
               </ProtectedRoute>
             }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { youtubeAPI } from '../../services/api';
-import { useAuth } from '../../contexts/AuthContext';
+import { youtubeAPI } from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import './YouTube.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
