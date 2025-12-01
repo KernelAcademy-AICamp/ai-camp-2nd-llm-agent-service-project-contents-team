@@ -447,6 +447,61 @@
   margin: 0 0 20px 0;
 }
 
+/* 이미지 첨부 박스 */
+.image-attach-box {
+  margin-bottom: 16px;
+}
+
+.btn-attach-image {
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-attach-image:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-attach-image:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 구분선 */
+.image-divider {
+  display: flex;
+  align-items: center;
+  margin: 16px 0;
+}
+
+.image-divider::before,
+.image-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #d1d5db;
+}
+
+.image-divider span {
+  padding: 0 12px;
+  color: #9ca3af;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 /* 이미지 프롬프트 박스 */
 .image-prompt-box {
   margin-bottom: 20px;

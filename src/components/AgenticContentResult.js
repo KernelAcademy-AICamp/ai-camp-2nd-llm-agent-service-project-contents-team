@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import SNSPublishModal from './sns/SNSPublishModal';
 import './AgenticContentResult.css';
@@ -12,6 +12,9 @@ function AgenticContentResult({ result, onEdit, onSave }) {
   const [generatedImage, setGeneratedImage] = useState(null);
   const [imagePrompt, setImagePrompt] = useState('');
   const [imageError, setImageError] = useState(null);
+
+  // 이미지 첨부용 ref
+  const fileInputRef = useRef(null);
 
   if (!result) return null;
 
@@ -80,6 +83,39 @@ function AgenticContentResult({ result, onEdit, onSave }) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // 이미지 첨부 핸들러
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // 파일 크기 체크 (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setImageError('이미지 크기는 10MB 이하여야 합니다.');
+      return;
+    }
+
+    // 이미지 타입 체크
+    if (!file.type.startsWith('image/')) {
+      setImageError('이미지 파일만 첨부할 수 있습니다.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setGeneratedImage(event.target.result);
+      setImageError(null);
+    };
+    reader.onerror = () => {
+      setImageError('이미지를 읽는 중 오류가 발생했습니다.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 파일 선택 버튼 클릭
+  const handleAttachClick = () => {
+    fileInputRef.current?.click();
   };
 
   // SNS 발행 모달 열기
@@ -330,18 +366,43 @@ function AgenticContentResult({ result, onEdit, onSave }) {
       {activeTab === 'publish' && (
         <div className="content-panel publish-panel">
           <div className="publish-layout">
-            {/* 왼쪽: 이미지 생성 */}
+            {/* 왼쪽: 이미지 생성/첨부 */}
             <div className="publish-section image-section">
-              <h3>🎨 이미지 생성</h3>
-              <p className="section-desc">생성된 글을 바탕으로 SNS용 이미지를 만들어보세요</p>
+              <h3>🎨 이미지 준비</h3>
+              <p className="section-desc">AI로 이미지를 생성하거나 직접 이미지를 첨부하세요</p>
 
+              {/* 숨겨진 파일 입력 */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/*"
+                style={{ display: 'none' }}
+              />
+
+              {/* 이미지 첨부 버튼 */}
+              <div className="image-attach-box">
+                <button
+                  className="btn-attach-image"
+                  onClick={handleAttachClick}
+                  disabled={isGeneratingImage}
+                >
+                  📎 이미지 첨부하기
+                </button>
+              </div>
+
+              <div className="image-divider">
+                <span>또는</span>
+              </div>
+
+              {/* AI 이미지 생성 */}
               <div className="image-prompt-box">
-                <label>이미지 프롬프트</label>
+                <label>AI 이미지 생성</label>
                 <textarea
                   value={imagePrompt}
                   onChange={(e) => setImagePrompt(e.target.value)}
                   placeholder={`기본값: ${analysis?.subject || blog?.title || '생성된 콘텐츠 주제'}\n\n더 구체적인 이미지를 원하시면 직접 입력해주세요.`}
-                  rows={4}
+                  rows={3}
                 />
                 <button
                   className="btn-generate-image"
@@ -371,7 +432,7 @@ function AgenticContentResult({ result, onEdit, onSave }) {
                       💾 다운로드
                     </button>
                     <button onClick={() => setGeneratedImage(null)} className="btn-reset">
-                      🔄 다시 생성
+                      🗑️ 이미지 삭제
                     </button>
                   </div>
                 </div>
@@ -380,7 +441,7 @@ function AgenticContentResult({ result, onEdit, onSave }) {
               {!generatedImage && !isGeneratingImage && (
                 <div className="image-placeholder">
                   <span className="placeholder-icon">🖼️</span>
-                  <p>이미지를 생성하면 여기에 표시됩니다</p>
+                  <p>이미지를 첨부하거나 생성하면 여기에 표시됩니다</p>
                 </div>
               )}
             </div>
