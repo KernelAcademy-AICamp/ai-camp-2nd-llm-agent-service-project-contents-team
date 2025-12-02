@@ -589,11 +589,6 @@ function AgenticContentResult({ result, onEdit, onSave }) {
                   <div className="preview-caption">
                     {sns?.content || ''}
                   </div>
-                  <div className="preview-hashtags">
-                    {sns?.tags?.map((tag, idx) => (
-                      <span key={idx} className="hashtag">#{tag}</span>
-                    ))}
-                  </div>
                 </div>
               </div>
 

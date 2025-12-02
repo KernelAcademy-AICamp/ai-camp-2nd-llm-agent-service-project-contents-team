@@ -313,4 +313,33 @@ export const instagramAPI = {
   },
 };
 
+// ==========================================
+// AI 콘텐츠 API
+// ==========================================
+export const aiContentAPI = {
+  // AI 콘텐츠 저장
+  save: async (data) => {
+    const response = await api.post('/api/ai-content/save', data);
+    return response.data;
+  },
+
+  // 콘텐츠 목록 조회
+  list: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/ai-content/list?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 특정 콘텐츠 조회
+  get: async (contentId) => {
+    const response = await api.get(`/api/ai-content/${contentId}`);
+    return response.data;
+  },
+
+  // 콘텐츠 삭제
+  delete: async (contentId) => {
+    const response = await api.delete(`/api/ai-content/${contentId}`);
+    return response.data;
+  },
+};
+
 export default api;

@@ -45,6 +45,7 @@ class User(Base):
     youtube_connection = relationship("YouTubeConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     facebook_connection = relationship("FacebookConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     instagram_connection = relationship("InstagramConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    ai_generated_contents = relationship("AIGeneratedContent", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserPreference(Base):
@@ -603,3 +604,47 @@ class VideoGenerationJob(Base):
 
     # Relationships
     user = relationship("User")
+
+
+class AIGeneratedContent(Base):
+    """
+    AI 생성 콘텐츠 모델
+    - AI 글 생성 기능으로 생성된 블로그 및 SNS 콘텐츠 저장
+    """
+    __tablename__ = "ai_generated_contents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # 입력 데이터
+    input_text = Column(Text, nullable=True)  # 사용자 입력 텍스트
+    input_image_count = Column(Integer, default=0)  # 업로드된 이미지 개수
+
+    # 블로그 콘텐츠
+    blog_title = Column(String, nullable=False)  # 블로그 제목
+    blog_content = Column(Text, nullable=False)  # 블로그 본문 (마크다운)
+    blog_tags = Column(JSON, nullable=True)  # ["태그1", "태그2"]
+
+    # SNS 콘텐츠
+    sns_content = Column(Text, nullable=True)  # SNS 본문
+    sns_hashtags = Column(JSON, nullable=True)  # ["해시태그1", "해시태그2"]
+
+    # AI 분석 결과
+    analysis_data = Column(JSON, nullable=True)  # 분석 결과 전체 (JSON)
+
+    # 평가 점수
+    blog_score = Column(Integer, nullable=True)  # 블로그 품질 점수 (0-100)
+    sns_score = Column(Integer, nullable=True)  # SNS 품질 점수 (0-100)
+    critique_data = Column(JSON, nullable=True)  # 평가 결과 전체 (JSON)
+
+    # 메타데이터
+    generation_attempts = Column(Integer, default=1)  # 생성 시도 횟수
+
+    # 상태
+    status = Column(String, default="generated")  # generated, published, archived
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="ai_generated_contents")

@@ -4,6 +4,7 @@ import AgenticContentForm from '../../components/AgenticContentForm';
 import AgenticContentResult from '../../components/AgenticContentResult';
 import { generateAgenticContent } from '../../services/agenticService';
 import { useContent } from '../../contexts/ContentContext';
+import { aiContentAPI } from '../../services/api';
 import './ContentCommon.css';
 import './AIContentGenerator.css';
 
@@ -56,9 +57,31 @@ function AIContentGenerator() {
     setCurrentStep('');
   };
 
-  const handleSave = () => {
-    // TODO: 실제 저장 로직 구현
-    alert('콘텐츠가 저장되었습니다.');
+  const handleSave = async () => {
+    if (!generatedContent) return;
+
+    try {
+      const saveData = {
+        input_text: generatedContent.analysis?.subject || '',
+        input_image_count: generatedContent.uploadedImages?.length || 0,
+        blog_title: generatedContent.blog?.title || '',
+        blog_content: generatedContent.blog?.content || '',
+        blog_tags: generatedContent.blog?.tags || [],
+        sns_content: generatedContent.sns?.content || '',
+        sns_hashtags: generatedContent.sns?.tags || [],
+        analysis_data: generatedContent.analysis || null,
+        blog_score: generatedContent.critique?.blog?.score || null,
+        sns_score: generatedContent.critique?.sns?.score || null,
+        critique_data: generatedContent.critique || null,
+        generation_attempts: generatedContent.metadata?.attempts || 1
+      };
+
+      await aiContentAPI.save(saveData);
+      alert('콘텐츠가 저장되었습니다.');
+    } catch (error) {
+      console.error('콘텐츠 저장 실패:', error);
+      alert('콘텐츠 저장에 실패했습니다.');
+    }
   };
 
   // 진행 상태에 따른 아이콘
