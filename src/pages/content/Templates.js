@@ -239,26 +239,25 @@ function Templates() {
           className={`tab-btn ${activeTab === 'text' ? 'active' : ''}`}
           onClick={() => setActiveTab('text')}
         >
-          ✍️ 글 <span className="tab-count">{tabCounts.text}</span>
+          글 <span className="tab-count">{tabCounts.text}</span>
         </button>
         <button
           className={`tab-btn ${activeTab === 'image' ? 'active' : ''}`}
           onClick={() => setActiveTab('image')}
         >
-          🎨 이미지 <span className="tab-count">{tabCounts.image}</span>
+          이미지 <span className="tab-count">{tabCounts.image}</span>
         </button>
         <button
           className={`tab-btn ${activeTab === 'video' ? 'active' : ''}`}
           onClick={() => setActiveTab('video')}
         >
-          🎬 영상 <span className="tab-count">{tabCounts.video}</span>
+          영상 <span className="tab-count">{tabCounts.video}</span>
         </button>
       </div>
 
       {/* 템플릿 그리드 */}
       {filteredTemplates.length === 0 ? (
         <div className="templates-empty">
-          <div className="empty-icon">📋</div>
           <h3>템플릿이 없습니다</h3>
           <p>새 템플릿을 만들어 자주 사용하는 프롬프트를 저장하세요</p>
           <button className="btn-primary" onClick={openNewModal}>
@@ -270,13 +269,12 @@ function Templates() {
           {filteredTemplates.map((template) => (
             <div key={template.id} className={`template-card type-${template.type}`}>
               <div className="template-header">
-                <div className="template-icon">{template.icon}</div>
+                <h3>{template.name}</h3>
                 <div className="template-type-badge">{
                   template.type === 'text' ? '글' :
                   template.type === 'image' ? '이미지' : '영상'
                 }</div>
               </div>
-              <h3>{template.name}</h3>
               <p className="template-category">{template.category}</p>
               <p className="template-description">{template.description}</p>
               <div className="template-prompt-preview">
@@ -337,40 +335,22 @@ function Templates() {
                     className={`type-btn ${formData.type === 'text' ? 'active' : ''}`}
                     onClick={() => handleInputChange({ target: { name: 'type', value: 'text' }})}
                   >
-                    ✍️ 글
+                    글
                   </button>
                   <button
                     type="button"
                     className={`type-btn ${formData.type === 'image' ? 'active' : ''}`}
                     onClick={() => handleInputChange({ target: { name: 'type', value: 'image' }})}
                   >
-                    🎨 이미지
+                    이미지
                   </button>
                   <button
                     type="button"
                     className={`type-btn ${formData.type === 'video' ? 'active' : ''}`}
                     onClick={() => handleInputChange({ target: { name: 'type', value: 'video' }})}
                   >
-                    🎬 영상
+                    영상
                   </button>
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>아이콘</label>
-                  <div className="icon-selector">
-                    {iconOptions[formData.type].map(icon => (
-                      <button
-                        key={icon}
-                        type="button"
-                        className={`icon-btn ${formData.icon === icon ? 'active' : ''}`}
-                        onClick={() => setFormData(prev => ({ ...prev, icon }))}
-                      >
-                        {icon}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
 

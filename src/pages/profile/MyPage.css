@@ -1,121 +1,120 @@
+/* ========================================
+   MY PAGE - BAUHAUS STYLE
+   Geometric forms, grid-based layout
+   ======================================== */
+
 .mypage-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
-  animation: fadeIn 0.5s ease-in;
+  padding: var(--space-xl);
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Header */
+/* Header - Bauhaus */
 .mypage-header {
-  margin-bottom: 2.5rem;
+  margin-bottom: var(--space-xl);
   text-align: center;
+  padding-bottom: var(--space-lg);
+  border-bottom: var(--border-thick) solid var(--primary-color);
 }
 
 .mypage-header h1 {
-  font-size: 2.5rem;
+  font-family: var(--font-display);
+  font-size: 36px;
   font-weight: 700;
-  background: var(--gradient-secondary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
 }
 
 .mypage-header .subtitle {
-  font-size: 1.1rem;
+  font-size: 14px;
   color: var(--text-secondary);
 }
 
-/* Section */
+/* Section - Bauhaus */
 .profile-section {
   background: var(--bg-primary);
-  border-radius: var(--radius-xl);
-  padding: 2rem;
-  margin-bottom: 2rem;
-  box-shadow: var(--shadow-md);
-  transition: all 0.3s ease;
-  border: 1px solid var(--border-color);
+  border: var(--border-medium) solid var(--border-color);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  transition: border-color 0.15s ease;
 }
 
 .profile-section:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--primary-light);
+  border-color: var(--primary-color);
 }
 
 .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid var(--border-color);
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: var(--border-medium) solid var(--border-color);
 }
 
 .section-header h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  text-transform: uppercase;
 }
 
-/* Badges */
+/* Badges - Bauhaus */
 .provider-badge {
   display: inline-block;
-  padding: 0.5rem 1rem;
-  background: var(--gradient-secondary);
-  color: white;
-  border-radius: var(--radius-full);
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-transform: capitalize;
-  box-shadow: var(--shadow-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--secondary-color);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .status-badge {
   display: inline-block;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-full);
-  font-size: 0.85rem;
-  font-weight: 600;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: var(--border-medium) solid currentColor;
 }
 
 .status-badge.completed {
-  background: linear-gradient(135deg, var(--success-color) 0%, var(--success-dark) 100%);
-  color: white;
-  box-shadow: var(--shadow-sm);
+  background: var(--bg-primary);
+  color: var(--success-color);
+  border-color: var(--success-color);
 }
 
-/* Info Grid */
+/* Info Grid - Bauhaus */
 .profile-info-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
+  gap: var(--space-md);
 }
 
 .info-card {
   background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  transition: all 0.3s ease;
-  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  transition: all 0.15s ease;
+  border: var(--border-thin) solid var(--border-color);
+  border-left: var(--border-heavy) solid var(--secondary-color);
+}
+
+.info-card:nth-child(2) {
+  border-left-color: var(--accent-color);
+}
+
+.info-card:nth-child(3) {
+  border-left-color: var(--bauhaus-blue);
 }
 
 .info-card:hover {
   background: var(--bg-tertiary);
-  transform: scale(1.02);
-  box-shadow: var(--shadow-sm);
 }
 
 .info-card.full-width {
@@ -123,17 +122,17 @@
 }
 
 .info-label {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 0.5rem;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-xs);
 }
 
 .info-value {
-  font-size: 1.1rem;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--text-primary);
   word-break: break-word;
 }
@@ -141,14 +140,15 @@
 .info-value.description {
   line-height: 1.6;
   color: var(--text-secondary);
+  font-size: 14px;
 }
 
 .info-value.business-type {
-  color: var(--primary-color);
-  font-weight: 600;
+  color: var(--secondary-color);
+  font-weight: 700;
 }
 
-/* Profile Image */
+/* Profile Image - Bauhaus */
 .profile-image-card {
   display: flex;
   flex-direction: column;
@@ -159,52 +159,47 @@
 .profile-image {
   width: 100px;
   height: 100px;
-  border-radius: var(--radius-full);
+  border-radius: 50%;
   object-fit: cover;
-  margin-top: 0.5rem;
-  border: 3px solid var(--primary-color);
-  box-shadow: var(--shadow-md);
+  margin-top: var(--space-sm);
+  border: var(--border-heavy) solid var(--primary-color);
 }
 
-/* Additional Business Info */
+/* Additional Business Info - Bauhaus */
 .additional-business-info {
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 2px solid var(--border-color);
+  margin-top: var(--space-xl);
+  padding-top: var(--space-xl);
+  border-top: var(--border-medium) solid var(--border-color);
 }
 
 .additional-business-info h3 {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-secondary);
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-lg);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.1em;
 }
 
 .business-detail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
 .business-detail-item {
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
-  padding: 1.25rem;
-  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-  border-radius: var(--radius-lg);
-  border-left: 4px solid var(--primary-color);
-  transition: all 0.3s ease;
-  border: 1px solid var(--border-color);
-  border-left: 4px solid var(--primary-color);
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border: var(--border-thin) solid var(--border-color);
+  border-left: var(--border-heavy) solid var(--bauhaus-blue);
+  transition: all 0.15s ease;
 }
 
 .business-detail-item:hover {
-  transform: translateX(4px);
-  box-shadow: var(--shadow-md);
-  border-left-color: var(--accent-color);
+  border-left-color: var(--secondary-color);
 }
 
 .detail-icon {
@@ -213,14 +208,11 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  background: var(--gradient-accent);
-  color: white;
-  border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  background: var(--accent-color);
+  color: var(--primary-color);
+  font-size: 12px;
   font-weight: 700;
   flex-shrink: 0;
-  margin-top: 2px;
-  box-shadow: var(--shadow-sm);
 }
 
 .detail-content {
@@ -228,78 +220,75 @@
 }
 
 .detail-key {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 0.4rem;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-xs);
 }
 
 .detail-value {
-  font-size: 1.05rem;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-primary);
   line-height: 1.5;
 }
 
-/* Interests Tags */
+/* Interests Tags - Bauhaus */
 .interests-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
 }
 
 .interest-tag {
   display: inline-block;
-  padding: 0.5rem 1rem;
-  background: var(--gradient-secondary);
-  color: white;
-  border-radius: var(--radius-full);
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s;
-  box-shadow: var(--shadow-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bauhaus-blue);
+  color: var(--bg-primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  transition: all 0.15s ease;
 }
 
 .interest-tag:hover {
-  transform: scale(1.05);
-  box-shadow: var(--shadow-md);
+  background: var(--bauhaus-blue-light);
 }
 
-/* Preferences Grid */
+/* Preferences Grid - Bauhaus */
 .preferences-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
+  gap: var(--space-lg);
 }
 
 .preference-card {
   background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  transition: all 0.3s ease;
-  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  transition: all 0.15s ease;
+  border: var(--border-thin) solid var(--border-color);
 }
 
 .preference-card:hover {
-  background: var(--bg-tertiary);
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
+  border-color: var(--primary-color);
 }
 
 .preference-card h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid var(--border-color);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: var(--border-medium) solid var(--border-color);
+  text-transform: uppercase;
 }
 
 .preference-item {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-md);
 }
 
 .preference-item:last-child {
@@ -308,152 +297,148 @@
 
 .preference-label {
   display: block;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 0.5rem;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-xs);
 }
 
 .preference-value {
-  font-size: 1rem;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
 .tone-badge {
   display: inline-block;
-  padding: 0.4rem 0.8rem;
-  background: var(--gradient-secondary);
-  color: white;
-  border-radius: var(--radius-lg);
-  font-size: 0.85rem;
-  box-shadow: var(--shadow-sm);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--secondary-color);
+  color: var(--bg-primary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .text-sample {
   background: var(--bg-primary);
-  border-left: 4px solid var(--primary-color);
-  padding: 1rem;
-  border-radius: var(--radius-md);
+  border-left: var(--border-heavy) solid var(--bauhaus-blue);
+  padding: var(--space-md);
   font-style: italic;
   color: var(--text-secondary);
   line-height: 1.6;
-  margin-top: 0.5rem;
-  box-shadow: var(--shadow-sm);
+  margin-top: var(--space-sm);
+  font-size: 13px;
 }
 
 .preference-description {
   color: var(--text-secondary);
   line-height: 1.6;
-  margin-top: 0.5rem;
+  margin-top: var(--space-sm);
+  font-size: 13px;
 }
 
 .style-sample-image {
   width: 100%;
   max-height: 300px;
   object-fit: cover;
-  border-radius: var(--radius-md);
-  margin-top: 0.5rem;
-  transition: all 0.3s;
-  box-shadow: var(--shadow-sm);
+  margin-top: var(--space-sm);
+  transition: all 0.15s ease;
+  border: var(--border-medium) solid var(--border-color);
 }
 
 .style-sample-image:hover {
-  transform: scale(1.02);
   cursor: pointer;
-  box-shadow: var(--shadow-md);
+  border-color: var(--primary-color);
 }
 
 .style-sample-video {
   width: 100%;
   max-height: 300px;
-  border-radius: var(--radius-md);
-  margin-top: 0.5rem;
-  box-shadow: var(--shadow-sm);
+  margin-top: var(--space-sm);
+  border: var(--border-medium) solid var(--border-color);
 }
 
 .color-palette {
   display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
 }
 
 .color-swatch {
   width: 40px;
   height: 40px;
-  border-radius: var(--radius-md);
-  border: 2px solid var(--border-color);
+  border: var(--border-medium) solid var(--border-color);
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: var(--shadow-sm);
+  transition: all 0.15s ease;
 }
 
 .color-swatch:hover {
-  transform: scale(1.15);
-  border-color: var(--primary-color);
-  box-shadow: var(--shadow-md);
+  border-color: var(--secondary-color);
+  transform: scale(1.1);
 }
 
-/* Onboarding Prompt */
+/* Onboarding Prompt - Bauhaus */
 .onboarding-prompt {
-  background: var(--gradient-primary);
-  color: white;
+  background: var(--secondary-color);
+  color: var(--text-primary);
   text-align: center;
-  padding: 3rem 2rem;
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl);
+  padding: var(--space-2xl);
+  border: var(--border-thick) solid var(--secondary-color);
 }
 
 .prompt-content h2 {
-  font-size: 1.8rem;
+  font-family: var(--font-display);
+  font-size: 24px;
   font-weight: 700;
-  margin-bottom: 1rem;
-  color: white;
+  margin-bottom: var(--space-md);
+  color: var(--text-primary);
+  text-transform: uppercase;
 }
 
 .prompt-content p {
-  font-size: 1.1rem;
-  margin-bottom: 1.5rem;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  margin-bottom: var(--space-lg);
+  color: var(--text-secondary);
 }
 
 .onboarding-button {
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
-  font-weight: 600;
-  background: white;
+  padding: var(--space-md) var(--space-xl);
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--accent-color);
   color: var(--primary-color);
-  border: none;
-  border-radius: var(--radius-full);
+  border: var(--border-medium) solid var(--accent-color);
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: var(--shadow-lg);
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .onboarding-button:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-xl);
+  background: var(--bg-primary);
+  color: var(--primary-color);
+  border-color: var(--bg-primary);
 }
 
-/* Loading State */
+/* Loading State - Bauhaus */
 .loading-spinner {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 400px;
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
 .spinner {
   width: 50px;
   height: 50px;
-  border: 4px solid var(--bg-tertiary);
-  border-top: 4px solid var(--primary-color);
-  border-radius: var(--radius-full);
-  animation: spin 1s linear infinite;
+  border: var(--border-heavy) solid var(--bg-tertiary);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
@@ -462,48 +447,49 @@
 }
 
 .loading-spinner p {
-  font-size: 1.1rem;
+  font-size: 14px;
   color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-/* Error State */
+/* Error State - Bauhaus */
 .error-message {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 400px;
-  gap: 1rem;
+  gap: var(--space-md);
 }
 
 .error-icon {
-  font-size: 3rem;
+  font-size: 48px;
 }
 
 .error-message p {
-  font-size: 1.1rem;
+  font-size: 14px;
   color: var(--error-color);
 }
 
 .retry-button {
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  background: var(--gradient-secondary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-full);
+  padding: var(--space-sm) var(--space-lg);
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--secondary-color);
+  color: var(--bg-primary);
+  border: var(--border-medium) solid var(--secondary-color);
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: var(--shadow-md);
+  transition: all 0.15s ease;
+  text-transform: uppercase;
 }
 
 .retry-button:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  background: var(--secondary-hover);
+  border-color: var(--secondary-hover);
 }
 
-/* Empty State */
+/* Empty State - Bauhaus */
 .empty-state {
   display: flex;
   align-items: center;
@@ -512,28 +498,30 @@
 }
 
 .empty-state p {
-  font-size: 1.2rem;
+  font-size: 14px;
   color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .mypage-container {
-    padding: 1rem;
+    padding: var(--space-md);
   }
 
   .mypage-header h1 {
-    font-size: 2rem;
+    font-size: 28px;
   }
 
   .profile-section {
-    padding: 1.5rem;
+    padding: var(--space-lg);
   }
 
   .section-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.75rem;
+    gap: var(--space-sm);
   }
 
   .profile-info-grid,

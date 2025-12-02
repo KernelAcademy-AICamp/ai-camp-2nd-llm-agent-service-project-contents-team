@@ -55,7 +55,6 @@
 
 .text-input:focus {
   outline: none;
-  border-color: #8b5cf6;
   box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }
 
@@ -91,7 +90,6 @@
 
 .upload-button:hover {
   background: #f3f4f6;
-  border-color: #8b5cf6;
 }
 
 .upload-icon {
@@ -184,7 +182,6 @@
 
 .btn-generate {
   padding: 12px 32px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
   border: none;
   border-radius: 8px;
   font-size: 14px;

@@ -1,31 +1,35 @@
+/* ========================================
+   SIDEBAR - BAUHAUS STYLE
+   Clean vertical navigation
+   ======================================== */
+
 .sidebar {
   position: fixed;
   left: 0;
   top: 64px;
   bottom: 0;
-  width: 240px;
-  background-color: var(--bg-primary);
+  width: 200px;
+  background-color: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   overflow-y: auto;
   z-index: 999;
 }
 
 .sidebar-nav {
-  padding: 16px 8px;
+  padding: var(--space-md) 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
 }
 
 .sidebar-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
   text-decoration: none;
   color: var(--text-secondary);
-  transition: all 0.2s;
+  transition: all 0.15s ease;
   font-size: 14px;
   font-weight: 500;
   border: none;
@@ -36,29 +40,22 @@
 }
 
 .sidebar-item:hover {
-  background-color: var(--bg-secondary);
+  background-color: var(--accent-color);
   color: var(--text-primary);
 }
 
 .sidebar-item.active {
-  background: var(--gradient-accent);
-  color: #ffffff;
-  box-shadow: var(--shadow-md);
-}
-
-.sidebar-icon {
-  font-size: 20px;
-  width: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: var(--accent-color);
+  color: var(--primary-color);
+  font-weight: 600;
+  border-right: 3px solid var(--primary-color);
 }
 
 .sidebar-label {
   flex: 1;
 }
 
-/* 드롭다운 스타일 */
+/* Dropdown Styles */
 .sidebar-dropdown {
   position: relative;
 }
@@ -69,7 +66,7 @@
 
 .sidebar-dropdown-arrow {
   font-size: 10px;
-  transition: transform 0.3s ease;
+  transition: transform 0.15s ease;
   margin-left: auto;
 }
 
@@ -80,34 +77,18 @@
 .sidebar-dropdown-menu {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-left: 12px;
-  margin-top: 4px;
-  padding-left: 12px;
-  border-left: 2px solid var(--border-color);
-  animation: slideDown 0.2s ease;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  gap: 0;
+  background: var(--bg-tertiary);
 }
 
 .sidebar-dropdown-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-3xl);
   text-decoration: none;
-  color: var(--text-secondary);
-  transition: all 0.2s;
+  color: var(--text-tertiary);
+  transition: all 0.15s ease;
   font-size: 13px;
   font-weight: 500;
   border: none;
@@ -118,38 +99,33 @@
 }
 
 .sidebar-dropdown-item:hover {
-  background-color: var(--bg-secondary);
+  background-color: var(--accent-color);
   color: var(--text-primary);
 }
 
 .sidebar-dropdown-item.active {
-  background: var(--gradient-accent);
-  color: #ffffff;
-  box-shadow: var(--shadow-sm);
+  color: var(--primary-color);
+  font-weight: 600;
 }
 
-.sidebar-dropdown-item .sidebar-icon {
-  font-size: 16px;
-  width: 20px;
-}
-
-/* 구분선 */
+/* Divider */
 .sidebar-divider {
   height: 1px;
   background-color: var(--border-color);
-  margin: 12px 16px;
+  margin: var(--space-md) var(--space-lg);
 }
 
-/* 섹션 라벨 */
+/* Section Label */
 .sidebar-section-label {
   font-size: 11px;
   font-weight: 700;
   color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 8px 16px 4px;
+  letter-spacing: 0.1em;
+  padding: var(--space-md) var(--space-lg) var(--space-xs);
 }
 
+/* Mobile responsive */
 @media (max-width: 768px) {
   .sidebar {
     width: 64px;
@@ -161,6 +137,12 @@
 
   .sidebar-item {
     justify-content: center;
+    padding: var(--space-md);
+  }
+
+  .sidebar-item.active {
+    border-right: none;
+    border-bottom: 3px solid var(--primary-color);
   }
 
   .sidebar-dropdown-arrow {
@@ -169,5 +151,13 @@
 
   .sidebar-dropdown-menu {
     display: none;
+  }
+
+  .sidebar-section-label {
+    display: none;
+  }
+
+  .sidebar-divider {
+    margin: var(--space-sm);
   }
 }

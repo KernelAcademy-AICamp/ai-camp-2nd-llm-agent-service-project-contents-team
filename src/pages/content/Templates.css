@@ -28,8 +28,8 @@
 
 .btn-primary {
   padding: 12px 24px;
-  background: var(--gradient-primary);
-  color: white;
+  background: var(--secondary-color);
+  color: var(--text-primary);
   border: none;
   border-radius: var(--radius-md);
   font-size: 14px;
@@ -40,8 +40,7 @@
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  background: var(--secondary-hover);
 }
 
 /* Tabs */
@@ -71,14 +70,14 @@
 
 .tab-btn:hover {
   background: var(--bg-primary);
-  border-color: var(--accent-color);
-  color: var(--accent-color);
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
 }
 
 .tab-btn.active {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
-  color: white;
+  background: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
 }
 
 .tab-count {
@@ -148,8 +147,15 @@
 .template-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 12px;
+}
+
+.template-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .template-icon {
@@ -165,26 +171,20 @@
 }
 
 .type-text .template-type-badge {
-  background: #d1fae5;
-  color: #065f46;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .type-image .template-type-badge {
-  background: #ede9fe;
-  color: #5b21b6;
+  background: var(--accent-color);
+  color: var(--text-primary);
 }
 
 .type-video .template-type-badge {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--secondary-color);
+  color: var(--text-primary);
 }
 
-.template-card h3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 6px 0;
-}
 
 .template-category {
   font-size: 13px;
@@ -257,14 +257,14 @@
 }
 
 .btn-action.delete:hover {
-  background: #fee2e2;
+  background: var(--bg-tertiary);
 }
 
 .btn-use-template {
   width: 100%;
   padding: 12px;
-  background: var(--gradient-primary);
-  color: white;
+  background: var(--secondary-color);
+  color: var(--text-primary);
   border: none;
   border-radius: var(--radius-md);
   font-size: 14px;
@@ -274,8 +274,7 @@
 }
 
 .btn-use-template:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  background: var(--secondary-hover);
 }
 
 /* Modal */
@@ -417,14 +416,14 @@
 }
 
 .type-btn:hover {
-  border-color: var(--accent-color);
-  color: var(--accent-color);
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
 }
 
 .type-btn.active {
-  border-color: var(--accent-color);
-  background: var(--accent-color);
-  color: white;
+  border-color: var(--secondary-color);
+  background: var(--secondary-color);
+  color: var(--text-primary);
 }
 
 /* Icon Selector */
@@ -457,9 +456,9 @@
 
 .btn-secondary {
   padding: 10px 20px;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--secondary-color);
   border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 500;
@@ -468,7 +467,7 @@
 }
 
 .btn-secondary:hover {
-  background: var(--border-color);
+  background: var(--secondary-color);
   color: var(--text-primary);
 }
 

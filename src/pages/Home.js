@@ -16,7 +16,7 @@ function Home() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [followUpPrompts, setFollowUpPrompts] = useState([]);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -179,18 +179,11 @@ function Home() {
     return date.toLocaleDateString('ko-KR');
   };
 
-  const suggestedPrompts = [
-    { icon: '✍️', text: 'AI 콘텐츠 생성', path: '/ai-content', description: '블로그, SNS 게시물 자동 생성' },
-    { icon: '🎨', text: 'AI 이미지 생성', path: '/image', description: '텍스트로 이미지 생성' },
-    { icon: '🎬', text: 'AI 동영상 생성', path: '/video', description: '프롬프트로 동영상 생성' },
-    { icon: '📋', text: '템플릿 갤러리', path: '/templates', description: '콘텐츠 템플릿 모아보기' },
-  ];
-
   // 콘텐츠 생성 도구 바로가기
   const contentTools = [
-    { icon: '✍️', label: '글 생성', path: '/ai-content' },
-    { icon: '🎨', label: '이미지', path: '/image' },
-    { icon: '🎬', label: '동영상', path: '/video' },
+    { label: '글 생성', path: '/ai-content' },
+    { label: '이미지', path: '/image' },
+    { label: '동영상', path: '/video' },
   ];
 
   // AI 응답에서 콘텐츠 생성 관련 키워드 감지
@@ -401,22 +394,16 @@ function Home() {
     }
   };
 
-  const handlePromptClick = (prompt) => {
-    if (prompt.path) {
-      navigate(prompt.path);
-    } else {
-      setInputValue(prompt.text);
-    }
-  };
-
   return (
     <div className="home-page">
       {/* 왼쪽 채팅 히스토리 사이드바 */}
       <aside className={`chat-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
-          <button onClick={handleNewChat} className="btn-new-chat-sidebar">
-            ➕ 새 채팅
-          </button>
+          {isSidebarOpen && (
+            <button onClick={handleNewChat} className="btn-new-chat-sidebar">
+              새 채팅
+            </button>
+          )}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             className="btn-toggle-sidebar"
@@ -476,30 +463,13 @@ function Home() {
             </p>
           </div>
 
-          <div className="suggested-prompts">
-            {suggestedPrompts.map((prompt, index) => (
-              <button
-                key={index}
-                className="prompt-card"
-                onClick={() => handlePromptClick(prompt)}
-              >
-                <span className="prompt-icon">{prompt.icon}</span>
-                <span className="prompt-text">{prompt.text}</span>
-                {prompt.description && (
-                  <span className="prompt-description">{prompt.description}</span>
-                )}
-              </button>
-            ))}
-          </div>
         </div>
       ) : (
         <div className="chat-messages">
           {messages.map((message) => (
             <div key={message.id} className={`message ${message.type}`}>
               <div className="message-avatar">
-                {message.type === 'user' ? (
-                  <span className="user-icon">👤</span>
-                ) : (
+                {message.type === 'ai' && (
                   <img src="/ddukddak_colored.png" alt="AI" className="ai-logo-icon" />
                 )}
               </div>
@@ -518,7 +488,6 @@ function Home() {
                         onClick={() => navigate(tool.path)}
                         title={tool.label}
                       >
-                        <span className="tool-icon">{tool.icon}</span>
                         <span className="tool-label">{tool.label}</span>
                       </button>
                     ))}
@@ -549,7 +518,7 @@ function Home() {
           {/* 팔로우업 프롬프트 추천 */}
           {followUpPrompts.length > 0 && messages.length > 0 && (
             <div className="follow-up-prompts">
-              <span className="follow-up-label">💡 이런 질문은 어떨까요?</span>
+              <span className="follow-up-label">이런 질문은 어떨까요?</span>
               <div className="follow-up-buttons">
                 {followUpPrompts.map((prompt, index) => (
                   <button
@@ -580,7 +549,7 @@ function Home() {
               className="btn-send"
               disabled={!inputValue.trim() || isLoading}
             >
-              <span className="send-icon">➤</span>
+              전송
             </button>
           </div>
           <p className="input-hint">

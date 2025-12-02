@@ -57,15 +57,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/dashboard"
             element={
               <ProtectedRoute>

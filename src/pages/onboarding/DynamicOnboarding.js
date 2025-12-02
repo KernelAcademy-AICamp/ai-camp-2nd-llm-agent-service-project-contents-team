@@ -101,6 +101,13 @@ function DynamicOnboarding() {
   }, [businessInfo.business_type]);
 
   const checkOnboardingStatus = async () => {
+    // 개발 모드: URL에 ?dev=true 파라미터가 있으면 리다이렉트 안함
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('dev') === 'true') {
+      console.log('개발 모드: 온보딩 리다이렉트 비활성화');
+      return;
+    }
+
     try {
       const response = await api.get('/api/onboarding/status');
       if (response.data.onboarding_completed) {
@@ -873,6 +880,18 @@ function DynamicOnboarding() {
 
             <div className="step-actions">
               <button
+                onClick={() => setCurrentStep(0)}
+                className="btn-secondary"
+              >
+                이전
+              </button>
+              <button
+                onClick={() => setCurrentStep(2)}
+                className="btn-secondary"
+              >
+                건너뛰기
+              </button>
+              <button
                 onClick={saveBusinessInfo}
                 disabled={isLoading || !validation.brand_name.valid || !validation.business_type.valid}
                 className="btn-primary"
@@ -941,6 +960,12 @@ function DynamicOnboarding() {
                 className="btn-secondary"
               >
                 이전
+              </button>
+              <button
+                onClick={() => setCurrentStep(3)}
+                className="btn-secondary"
+              >
+                건너뛰기
               </button>
               <button
                 onClick={analyzeMultiPlatform}
@@ -1117,6 +1142,12 @@ function DynamicOnboarding() {
                 이전
               </button>
               <button
+                onClick={() => setCurrentStep(3)}
+                className="btn-secondary"
+              >
+                건너뛰기
+              </button>
+              <button
                 onClick={analyzeManualContent}
                 disabled={isLoading}
                 className="btn-primary"
@@ -1212,6 +1243,24 @@ function DynamicOnboarding() {
           </div>
 
           <div className="step-actions">
+            <button
+              onClick={() => setCurrentStep(0)}
+              className="btn-secondary"
+            >
+              처음으로
+            </button>
+            <button
+              onClick={() => {
+                if (onboardingPath === 'sns_analysis') {
+                  setCurrentStep(1);
+                } else {
+                  setCurrentStep(2);
+                }
+              }}
+              className="btn-secondary"
+            >
+              이전
+            </button>
             <button onClick={completeOnboarding} disabled={isLoading} className="btn-primary btn-large">
               {isLoading ? '처리 중...' : '🚀 대시보드로 이동'}
             </button>

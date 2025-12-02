@@ -70,7 +70,6 @@
 
 .btn-primary {
   padding: 10px 24px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -155,13 +154,7 @@
 }
 
 .tab-button:hover {
-  color: #8b5cf6;
   background: #f9fafb;
-}
-
-.tab-button.active {
-  color: #8b5cf6;
-  border-bottom-color: #8b5cf6;
 }
 
 .tab-icon {

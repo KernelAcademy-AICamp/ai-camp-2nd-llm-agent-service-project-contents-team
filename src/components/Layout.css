@@ -1,18 +1,24 @@
+/* ========================================
+   LAYOUT - BAUHAUS STYLE
+   Grid-based structure, clean lines
+   ======================================== */
+
 .layout {
   min-height: 100vh;
-  background-color: #f9fafb;
+  background-color: var(--bg-primary);
 }
 
 .main-content {
-  margin-left: 240px;
+  margin-left: 200px;
   margin-top: 64px;
-  padding: 24px;
+  padding: var(--space-lg);
   min-height: calc(100vh - 64px);
+  background: var(--bg-primary);
 }
 
 @media (max-width: 768px) {
   .main-content {
     margin-left: 64px;
-    padding: 16px;
+    padding: var(--space-md);
   }
 }
