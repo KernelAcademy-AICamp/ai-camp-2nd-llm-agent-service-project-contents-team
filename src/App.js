@@ -22,6 +22,8 @@ import AIVideoGenerator from './pages/content/AIVideoGenerator';
 import YouTube from './pages/connection_SNS/youtube/YouTube';
 import Facebook from './pages/connection_SNS/facebook/Facebook';
 import Instagram from './pages/connection_SNS/instagram/Instagram';
+import PrivacyPolicy from './pages/legal/PrivacyPolicy';
+import DeleteData from './pages/legal/DeleteData';
 import './App.css';
 
 function App() {
@@ -32,6 +34,8 @@ function App() {
           {/* 공개 라우트 */}
           <Route path="/login" element={<Login />} />
           <Route path="/oauth/callback" element={<OAuthCallback />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/delete-data" element={<DeleteData />} />
 
           {/* 온보딩 라우트 */}
           <Route

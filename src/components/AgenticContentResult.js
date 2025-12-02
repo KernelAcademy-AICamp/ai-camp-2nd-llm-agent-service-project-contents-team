@@ -1,9 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import SNSPublishModal from './sns/SNSPublishModal';
 import './AgenticContentResult.css';
 
 function AgenticContentResult({ result, onEdit, onSave }) {
   const [activeTab, setActiveTab] = useState('blog');
+  const [showPublishModal, setShowPublishModal] = useState(false);
+
+  // 이미지 생성 상태
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [generatedImage, setGeneratedImage] = useState(null);
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [imageError, setImageError] = useState(null);
+
+  // 이미지 첨부용 ref
+  const fileInputRef = useRef(null);
 
   if (!result) return null;
 
@@ -22,6 +33,94 @@ function AgenticContentResult({ result, onEdit, onSave }) {
     if (score >= 80) return '양호';
     if (score >= 70) return '보통';
     return '개선필요';
+  };
+
+  // AI 이미지 생성
+  const handleGenerateImage = async () => {
+    const prompt = imagePrompt.trim() || `${analysis?.subject || blog?.title || sns?.content?.slice(0, 100)}`;
+
+    if (!prompt) {
+      setImageError('이미지 생성을 위한 프롬프트를 입력해주세요.');
+      return;
+    }
+
+    setIsGeneratingImage(true);
+    setImageError(null);
+
+    try {
+      const response = await fetch('http://localhost:8000/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+          model: 'nanovana',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || '이미지 생성에 실패했습니다.');
+      }
+
+      const data = await response.json();
+      setGeneratedImage(data.imageUrl);
+    } catch (error) {
+      console.error('Image generation error:', error);
+      setImageError(error.message || '이미지 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  // 이미지 다운로드
+  const handleDownloadImage = () => {
+    if (!generatedImage) return;
+    const link = document.createElement('a');
+    link.href = generatedImage;
+    link.download = `sns_image_${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // 이미지 첨부 핸들러
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // 파일 크기 체크 (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setImageError('이미지 크기는 10MB 이하여야 합니다.');
+      return;
+    }
+
+    // 이미지 타입 체크
+    if (!file.type.startsWith('image/')) {
+      setImageError('이미지 파일만 첨부할 수 있습니다.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setGeneratedImage(event.target.result);
+      setImageError(null);
+    };
+    reader.onerror = () => {
+      setImageError('이미지를 읽는 중 오류가 발생했습니다.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 파일 선택 버튼 클릭
+  const handleAttachClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // SNS 발행 모달 열기
+  const handleOpenPublishModal = () => {
+    setShowPublishModal(true);
   };
 
   return (
@@ -107,6 +206,13 @@ function AgenticContentResult({ result, onEdit, onSave }) {
         >
           <span className="tab-icon">📱</span>
           인스타그램/페이스북
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'publish' ? 'active' : ''}`}
+          onClick={() => setActiveTab('publish')}
+        >
+          <span className="tab-icon">🚀</span>
+          이미지 생성 & SNS 발행
         </button>
       </div>
 
@@ -255,6 +361,141 @@ function AgenticContentResult({ result, onEdit, onSave }) {
           )}
         </div>
       )}
+
+      {/* 이미지 생성 & SNS 발행 탭 */}
+      {activeTab === 'publish' && (
+        <div className="content-panel publish-panel">
+          <div className="publish-layout">
+            {/* 왼쪽: 이미지 생성/첨부 */}
+            <div className="publish-section image-section">
+              <h3>🎨 이미지 준비</h3>
+              <p className="section-desc">AI로 이미지를 생성하거나 직접 이미지를 첨부하세요</p>
+
+              {/* 숨겨진 파일 입력 */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/*"
+                style={{ display: 'none' }}
+              />
+
+              {/* 이미지 첨부 버튼 */}
+              <div className="image-attach-box">
+                <button
+                  className="btn-attach-image"
+                  onClick={handleAttachClick}
+                  disabled={isGeneratingImage}
+                >
+                  📎 이미지 첨부하기
+                </button>
+              </div>
+
+              <div className="image-divider">
+                <span>또는</span>
+              </div>
+
+              {/* AI 이미지 생성 */}
+              <div className="image-prompt-box">
+                <label>AI 이미지 생성</label>
+                <textarea
+                  value={imagePrompt}
+                  onChange={(e) => setImagePrompt(e.target.value)}
+                  placeholder={`기본값: ${analysis?.subject || blog?.title || '생성된 콘텐츠 주제'}\n\n더 구체적인 이미지를 원하시면 직접 입력해주세요.`}
+                  rows={3}
+                />
+                <button
+                  className="btn-generate-image"
+                  onClick={handleGenerateImage}
+                  disabled={isGeneratingImage}
+                >
+                  {isGeneratingImage ? (
+                    <>
+                      <span className="spinner-small"></span>
+                      이미지 생성 중...
+                    </>
+                  ) : (
+                    '🖼️ AI 이미지 생성'
+                  )}
+                </button>
+              </div>
+
+              {imageError && (
+                <div className="error-message">{imageError}</div>
+              )}
+
+              {generatedImage && (
+                <div className="generated-image-box">
+                  <img src={generatedImage} alt="Generated" />
+                  <div className="image-actions">
+                    <button onClick={handleDownloadImage} className="btn-download">
+                      💾 다운로드
+                    </button>
+                    <button onClick={() => setGeneratedImage(null)} className="btn-reset">
+                      🗑️ 이미지 삭제
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!generatedImage && !isGeneratingImage && (
+                <div className="image-placeholder">
+                  <span className="placeholder-icon">🖼️</span>
+                  <p>이미지를 첨부하거나 생성하면 여기에 표시됩니다</p>
+                </div>
+              )}
+            </div>
+
+            {/* 오른쪽: SNS 발행 미리보기 */}
+            <div className="publish-section preview-section">
+              <h3>📤 SNS 발행 미리보기</h3>
+              <p className="section-desc">Instagram/Facebook에 발행될 내용입니다</p>
+
+              <div className="preview-card">
+                {generatedImage && (
+                  <div className="preview-image">
+                    <img src={generatedImage} alt="Preview" />
+                  </div>
+                )}
+                <div className="preview-content">
+                  <div className="preview-caption">
+                    {sns?.content || ''}
+                  </div>
+                  <div className="preview-hashtags">
+                    {sns?.tags?.map((tag, idx) => (
+                      <span key={idx} className="hashtag">#{tag}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                className="btn-sns-publish-large"
+                onClick={handleOpenPublishModal}
+              >
+                🚀 SNS에 발행하기
+              </button>
+
+              <p className="publish-note">
+                * Instagram, Facebook 계정이 연동되어 있어야 발행할 수 있습니다.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SNS 발행 모달 */}
+      <SNSPublishModal
+        isOpen={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        content={{
+          type: generatedImage ? 'image' : 'text',
+          instagramCaption: sns?.content || '',
+          facebookPost: sns?.content || '',
+          hashtags: sns?.tags || [],
+          images: generatedImage ? [generatedImage] : []
+        }}
+      />
     </div>
   );
 }

@@ -4,6 +4,9 @@ from starlette.middleware.sessions import SessionMiddleware
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user, blog, chat, brand_analysis, youtube, facebook, instagram, ai_video_generation, sns_publish
+from .database import engine, Base
+
 
 # 루트 .env 파일 먼저 로드 (프로젝트 루트) - 라우터 import 전에 로드 필수!
 root_env = Path(__file__).parent.parent.parent / ".env"
@@ -11,9 +14,6 @@ load_dotenv(root_env)
 
 # backend/.env 파일 로드 (있으면 덮어쓰기)
 load_dotenv()
-
-from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user, blog, chat, brand_analysis, youtube, facebook, instagram, ai_video_generation
-from .database import engine, Base
 
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
@@ -56,6 +56,7 @@ app.include_router(youtube.router)
 app.include_router(facebook.router)
 app.include_router(instagram.router)
 app.include_router(ai_video_generation.router)
+app.include_router(sns_publish.router)
 
 
 @app.get("/")
