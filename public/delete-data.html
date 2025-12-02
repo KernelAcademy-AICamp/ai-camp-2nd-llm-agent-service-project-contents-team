@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>사용자 데이터 삭제 안내</title>
+  <!--
+    이 파일은 Facebook 앱에 입력하는 '사용자 데이터 삭제 URL' 용 템플릿입니다.
+    페이스북은 앱에서 수집된 데이터를 어떻게 삭제할 수 있는지 안내하는 페이지를 요구합니다.
+    실제 삭제 API가 없어도 "삭제 요청 방법"을 명시해 두면 통과됩니다.
+  -->
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; color:#222; line-height:1.6; padding:24px; max-width:800px; margin:40px auto; }
+    h1 { font-size:26px; margin-bottom:6px; }
+    p { margin:8px 0; }
+    .btn { display:inline-block; margin-top:12px; padding:10px 14px; background:#1877f2; color:white; text-decoration:none; border-radius:6px; }
+    footer { margin-top:30px; color:#666; font-size:13px; border-top:1px solid #eee; padding-top:12px; }
+    code { background:#f5f5f5; padding:2px 6px; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <h1>사용자 데이터 삭제 안내 (임시)</h1>
+  <p>
+    본 페이지는 Facebook 앱 설정에 필요한 '데이터 삭제 안내' 용도의 임시 페이지입니다.
+    실제 서비스에서는 아래 절차에 따라 자동화된 삭제 API 또는 수동 안내를 제공해야 합니다.
+  </p>
+
+  <h2>데이터 삭제 요청 방법</h2>
+  <ol>
+    <li>이메일로 삭제 요청: <a href="mailto:ohhy0924@gmail.com">ohhy0924@gmail.com</a> 으로 계정 식별 정보(회원 이메일 또는 사용자ID)를 보내주세요.</li>
+    <li>요청 접수 후 최대 7일 이내에 요청 확인 및 삭제 완료 안내를 드립니다.</li>
+    <li>삭제가 완료되면 확인 이메일을 발송합니다.</li>
+  </ol>
+
+  <h2>자동화된 삭제 (권장)</h2>
+  <p>
+    실제 서비스에서는 아래 예시처럼 앱에서 제공하는 엔드포인트를 통해 삭제를 자동화할 수 있습니다.
+  </p>
+  <pre><code>DELETE https://내도메인.com/api/user/{userId}</code></pre>
+  <p>위 API는 사용자 인증 및 본인 확인 절차를 거쳐 요청을 처리해야 합니다.</p>
+
+  <p>
+    삭제 요청이나 절차에 관해 문의가 있으시면 아래 이메일로 연락주세요.<br>
+    이메일: <a href="mailto:ohhy0924@gmail.com">ohhy0924@gmail.com</a>
+  </p>
+
+  <a class="btn" href="mailto:ohhy0924@gmail.com">삭제 요청 이메일 보내기</a>
+
+  <footer>
+    <!--
+      Facebook에 등록할 때:
+      - 데이터 삭제 URL 예: http://localhost:3000/delete-data
+      - 페이스북은 "삭제 방법"을 요구하므로 자동 API 예시나 이메일 절차를 적어두면 됩니다.
+      - 서비스 공개 전 실제 삭제 API를 구현하는 것이 권장됩니다.
+    -->
+    임시 데이터 삭제 안내 페이지 — 테스트 전용.
+  </footer>
+</body>
+</html>

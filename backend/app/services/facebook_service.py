@@ -58,7 +58,11 @@ class FacebookService:
             if response.status_code == 200:
                 return response.json()
             else:
-                logger.error(f"Facebook API error: {response.status_code} - {response.text}")
+                error_data = response.json() if response.text else {}
+                error_message = error_data.get('error', {}).get('message', response.text)
+                error_code = error_data.get('error', {}).get('code', 'unknown')
+                logger.error(f"Facebook API error: {response.status_code} - Code: {error_code} - {error_message}")
+                logger.error(f"Full error response: {response.text}")
                 return None
 
         except Exception as e:

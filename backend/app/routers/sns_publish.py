@@ -260,6 +260,7 @@ async def get_sns_status(
         models.FacebookConnection.is_active == True
     ).first()
 
+    # 페이지가 선택되어 있어야 발행 가능
     facebook_status = PlatformStatus(
         connected=fb_connection is not None and fb_connection.page_id is not None,
         username=fb_connection.page_name if fb_connection else None,

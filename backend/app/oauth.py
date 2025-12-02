@@ -63,13 +63,12 @@ oauth.register(
     access_token_params=None,
     redirect_uri=os.getenv('FACEBOOK_PAGES_REDIRECT_URI', 'http://localhost:8000/api/facebook/callback'),
     client_kwargs={
+        # 개발 모드에서는 기본 권한만 사용 가능
+        # pages_manage_posts는 앱 검토 필요 - 개발 모드에서는 page access token으로 직접 게시
         'scope': ' '.join([
             'public_profile',
-            'email',
-            'pages_show_list',              # 페이지 목록 조회 (기본 권한)
-            'pages_read_engagement',        # 페이지 인사이트 읽기 (기본 권한)
-            'pages_read_user_content',      # 페이지 콘텐츠 읽기
-            'business_management',          # 비즈니스 관리 (페이지 접근용)
+            'pages_show_list',              # 페이지 목록 조회
+            'pages_read_engagement',        # 페이지 인사이트 읽기
         ]),
     }
 )

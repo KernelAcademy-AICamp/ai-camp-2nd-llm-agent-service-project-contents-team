@@ -143,7 +143,11 @@ function SNSPublishModal({ isOpen, onClose, content }) {
                 <span className="platform-icon">📘</span>
                 <span className="platform-name">Facebook</span>
                 {!connectionStatus.facebook?.connected && (
-                  <span className="platform-status">연동 필요</span>
+                  <span className="platform-status">
+                    <a href="/facebook" style={{color: '#3b82f6', textDecoration: 'underline'}}>
+                      페이지 연동 필요
+                    </a>
+                  </span>
                 )}
               </label>
             </div>
