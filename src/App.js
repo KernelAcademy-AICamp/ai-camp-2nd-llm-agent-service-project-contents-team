@@ -10,7 +10,6 @@ import Home from './pages/Home';
 import Dashboard from './pages/dashboard/Dashboard';
 import ContentList from './pages/content/ContentList';
 import Templates from './pages/content/Templates';
-import Analytics from './pages/analytics/Analytics';
 import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
 import ImageStudio from './pages/content/ImageStudio';
@@ -143,16 +142,6 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Templates />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/analytics"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Analytics />
                 </Layout>
               </ProtectedRoute>
             }
