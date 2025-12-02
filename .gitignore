@@ -68,3 +68,6 @@ Thumbs.db
 # ==============================================
 
 .claude/settings.local.json
+
+# AI Video uploads
+/backend/uploads/

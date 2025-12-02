@@ -548,3 +548,58 @@ class InstagramPost(Base):
 
     # Relationships
     connection = relationship("InstagramConnection", back_populates="posts")
+
+
+class VideoGenerationJob(Base):
+    """
+    AI 비디오 생성 작업 모델
+    - 사용자가 업로드한 제품 사진과 정보를 기반으로
+    - 스토리보드 생성 → 이미지 생성 → 비디오 트랜지션 생성 → 최종 합성
+    """
+    __tablename__ = "video_generation_jobs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # 제품 정보
+    product_name = Column(String, nullable=False)  # 제품명
+    product_description = Column(Text, nullable=True)  # 제품 설명
+    uploaded_image_url = Column(String, nullable=False)  # 업로드된 제품 이미지 URL
+
+    # 영상 설정
+    tier = Column(String, nullable=False)  # short, standard, premium
+    cut_count = Column(Integer, nullable=False)  # 4, 6, 8
+    duration_seconds = Column(Integer, nullable=False)  # 15, 25, 40
+    cost = Column(Float, nullable=False)  # 3.90, 5.90, 7.90
+
+    # 생성 단계별 데이터
+    storyboard = Column(JSON, nullable=True)  # [{"cut": 1, "scene": "...", "image_prompt": "...", "duration": 5}, ...]
+    generated_image_urls = Column(JSON, nullable=True)  # [{"cut": 1, "url": "..."}, ...]
+    generated_video_urls = Column(JSON, nullable=True)  # [{"transition": "1-2", "url": "..."}, ...]
+    final_video_url = Column(String, nullable=True)  # 최종 합성된 비디오 URL
+    thumbnail_url = Column(String, nullable=True)  # 썸네일 이미지 URL
+
+    # 상태 추적
+    status = Column(String, nullable=False, default="pending")
+    # pending: 대기 중
+    # planning: 스토리보드 생성 중
+    # generating_images: 이미지 생성 중
+    # generating_videos: 비디오 트랜지션 생성 중
+    # composing: 최종 비디오 합성 중
+    # completed: 완료
+    # failed: 실패
+
+    current_step = Column(String, nullable=True)  # 현재 진행 중인 단계 상세 설명
+    error_message = Column(Text, nullable=True)  # 에러 메시지
+
+    # AI 모델 사용 정보
+    planning_model = Column(String, default="claude-3-5-sonnet-20241022")  # 스토리보드 생성 모델
+    image_model = Column(String, default="gemini-2.0-flash-exp")  # 이미지 생성 모델
+    video_model = Column(String, default="veo-3.1-fast-generate-preview")  # 비디오 생성 모델
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    user = relationship("User")
