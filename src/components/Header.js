@@ -48,15 +48,11 @@ function Header() {
           <img src="/ddukddak_colored.png" alt="콘텐츠 크리에이터" />
         </div>
         <div className="header-actions">
-          <button className="btn-notification">
-            <span className="notification-icon">🔔</span>
-          </button>
           <div className="user-profile-wrapper" ref={dropdownRef}>
             <button
               className="user-profile"
               onClick={() => setShowDropdown(!showDropdown)}
             >
-              <span className="user-avatar">👤</span>
               <span className="user-name">{user?.username || 'User'}</span>
             </button>
             {showDropdown && (
@@ -65,7 +61,6 @@ function Header() {
                   onClick={() => handleMenuClick('/mypage')}
                   className="user-info-button"
                 >
-                  <span className="user-info-avatar">👤</span>
                   <div className="user-info-text">
                     <p className="user-info-name">{user?.username || 'User'}</p>
                     <p className="user-info-link">마이페이지 보기</p>
@@ -73,8 +68,7 @@ function Header() {
                 </button>
                 <div className="dropdown-divider"></div>
                 <button onClick={handleLogout} className="dropdown-item logout-btn">
-                  <span className="dropdown-icon">🚪</span>
-                  <span>로그아웃</span>
+                  로그아웃
                 </button>
               </div>
             )}

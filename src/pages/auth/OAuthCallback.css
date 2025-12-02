@@ -3,13 +3,12 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--accent-color);
 }
 
 .oauth-callback-box {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   padding: 60px 80px;
   text-align: center;
 }
@@ -17,8 +16,8 @@
 .spinner {
   width: 50px;
   height: 50px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #667eea;
+  border: 4px solid var(--bg-tertiary);
+  border-top: 4px solid var(--primary-color);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 20px;
@@ -33,8 +32,8 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: #4caf50;
-  color: white;
+  background: var(--primary-color);
+  color: var(--bg-primary);
   font-size: 36px;
   display: flex;
   align-items: center;
@@ -47,8 +46,8 @@
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  background: #f44336;
-  color: white;
+  background: var(--text-tertiary);
+  color: var(--bg-primary);
   font-size: 36px;
   display: flex;
   align-items: center;
@@ -71,7 +70,7 @@
 
 .oauth-callback-box p {
   font-size: 16px;
-  color: #666;
+  color: var(--text-tertiary);
   margin: 0;
 }
 

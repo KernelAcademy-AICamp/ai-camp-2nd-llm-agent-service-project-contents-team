@@ -68,36 +68,46 @@ function ContentList() {
     return matchesFilter && matchesSearch;
   });
 
+  // 필터별 카운트
+  const filterCounts = {
+    all: contents.length,
+    '발행됨': contents.filter(c => c.status === '발행됨').length,
+    '예약됨': contents.filter(c => c.status === '예약됨').length,
+    '작성 중': contents.filter(c => c.status === '작성 중').length,
+  };
+
   return (
     <div className="content-list-page">
       <div className="list-header">
-        <h2>콘텐츠 관리</h2>
-        <button className="btn-primary">새 콘텐츠 만들기</button>
+        <div className="header-left">
+          <h2>콘텐츠 관리</h2>
+          <p className="header-subtitle">생성된 콘텐츠를 관리하고 발행 상태를 확인하세요</p>
+        </div>
+        <button className="btn-primary">+ 새 콘텐츠 만들기</button>
       </div>
 
-      <div className="list-controls">
-        <div className="search-box">
-          <span className="search-icon">🔍</span>
-          <input
-            type="text"
-            placeholder="콘텐츠 검색..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-        </div>
+      {/* 탭 네비게이션 */}
+      <div className="content-tabs">
+        {filterOptions.map((option) => (
+          <button
+            key={option.id}
+            className={`tab-btn ${filter === option.id ? 'active' : ''}`}
+            onClick={() => setFilter(option.id)}
+          >
+            {option.label} <span className="tab-count">{filterCounts[option.id]}</span>
+          </button>
+        ))}
+      </div>
 
-        <div className="filter-tabs">
-          {filterOptions.map((option) => (
-            <button
-              key={option.id}
-              className={`filter-tab ${filter === option.id ? 'active' : ''}`}
-              onClick={() => setFilter(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+      {/* 검색 */}
+      <div className="search-container">
+        <input
+          type="text"
+          placeholder="콘텐츠 검색..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="search-input"
+        />
       </div>
 
       <div className="content-table-container">
@@ -148,8 +158,9 @@ function ContentList() {
 
         {filteredContents.length === 0 && (
           <div className="empty-state">
-            <span className="empty-icon">📭</span>
-            <p>콘텐츠가 없습니다.</p>
+            <h3>콘텐츠가 없습니다</h3>
+            <p>새 콘텐츠를 만들어 시작하세요</p>
+            <button className="btn-primary">+ 첫 콘텐츠 만들기</button>
           </div>
         )}
       </div>

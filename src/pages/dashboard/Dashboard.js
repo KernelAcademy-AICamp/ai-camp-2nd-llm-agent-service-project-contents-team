@@ -3,10 +3,10 @@ import './Dashboard.css';
 
 function Dashboard() {
   const stats = [
-    { label: '총 콘텐츠', value: '24', change: '+12%', icon: '📝' },
-    { label: '이번 주 생성', value: '8', change: '+25%', icon: '✨' },
-    { label: '예약된 포스트', value: '12', change: '+8%', icon: '📅' },
-    { label: '총 조회수', value: '1.2K', change: '+15%', icon: '👀' },
+    { label: '총 콘텐츠', value: '24', change: '+12%' },
+    { label: '이번 주 생성', value: '8', change: '+25%' },
+    { label: '예약된 포스트', value: '12', change: '+8%' },
+    { label: '총 조회수', value: '1.2K', change: '+15%' },
   ];
 
   const recentContents = [
@@ -24,7 +24,6 @@ function Dashboard() {
       <div className="stats-grid">
         {stats.map((stat, index) => (
           <div key={index} className="stat-card">
-            <div className="stat-icon">{stat.icon}</div>
             <div className="stat-content">
               <div className="stat-label">{stat.label}</div>
               <div className="stat-value">{stat.value}</div>
@@ -59,19 +58,15 @@ function Dashboard() {
           <h3>빠른 작업</h3>
           <div className="action-buttons">
             <button className="action-btn">
-              <span className="action-icon">✨</span>
               <span>콘텐츠 생성</span>
             </button>
             <button className="action-btn">
-              <span className="action-icon">📋</span>
               <span>템플릿 선택</span>
             </button>
             <button className="action-btn">
-              <span className="action-icon">📅</span>
               <span>스케줄 설정</span>
             </button>
             <button className="action-btn">
-              <span className="action-icon">📊</span>
               <span>분석 보기</span>
             </button>
           </div>

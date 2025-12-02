@@ -1,25 +1,22 @@
-/* AI 글 생성 페이지 고유 스타일 */
-/* 공통 스타일은 ContentCommon.css 참조 */
+/* ========================================
+   AI CONTENT GENERATOR - CLEAN MINIMAL STYLE
+   ======================================== */
 
-/* 진행 상태 배너 */
+/* Progress Banner */
 .progress-banner {
-  margin-bottom: 24px;
-  padding: 20px;
-  background: var(--gradient-secondary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  animation: slideDown 0.3s ease-out;
+  margin-bottom: var(--space-lg);
+  padding: var(--space-lg);
+  background: var(--primary-color);
 }
 
 .progress-content {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-md);
 }
 
 .progress-icon {
-  font-size: 32px;
-  animation: bounce 1s ease-in-out infinite;
+  font-size: 28px;
 }
 
 .progress-text {
@@ -27,98 +24,112 @@
 }
 
 .progress-message {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
-  color: white;
-  margin-bottom: 4px;
+  color: var(--bg-primary);
+  margin-bottom: var(--space-xs);
 }
 
 .progress-detail {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .progress-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--bg-primary);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 
-/* 콘텐츠 영역 */
+/* Content Area */
 .generator-content {
-  margin-bottom: 40px;
+  margin-bottom: var(--space-2xl);
 }
 
-/* 기능 설명 섹션 */
+/* Feature Info */
 .feature-info {
   background: var(--bg-primary);
-  border-radius: var(--radius-lg);
-  padding: 32px;
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+  padding: var(--space-xl);
 }
 
 .feature-info h3 {
-  font-size: 16px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 20px 0;
+  margin: 0 0 var(--space-lg) 0;
   text-align: center;
 }
 
 .feature-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
+  gap: var(--space-md);
 }
 
 .feature-card {
-  padding: 24px;
+  padding: var(--space-lg);
   background: var(--bg-secondary);
-  border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
-  transition: all 0.3s;
+  transition: all 0.15s ease;
+}
+
+/* Color accents */
+.feature-card:nth-child(1) {
+  border-top: 3px solid var(--secondary-color);
+}
+
+.feature-card:nth-child(2) {
+  border-top: 3px solid var(--accent-color);
+}
+
+.feature-card:nth-child(3) {
+  border-top: 3px solid var(--bauhaus-blue);
+}
+
+.feature-card:nth-child(4) {
+  border-top: 3px solid var(--success-color);
 }
 
 .feature-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--accent-color);
+  border-color: var(--primary-color);
 }
 
 .feature-icon {
-  font-size: 36px;
-  margin-bottom: 12px;
+  font-size: 32px;
+  margin-bottom: var(--space-md);
 }
 
 .feature-card h4 {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 8px 0;
+  margin: 0 0 var(--space-sm) 0;
 }
 
 .feature-card p {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.6;
   margin: 0;
 }
 
-/* 반응형 */
+/* Responsive */
 @media (max-width: 768px) {
   .progress-banner {
-    padding: 16px;
+    padding: var(--space-md);
   }
 
   .progress-message {
-    font-size: 16px;
+    font-size: 14px;
   }
 
   .progress-detail {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .progress-spinner {

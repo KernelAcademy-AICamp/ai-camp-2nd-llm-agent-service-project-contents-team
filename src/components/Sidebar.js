@@ -8,27 +8,27 @@ function Sidebar() {
   const [isContentMenuOpen, setIsContentMenuOpen] = useState(false);
 
   const menuItems = [
-    { path: '/home', icon: '🏠', label: '홈' },
-    { path: '/', icon: '📊', label: '대시보드' },
+    { path: '/home', label: '홈' },
+    { path: '/dashboard', label: '대시보드' },
   ];
 
   const contentMenuItems = [
-    { path: '/ai-content', icon: '🤖', label: 'AI 글 생성' },
-    { path: '/image', icon: '🎨', label: 'AI 이미지 생성' },
-    { path: '/video', icon: '🎬', label: 'AI 동영상 생성' },
+    { path: '/ai-content', label: 'AI 글 생성' },
+    { path: '/image', label: 'AI 이미지 생성' },
+    { path: '/video', label: 'AI 동영상 생성' },
   ];
 
   const platformMenuItems = [
-    { path: '/youtube', icon: '📺', label: 'YouTube' },
-    { path: '/facebook', icon: '📘', label: 'Facebook' },
-    { path: '/instagram', icon: '📸', label: 'Instagram' },
+    { path: '/youtube', label: 'YouTube' },
+    { path: '/facebook', label: 'Facebook' },
+    { path: '/instagram', label: 'Instagram' },
   ];
 
   const managementMenuItems = [
-    { path: '/contents', icon: '📝', label: '콘텐츠 관리' },
-    { path: '/templates', icon: '📋', label: '템플릿' },
-    { path: '/analytics', icon: '📈', label: '분석' },
-    { path: '/settings', icon: '⚙️', label: '설정' },
+    { path: '/contents', label: '콘텐츠 관리' },
+    { path: '/templates', label: '템플릿' },
+    { path: '/analytics', label: '분석' },
+    { path: '/settings', label: '설정' },
   ];
 
   const isContentMenuActive = contentMenuItems.some(item =>
@@ -60,7 +60,6 @@ function Sidebar() {
             to={item.path}
             className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
           >
-            <span className="sidebar-icon">{item.icon}</span>
             <span className="sidebar-label">{item.label}</span>
           </Link>
         ))}
@@ -71,7 +70,6 @@ function Sidebar() {
             className={`sidebar-item sidebar-dropdown-trigger ${isContentMenuActive ? 'active' : ''}`}
             onClick={toggleContentMenu}
           >
-            <span className="sidebar-icon">✨</span>
             <span className="sidebar-label">콘텐츠 생성</span>
             <span className={`sidebar-dropdown-arrow ${isContentMenuOpen ? 'open' : ''}`}>▼</span>
           </button>
@@ -84,7 +82,6 @@ function Sidebar() {
                   onClick={() => handleContentItemClick(item.path)}
                   className={`sidebar-dropdown-item ${location.pathname === item.path ? 'active' : ''}`}
                 >
-                  <span className="sidebar-icon">{item.icon}</span>
                   <span className="sidebar-label">{item.label}</span>
                 </button>
               ))}
@@ -101,7 +98,6 @@ function Sidebar() {
             to={item.path}
             className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
           >
-            <span className="sidebar-icon">{item.icon}</span>
             <span className="sidebar-label">{item.label}</span>
           </Link>
         ))}
@@ -114,7 +110,6 @@ function Sidebar() {
             to={item.path}
             className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
           >
-            <span className="sidebar-icon">{item.icon}</span>
             <span className="sidebar-label">{item.label}</span>
           </Link>
         ))}

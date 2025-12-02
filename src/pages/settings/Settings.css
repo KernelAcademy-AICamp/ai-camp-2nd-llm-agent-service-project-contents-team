@@ -1,275 +1,80 @@
+/* ========================================
+   SETTINGS PAGE - TEMPLATE GALLERY STYLE
+   ======================================== */
+
 .settings-page {
+  max-width: 1200px;
   padding: 24px;
-  max-width: 1000px;
-  margin: 0 auto;
 }
 
+/* Header */
 .settings-header {
-  margin-bottom: 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.settings-header h2 {
+.header-left h2 {
   font-size: 28px;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 8px;
+  margin: 0 0 8px 0;
 }
 
-.settings-header p {
+.header-subtitle {
   font-size: 14px;
   color: var(--text-tertiary);
+  margin: 0;
 }
 
+/* Section */
 .settings-section {
   background: var(--bg-primary);
-  border-radius: var(--radius-xl);
-  padding: 28px;
+  border-radius: var(--radius-lg);
+  padding: 24px;
   margin-bottom: 24px;
-  box-shadow: var(--shadow-md);
-}
-
-.settings-section h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-}
-
-.section-header h3 {
-  margin-bottom: 0;
-}
-
-.btn-help {
-  padding: 8px 16px;
-  background: var(--bg-secondary);
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-help:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-}
-
-/* 연결된 계정 */
-.connected-accounts {
-  margin-bottom: 20px;
-}
-
-.account-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  background: var(--bg-secondary);
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  margin-bottom: 12px;
-  transition: all 0.2s;
-}
-
-.account-card:hover {
-  border-color: var(--accent-color);
-  background: var(--primary-lighter);
-}
-
-.account-info {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex: 1;
-}
-
-.account-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid var(--accent-color);
-}
-
-.account-avatar-placeholder {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--gradient-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 24px;
-}
-
-.account-details {
-  flex: 1;
-}
-
-.account-username {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.account-meta {
-  font-size: 13px;
-  color: var(--text-tertiary);
-  margin-bottom: 8px;
-}
-
-.account-status {
-  display: flex;
-  gap: 8px;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.status-badge.active {
-  background: var(--success-light);
-  color: var(--success-dark);
-}
-
-.btn-disconnect {
-  padding: 10px 20px;
-  background: var(--bg-primary);
-  border: 2px solid var(--error-color);
-  border-radius: var(--radius-md);
-  color: var(--error-color);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-disconnect:hover:not(:disabled) {
-  background: var(--error-color);
-  color: white;
-}
-
-.btn-disconnect:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 계정 없음 */
-.no-accounts {
-  text-align: center;
-  padding: 60px 20px;
-  background: var(--bg-secondary);
-  border: 2px dashed var(--border-hover);
-  border-radius: var(--radius-lg);
-  margin-bottom: 20px;
-}
-
-.no-accounts-icon {
-  font-size: 64px;
   margin-bottom: 16px;
-  opacity: 0.5;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.no-accounts p {
-  font-size: 16px;
+.settings-section h3 {
+  font-size: 18px;
   font-weight: 600;
-  color: var(--text-tertiary);
-  margin-bottom: 8px;
-}
-
-.no-accounts-sub {
-  font-size: 14px;
-  color: var(--text-tertiary);
-  font-weight: 400;
-}
-
-/* Instagram 연결 버튼 */
-.btn-connect-instagram {
-  width: 100%;
-  padding: 16px;
-  background: linear-gradient(135deg, #e1306c 0%, #fd1d1d 50%, #f56040 75%, #ffdc80 100%);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  transition: all 0.3s;
-  box-shadow: 0 4px 12px rgba(225, 48, 108, 0.3);
-  margin-bottom: 20px;
-}
-
-.btn-connect-instagram:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(225, 48, 108, 0.4);
-}
-
-.btn-connect-instagram:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-icon {
-  font-size: 20px;
-}
-
-/* 연동 안내 */
-.connection-info {
-  background: var(--info-light);
-  border: 2px solid var(--info-color);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-}
-
-.connection-info h4 {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--info-dark);
-  margin-bottom: 12px;
-}
-
-.connection-info ul {
+  color: var(--text-primary);
   margin: 0;
-  padding-left: 20px;
 }
 
-.connection-info li {
+.section-count {
+  background: var(--bg-secondary);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.section-description {
   font-size: 14px;
-  color: var(--info-dark);
-  margin-bottom: 8px;
-  line-height: 1.5;
+  color: var(--text-tertiary);
+  margin: 0 0 20px 0;
 }
 
-.connection-info strong {
-  font-weight: 700;
-}
-
-/* 플랫폼 리스트 */
+/* Platform List */
 .platform-list {
   display: grid;
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
 }
 
 .platform-item {
@@ -277,39 +82,33 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 20px;
+  padding: 20px;
   background: var(--bg-secondary);
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   transition: all 0.2s;
+  text-decoration: none;
 }
 
 .platform-item:not(.disabled):hover {
-  border-color: var(--accent-color);
-  background: var(--primary-lighter);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--secondary-color);
 }
 
 .platform-item.disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .platform-item.connected {
   border-color: var(--success-color);
+  border-left: 3px solid var(--success-color);
   background: var(--success-light);
 }
 
 .platform-item.connected .platform-status {
   color: var(--success-dark);
-}
-
-a.platform-item {
-  text-decoration: none;
-}
-
-.platform-icon {
-  font-size: 32px;
-  margin-right: 16px;
 }
 
 .platform-info {
@@ -318,7 +117,7 @@ a.platform-item {
 
 .platform-name {
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--text-primary);
   display: block;
   margin-bottom: 4px;
@@ -331,100 +130,83 @@ a.platform-item {
 
 .btn-connect {
   padding: 10px 20px;
-  background: var(--gradient-secondary);
+  background: var(--secondary-color);
   border: none;
   border-radius: var(--radius-md);
-  color: white;
-  font-size: 14px;
+  color: var(--text-primary);
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .btn-connect:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  background: var(--secondary-hover);
 }
 
 .btn-connect:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   background: var(--text-tertiary);
   cursor: not-allowed;
-  transform: none;
 }
 
-/* API 정보 */
+/* API Info */
 .api-info {
-  background: var(--warning-light);
-  border: 2px solid var(--warning-color);
-  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   padding: 20px;
 }
 
 .api-info p {
   font-size: 14px;
-  color: var(--warning-dark);
-  margin-bottom: 16px;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
   line-height: 1.6;
 }
 
+.api-info p:last-child {
+  margin-bottom: 0;
+}
+
+.api-info ul {
+  margin: 0 0 12px 0;
+  padding-left: 20px;
+}
+
+.api-info li {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
 .api-info code {
-  background: var(--warning-light);
+  background: var(--bg-primary);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
-  font-family: 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
-  color: var(--warning-dark);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
-.code-block {
-  background: var(--warning-dark);
-  color: var(--warning-light);
-  padding: 16px;
-  border-radius: var(--radius-md);
-  font-family: 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
-  margin-bottom: 16px;
-  overflow-x: auto;
+.mt-3 {
+  margin-top: 12px;
 }
 
-.btn-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
-  background: var(--warning-color);
-  color: white;
-  text-decoration: none;
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.btn-link:hover {
-  background: var(--warning-dark);
-  transform: translateX(4px);
-}
-
-/* 반응형 */
+/* Responsive */
 @media (max-width: 768px) {
   .settings-page {
     padding: 16px;
   }
 
   .settings-section {
-    padding: 20px;
+    padding: 16px;
   }
 
-  .account-card {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
-  }
-
-  .btn-disconnect {
-    width: 100%;
+  .platform-list {
+    grid-template-columns: 1fr;
   }
 
   .platform-item {
@@ -433,5 +215,6 @@ a.platform-item {
 
   .btn-connect {
     width: 100%;
+    text-align: center;
   }
 }

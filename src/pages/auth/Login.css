@@ -1,81 +1,125 @@
+/* ========================================
+   LOGIN PAGE - BAUHAUS STYLE
+   Bold geometric design, high contrast
+   ======================================== */
+
 .login-container {
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: var(--gradient-primary);
-  padding: 20px;
+  background: var(--bg-primary);
+  padding: var(--space-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Bauhaus geometric background decorations */
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: var(--primary-color);
+  z-index: 0;
+}
+
+.login-container::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 200px;
+  height: 200px;
+  background: var(--secondary-color);
+  border-radius: 50%;
+  transform: translate(30%, 30%);
+  z-index: 0;
 }
 
 .login-box {
   background: var(--bg-primary);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl);
-  padding: 50px 40px;
+  border: var(--border-thick) solid var(--primary-color);
+  padding: var(--space-2xl);
   width: 100%;
   max-width: 420px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 1;
+}
+
+/* Bauhaus accent line */
+.login-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: var(--accent-color);
 }
 
 .login-header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: var(--space-xl);
 }
 
 .login-header h1 {
+  font-family: var(--font-display);
   font-size: 32px;
-  background: var(--gradient-secondary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 12px;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
 }
 
 .login-header p {
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.5;
 }
 
 .error-message {
-  background-color: var(--error-light);
-  color: var(--error-dark);
-  padding: 14px;
-  border-radius: var(--radius-md);
-  margin-bottom: 24px;
-  font-size: 14px;
+  background-color: var(--bg-primary);
+  color: var(--error-color);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  font-size: 13px;
   text-align: center;
-  border: 1px solid var(--error-color);
+  font-weight: 600;
+  text-transform: uppercase;
+  border: var(--border-medium) solid var(--error-color);
 }
 
-/* 소셜 로그인 */
+/* Social Login - Bauhaus */
 .social-login {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-sm);
 }
 
 .social-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 16px 20px;
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border: var(--border-medium) solid var(--primary-color);
   background: var(--bg-primary);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-primary);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .social-btn:hover {
-  background: var(--bg-secondary);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+  background: var(--secondary-color);
+  color: var(--text-primary);
 }
 
 .social-btn svg {
@@ -83,40 +127,56 @@
 }
 
 .social-btn.google {
-  color: #333;
-  border-color: #dadce0;
+  color: var(--text-primary);
+  border-color: var(--secondary-color);
 }
 
 .social-btn.google:hover {
-  border-color: #4285f4;
-  background: #f8f9fa;
+  background: var(--secondary-color);
+  color: var(--text-primary);
 }
 
 .social-btn.kakao {
-  background: #FEE500;
-  border-color: #FEE500;
-  color: #000000;
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--primary-color);
 }
 
 .social-btn.kakao:hover {
-  background: #FDD835;
-  border-color: #FDD835;
-  box-shadow: 0 4px 12px rgba(254, 229, 0, 0.3);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .social-btn.facebook {
-  color: #1877F2;
-  border-color: #d0e1f9;
+  color: var(--bauhaus-blue);
+  border-color: var(--bauhaus-blue);
 }
 
 .social-btn.facebook:hover {
-  border-color: #1877F2;
-  background: #f0f5ff;
+  background: var(--bauhaus-blue);
+  color: var(--bg-primary);
+}
+
+/* Bauhaus geometric decoration at bottom */
+.login-box::after {
+  content: '';
+  position: absolute;
+  bottom: var(--space-md);
+  right: var(--space-md);
+  width: 24px;
+  height: 24px;
+  background: var(--secondary-color);
+  border-radius: 50%;
 }
 
 @media (max-width: 768px) {
+  .login-container::before {
+    width: 100%;
+    height: 30%;
+  }
+
   .login-box {
-    padding: 30px 20px;
+    padding: var(--space-xl) var(--space-lg);
   }
 
   .login-header h1 {
@@ -125,6 +185,6 @@
 
   .social-btn {
     font-size: 13px;
-    padding: 11px 14px;
+    padding: var(--space-sm) var(--space-md);
   }
 }
