@@ -13,12 +13,110 @@ function AgenticContentResult({ result, onEdit, onSave }) {
   const [imagePrompt, setImagePrompt] = useState('');
   const [imageError, setImageError] = useState(null);
 
+  // 복사 상태
+  const [isCopied, setIsCopied] = useState(false);
+
   // 이미지 첨부용 ref
   const fileInputRef = useRef(null);
+  const blogContentRef = useRef(null);
 
   if (!result) return null;
 
-  const { blog, sns, analysis, critique, metadata } = result;
+  const { blog, sns, analysis, critique, metadata, uploadedImages } = result;
+
+  // 블로그 콘텐츠를 이미지 마커 기준으로 분할하여 React 요소로 렌더링
+  const renderBlogContentWithImages = (content) => {
+    if (!uploadedImages || uploadedImages.length === 0) {
+      return <ReactMarkdown>{content}</ReactMarkdown>;
+    }
+
+    // [IMAGE_1], [IMAGE_2] 등의 마커로 콘텐츠 분할
+    const parts = [];
+    let remainingContent = content;
+    let partIndex = 0;
+
+    // 모든 이미지 마커를 찾아서 분할
+    for (let i = 1; i <= uploadedImages.length; i++) {
+      const marker = `[IMAGE_${i}]`;
+      const markerIndex = remainingContent.indexOf(marker);
+
+      if (markerIndex !== -1) {
+        // 마커 이전 텍스트
+        const beforeText = remainingContent.substring(0, markerIndex);
+        if (beforeText.trim()) {
+          parts.push(
+            <div key={`text-${partIndex}`} className="content-text-block">
+              <ReactMarkdown>{beforeText}</ReactMarkdown>
+            </div>
+          );
+          partIndex++;
+        }
+
+        // 이미지 삽입
+        parts.push(
+          <div key={`image-${i}`} className="content-image-block">
+            <img
+              src={uploadedImages[i - 1]}
+              alt={`업로드 이미지 ${i}`}
+              className="uploaded-content-image"
+            />
+          </div>
+        );
+
+        // 나머지 콘텐츠
+        remainingContent = remainingContent.substring(markerIndex + marker.length);
+      }
+    }
+
+    // 남은 텍스트 추가
+    if (remainingContent.trim()) {
+      parts.push(
+        <div key={`text-final`} className="content-text-block">
+          <ReactMarkdown>{remainingContent}</ReactMarkdown>
+        </div>
+      );
+    }
+
+    return <>{parts}</>;
+  };
+
+  // 블로그 콘텐츠 복사 (텍스트만 - 이미지 마커 제거)
+  const handleCopyBlogContent = async () => {
+    try {
+      // 이미지 마커 제거한 텍스트
+      let cleanContent = blog.content;
+      if (uploadedImages && uploadedImages.length > 0) {
+        for (let i = 1; i <= uploadedImages.length; i++) {
+          cleanContent = cleanContent.replace(`[IMAGE_${i}]`, '\n\n[이미지 위치]\n\n');
+        }
+      }
+
+      const textContent = `${blog.title}\n\n${cleanContent}\n\n${blog.tags.map(tag => `#${tag}`).join(' ')}`;
+      await navigator.clipboard.writeText(textContent);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (error) {
+      console.error('복사 실패:', error);
+      alert('복사에 실패했습니다. 직접 선택하여 복사해주세요.');
+    }
+  };
+
+  // 이미지 다운로드
+  const handleDownloadImages = () => {
+    if (!uploadedImages || uploadedImages.length === 0) {
+      alert('다운로드할 이미지가 없습니다.');
+      return;
+    }
+
+    uploadedImages.forEach((dataUrl, index) => {
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `blog_image_${index + 1}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+  };
 
   // 점수에 따른 색상 결정
   const getScoreColor = (score) => {
@@ -219,6 +317,24 @@ function AgenticContentResult({ result, onEdit, onSave }) {
       {/* 블로그 콘텐츠 */}
       {activeTab === 'blog' && (
         <div className="content-panel">
+          {/* 복사 버튼 */}
+          <div className="copy-button-container">
+            {uploadedImages && uploadedImages.length > 0 && (
+              <button
+                className="btn-download-images"
+                onClick={handleDownloadImages}
+              >
+                이미지 다운로드 ({uploadedImages.length}개)
+              </button>
+            )}
+            <button
+              className={`btn-copy ${isCopied ? 'copied' : ''}`}
+              onClick={handleCopyBlogContent}
+            >
+              {isCopied ? '완료!' : '복사'}
+            </button>
+          </div>
+
           <div className="content-section">
             <div className="section-header">
               <h3>제목</h3>
@@ -233,12 +349,15 @@ function AgenticContentResult({ result, onEdit, onSave }) {
 
           <div className="content-section">
             <h3>본문</h3>
-            <div className="content-display markdown-content">
-              <ReactMarkdown>{blog.content}</ReactMarkdown>
+            <div className="content-display markdown-content" ref={blogContentRef}>
+              {renderBlogContentWithImages(blog.content)}
             </div>
             <div className="content-stats">
               <span>글자 수: {blog.content.length}자</span>
               <span>예상 읽기 시간: {Math.ceil(blog.content.length / 500)}분</span>
+              {uploadedImages && uploadedImages.length > 0 && (
+                <span>첨부 이미지: {uploadedImages.length}개</span>
+              )}
             </div>
           </div>
 
@@ -452,9 +571,18 @@ function AgenticContentResult({ result, onEdit, onSave }) {
               <p className="section-desc">Instagram/Facebook에 발행될 내용입니다</p>
 
               <div className="preview-card">
-                {generatedImage && (
+                {/* 업로드된 이미지 또는 생성된 이미지 미리보기 */}
+                {(uploadedImages?.length > 0 || generatedImage) && (
                   <div className="preview-image">
-                    <img src={generatedImage} alt="Preview" />
+                    {uploadedImages?.length > 0 ? (
+                      <div className="preview-image-grid">
+                        {uploadedImages.map((img, idx) => (
+                          <img key={idx} src={img} alt={`Preview ${idx + 1}`} />
+                        ))}
+                      </div>
+                    ) : (
+                      <img src={generatedImage} alt="Preview" />
+                    )}
                   </div>
                 )}
                 <div className="preview-content">
@@ -489,11 +617,13 @@ function AgenticContentResult({ result, onEdit, onSave }) {
         isOpen={showPublishModal}
         onClose={() => setShowPublishModal(false)}
         content={{
-          type: generatedImage ? 'image' : 'text',
+          type: (uploadedImages?.length > 0 || generatedImage) ? 'image' : 'text',
           instagramCaption: sns?.content || '',
           facebookPost: sns?.content || '',
           hashtags: sns?.tags || [],
-          images: generatedImage ? [generatedImage] : []
+          images: uploadedImages?.length > 0
+            ? uploadedImages
+            : (generatedImage ? [generatedImage] : [])
         }}
       />
     </div>

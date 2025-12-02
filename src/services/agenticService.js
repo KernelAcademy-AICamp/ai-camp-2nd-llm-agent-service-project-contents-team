@@ -16,6 +16,16 @@ const fileToBase64 = (file) => {
   });
 };
 
+// 파일을 data URL로 변환하는 헬퍼 함수 (미리보기용)
+const fileToDataURL = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+};
+
 // ============================================
 // 1. Orchestrator Agent
 // ============================================
@@ -182,7 +192,7 @@ class WriterAgent {
     this.model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   }
 
-  async generateContent(analysisData, feedback = null) {
+  async generateContent(analysisData, feedback = null, imageCount = 0) {
     console.log('✍️ Writer Agent: 콘텐츠 생성 중...');
 
     const improvementInstructions = feedback ? `
@@ -192,6 +202,18 @@ ${feedback.blog ? `블로그: ${feedback.blog.join(', ')}` : ''}
 ${feedback.sns ? `SNS: ${feedback.sns.join(', ')}` : ''}
 
 위 피드백을 반영하여 개선된 버전을 작성하세요.
+` : '';
+
+    // 이미지 삽입 지시문
+    const imageInstructions = imageCount > 0 ? `
+
+**이미지 삽입 안내:**
+- 사용자가 ${imageCount}개의 이미지를 업로드했습니다.
+- 블로그 본문 중 적절한 위치에 이미지 마커를 삽입하세요.
+- 이미지 마커 형식: [IMAGE_1], [IMAGE_2], ... (숫자는 1부터 시작)
+- 이미지는 글의 맥락에 맞는 곳에 자연스럽게 배치하세요.
+- 예: 제품 설명 후, 분위기 묘사 후, 결론 전 등
+- 첫 번째 이미지는 도입부 또는 주요 내용 설명 후에 배치하세요.
 ` : '';
 
     // 브랜드 분석 정보가 있으면 추가
@@ -222,6 +244,7 @@ ${feedback.sns ? `SNS: ${feedback.sns.join(', ')}` : ''}
 ${analysisData.visualInfo ? `- 비주얼: ${analysisData.visualInfo}` : ''}
 ${brandGuidelines}
 ${improvementInstructions}
+${imageInstructions}
 
 **작성 요구사항:**
 
@@ -403,6 +426,15 @@ export const generateAgenticContent = async ({ textInput, images = [] }, onProgr
     let finalSnsContent = null;
     let critiqueResult = null;
 
+    // 이미지 Data URL 변환 (결과에 포함하기 위해)
+    const imageDataUrls = [];
+    if (images && images.length > 0) {
+      for (const file of images) {
+        const dataUrl = await fileToDataURL(file);
+        imageDataUrls.push(dataUrl);
+      }
+    }
+
     // 3단계: Writer가 콘텐츠 생성 (반복 가능)
     while (orchestrator.state.attempts <= orchestrator.state.maxAttempts) {
       updateProgress(
@@ -415,7 +447,7 @@ export const generateAgenticContent = async ({ textInput, images = [] }, onProgr
         sns: critiqueResult?.sns.improvements
       } : null;
 
-      const content = await writerAgent.generateContent(analysisResult, feedback);
+      const content = await writerAgent.generateContent(analysisResult, feedback, images.length);
       finalBlogContent = content.blog;
       finalSnsContent = content.sns;
 
@@ -445,6 +477,7 @@ export const generateAgenticContent = async ({ textInput, images = [] }, onProgr
       sns: finalSnsContent,
       analysis: analysisResult,
       critique: critiqueResult,
+      uploadedImages: imageDataUrls, // 업로드된 이미지 Data URL 배열
       metadata: {
         attempts: orchestrator.state.attempts,
         finalScores: {

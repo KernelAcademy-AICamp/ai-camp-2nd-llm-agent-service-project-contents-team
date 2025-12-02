@@ -733,3 +733,113 @@
   text-align: center;
   margin: 16px 0 0 0;
 }
+
+/* 미리보기 이미지 그리드 (여러 이미지) */
+.preview-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 4px;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
+.preview-image-grid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 블로그 본문 내 이미지 스타일 */
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 16px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.markdown-content p img {
+  display: block;
+  margin: 16px auto;
+}
+
+/* 업로드된 이미지 블록 (텍스트와 분리된 이미지 영역) */
+.content-image-block {
+  margin: 24px 0;
+  text-align: center;
+}
+
+.uploaded-content-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  display: block;
+  margin: 0 auto;
+}
+
+.content-text-block {
+  margin-bottom: 16px;
+}
+
+.content-text-block:last-child {
+  margin-bottom: 0;
+}
+
+/* 복사 버튼 스타일 */
+.copy-button-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.btn-copy {
+  padding: 2px 6px;
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+}
+
+.btn-copy::before {
+  content: '';
+}
+
+.btn-copy:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.btn-copy.copied {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.btn-copy.copied:hover {
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-download-images {
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-download-images:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(167, 139, 250, 0.4);
+}
