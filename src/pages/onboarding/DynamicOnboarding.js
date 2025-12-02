@@ -705,7 +705,7 @@ function DynamicOnboarding() {
           <h2>비즈니스를 알려주세요</h2>
           <p className="step-description">AI가 이 정보를 바탕으로 완벽한 콘텐츠를 만듭니다</p>
 
-          <div className="form-section">
+          <div className="onboarding-form-section">
             <div className="form-group">
               <label>브랜드명 *</label>
               <input
@@ -913,7 +913,7 @@ function DynamicOnboarding() {
             입력하신 플랫폼만 분석되며, 선택적으로 입력 가능합니다.
           </p>
 
-          <div className="form-section">
+          <div className="onboarding-form-section">
             <div className="platform-input-group">
               <h3>📝 네이버 블로그 (선택)</h3>
               <input
@@ -985,7 +985,7 @@ function DynamicOnboarding() {
           <h2>선호하는 콘텐츠 스타일</h2>
           <p className="step-description">샘플을 제공하시면 더 정확한 콘텐츠를 만들 수 있어요</p>
 
-          <div className="form-section">
+          <div className="onboarding-form-section">
             {/* 글 스타일 */}
             <div className="style-card">
               <h3>📝 글 스타일 (선택)</h3>
