@@ -18,6 +18,7 @@ import VideoCreator from './pages/content/VideoCreator';
 import MyPage from './pages/profile/MyPage';
 import AIContentGenerator from './pages/content/AIContentGenerator';
 import ImageGenerator from './pages/content/ImageGenerator';
+import AIVideoGenerator from './pages/content/AIVideoGenerator';
 import YouTube from './pages/connection_SNS/youtube/YouTube';
 import Facebook from './pages/connection_SNS/facebook/Facebook';
 import Instagram from './pages/connection_SNS/instagram/Instagram';
@@ -120,6 +121,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <VideoCreator />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ai-video"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AIVideoGenerator />
                 </Layout>
               </ProtectedRoute>
             }
