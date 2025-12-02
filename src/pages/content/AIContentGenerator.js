@@ -3,13 +3,14 @@ import { useLocation } from 'react-router-dom';
 import AgenticContentForm from '../../components/AgenticContentForm';
 import AgenticContentResult from '../../components/AgenticContentResult';
 import { generateAgenticContent } from '../../services/agenticService';
+import { useContent } from '../../contexts/ContentContext';
 import './ContentCommon.css';
 import './AIContentGenerator.css';
 
 function AIContentGenerator() {
   const location = useLocation();
+  const { generatedContent, setGeneratedContent } = useContent();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState(null);
   const [progressMessage, setProgressMessage] = useState('');
   const [currentStep, setCurrentStep] = useState('');
   const [templateText, setTemplateText] = useState('');
