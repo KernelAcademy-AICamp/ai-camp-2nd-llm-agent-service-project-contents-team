@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import './SNSPublishModal.css';
 
 function SNSPublishModal({ isOpen, onClose, content }) {
@@ -85,6 +85,7 @@ function SNSPublishModal({ isOpen, onClose, content }) {
 
       if (response.ok) {
         setPublishResults(result);
+        // 발행 성공 시 DB 저장은 백엔드에서 자동 처리됨
       } else {
         throw new Error(result.detail || '발행에 실패했습니다.');
       }

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 import httpx
 import os
 
+from datetime import datetime
 from .. import models, auth
 from ..database import get_db
 from ..services.instagram_service import InstagramService
@@ -340,5 +341,44 @@ async def publish_to_sns(
     instagram_success = results.get("instagram", {}).get("success", True) if results.get("instagram") else True
     facebook_success = results.get("facebook", {}).get("success", True) if results.get("facebook") else True
     results["success"] = instagram_success or facebook_success
+
+    # 발행 성공 시 DB에 자동 저장
+    if results.get("instagram") and results["instagram"].get("success"):
+        try:
+            ig_content = models.SNSPublishedContent(
+                user_id=current_user.id,
+                platform="instagram",
+                caption=request.content.instagramCaption or "",
+                hashtags=request.content.hashtags or [],
+                image_urls=image_urls,
+                post_id=results["instagram"].get("post_id"),
+                post_url=None,
+                status="published",
+                published_at=datetime.now()
+            )
+            db.add(ig_content)
+            db.commit()
+            logger.info(f"✅ Instagram 콘텐츠 자동 저장 완료 (user_id: {current_user.id})")
+        except Exception as e:
+            logger.error(f"Instagram 콘텐츠 저장 실패: {e}")
+
+    if results.get("facebook") and results["facebook"].get("success"):
+        try:
+            fb_content = models.SNSPublishedContent(
+                user_id=current_user.id,
+                platform="facebook",
+                caption=request.content.facebookPost or "",
+                hashtags=request.content.hashtags or [],
+                image_urls=image_urls,
+                post_id=results["facebook"].get("post_id"),
+                post_url=None,
+                status="published",
+                published_at=datetime.now()
+            )
+            db.add(fb_content)
+            db.commit()
+            logger.info(f"✅ Facebook 콘텐츠 자동 저장 완료 (user_id: {current_user.id})")
+        except Exception as e:
+            logger.error(f"Facebook 콘텐츠 저장 실패: {e}")
 
     return results
