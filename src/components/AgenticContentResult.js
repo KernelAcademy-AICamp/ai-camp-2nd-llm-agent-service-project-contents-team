@@ -436,7 +436,7 @@ function AgenticContentResult({ result, onEdit, onSave }) {
             <div className="tags-display">
               {sns.tags.map((tag, index) => (
                 <span key={index} className="tag tag-sns">
-                  #{tag}
+                  {tag}
                 </span>
               ))}
             </div>
@@ -589,6 +589,13 @@ function AgenticContentResult({ result, onEdit, onSave }) {
                   <div className="preview-caption">
                     {sns?.content || ''}
                   </div>
+                  {sns?.tags && sns.tags.length > 0 && (
+                    <div className="preview-hashtags">
+                      {sns.tags.map((tag, index) => (
+                        <span key={index} className="preview-tag">{tag}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

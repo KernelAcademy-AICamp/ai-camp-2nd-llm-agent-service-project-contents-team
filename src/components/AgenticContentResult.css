@@ -698,7 +698,8 @@
   gap: 6px;
 }
 
-.preview-hashtags .hashtag {
+.preview-hashtags .hashtag,
+.preview-tag {
   font-size: 13px;
   color: #6366f1;
   font-weight: 500;
