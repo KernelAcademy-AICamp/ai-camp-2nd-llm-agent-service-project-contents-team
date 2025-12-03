@@ -1,6 +1,6 @@
 """
-Twitter(X) API Service
-- Twitter API v2를 사용한 트윗 관리 및 계정 정보 조회
+X API Service
+- X(구 Twitter) API v2를 사용한 포스트 관리 및 계정 정보 조회
 - OAuth 2.0 with PKCE 인증 방식
 """
 import os
@@ -9,19 +9,19 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 
-from ..models import TwitterConnection, Tweet
+from ..models import XConnection, XPost
 from ..logger import get_logger
 
 logger = get_logger(__name__)
 
 
-# Twitter API v2 기본 URL
-TWITTER_API_URL = "https://api.twitter.com/2"
-TWITTER_TOKEN_URL = "https://api.twitter.com/2/oauth2/token"
+# X API v2 기본 URL
+X_API_URL = "https://api.twitter.com/2"
+X_TOKEN_URL = "https://api.twitter.com/2/oauth2/token"
 
 
-class TwitterService:
-    """Twitter API v2 서비스 클래스"""
+class XService:
+    """X API v2 서비스 클래스"""
 
     def __init__(self, access_token: str, refresh_token: Optional[str] = None):
         self.access_token = access_token
@@ -36,12 +36,12 @@ class TwitterService:
         if not self.refresh_token:
             return None
 
-        client_id = os.getenv("TWITTER_CLIENT_ID")
-        client_secret = os.getenv("TWITTER_CLIENT_SECRET")
+        client_id = os.getenv("X_CLIENT_ID")
+        client_secret = os.getenv("X_CLIENT_SECRET")
 
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                TWITTER_TOKEN_URL,
+                X_TOKEN_URL,
                 data={
                     "grant_type": "refresh_token",
                     "refresh_token": self.refresh_token,
@@ -56,10 +56,10 @@ class TwitterService:
                 self.access_token = data["access_token"]
                 self.refresh_token = data.get("refresh_token", self.refresh_token)
                 self.headers["Authorization"] = f"Bearer {self.access_token}"
-                logger.info("Twitter access token refreshed successfully")
+                logger.info("X access token refreshed successfully")
                 return self.access_token
 
-            logger.error(f"Twitter token refresh failed: {response.text}")
+            logger.error(f"X token refresh failed: {response.text}")
             return None
 
     async def _make_request(
@@ -89,7 +89,7 @@ class TwitterService:
                 return None
 
             if response.status_code >= 400:
-                logger.error(f"Twitter API error: {response.status_code} - {response.text}")
+                logger.error(f"X API error: {response.status_code} - {response.text}")
                 return None
 
             # DELETE 요청은 빈 응답일 수 있음
@@ -102,7 +102,7 @@ class TwitterService:
 
     async def get_me(self) -> Optional[Dict]:
         """현재 인증된 사용자 정보 조회"""
-        url = f"{TWITTER_API_URL}/users/me"
+        url = f"{X_API_URL}/users/me"
         params = {
             "user.fields": "id,name,username,description,profile_image_url,verified,public_metrics,created_at"
         }
@@ -114,7 +114,7 @@ class TwitterService:
 
     async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
         """사용자 ID로 정보 조회"""
-        url = f"{TWITTER_API_URL}/users/{user_id}"
+        url = f"{X_API_URL}/users/{user_id}"
         params = {
             "user.fields": "id,name,username,description,profile_image_url,verified,public_metrics,created_at"
         }
@@ -133,7 +133,7 @@ class TwitterService:
         pagination_token: Optional[str] = None
     ) -> Optional[Dict]:
         """사용자의 트윗 목록 조회"""
-        url = f"{TWITTER_API_URL}/users/{user_id}/tweets"
+        url = f"{X_API_URL}/users/{user_id}/tweets"
         params = {
             "max_results": min(max_results, 100),  # 최대 100개
             "tweet.fields": "id,text,created_at,public_metrics,attachments,conversation_id,in_reply_to_user_id,referenced_tweets",
@@ -148,7 +148,7 @@ class TwitterService:
 
     async def get_tweet_by_id(self, tweet_id: str) -> Optional[Dict]:
         """트윗 ID로 상세 정보 조회"""
-        url = f"{TWITTER_API_URL}/tweets/{tweet_id}"
+        url = f"{X_API_URL}/tweets/{tweet_id}"
         params = {
             "tweet.fields": "id,text,created_at,public_metrics,attachments,conversation_id,in_reply_to_user_id,referenced_tweets",
             "expansions": "attachments.media_keys",
@@ -164,7 +164,7 @@ class TwitterService:
 
     async def create_tweet(self, text: str, reply_to: Optional[str] = None) -> Optional[Dict]:
         """새 트윗 작성"""
-        url = f"{TWITTER_API_URL}/tweets"
+        url = f"{X_API_URL}/tweets"
         data = {"text": text}
 
         if reply_to:
@@ -177,7 +177,7 @@ class TwitterService:
 
     async def delete_tweet(self, tweet_id: str) -> bool:
         """트윗 삭제"""
-        url = f"{TWITTER_API_URL}/tweets/{tweet_id}"
+        url = f"{X_API_URL}/tweets/{tweet_id}"
         result = await self._make_request("DELETE", url)
         return result is not None and result.get("data", {}).get("deleted", False)
 
@@ -201,18 +201,18 @@ class TwitterService:
 
 # ===== 데이터베이스 헬퍼 함수 =====
 
-async def sync_twitter_user_info(
+async def sync_x_user_info(
     db: Session,
-    connection: TwitterConnection,
-    service: TwitterService
+    connection: XConnection,
+    service: XService
 ) -> bool:
-    """Twitter 사용자 정보 동기화"""
+    """X 사용자 정보 동기화"""
     user_info = await service.get_me()
     if not user_info:
         return False
 
     # 연결 정보 업데이트
-    connection.twitter_user_id = user_info["id"]
+    connection.x_user_id = user_info["id"]
     connection.username = user_info.get("username")
     connection.name = user_info.get("name")
     connection.description = user_info.get("description")
@@ -223,30 +223,30 @@ async def sync_twitter_user_info(
     public_metrics = user_info.get("public_metrics", {})
     connection.followers_count = public_metrics.get("followers_count", 0)
     connection.following_count = public_metrics.get("following_count", 0)
-    connection.tweet_count = public_metrics.get("tweet_count", 0)
+    connection.post_count = public_metrics.get("tweet_count", 0)
     connection.listed_count = public_metrics.get("listed_count", 0)
 
     connection.last_synced_at = datetime.utcnow()
     db.commit()
 
-    logger.info(f"Twitter user info synced: @{connection.username}")
+    logger.info(f"X user info synced: @{connection.username}")
     return True
 
 
-async def sync_twitter_tweets(
+async def sync_x_posts(
     db: Session,
-    connection: TwitterConnection,
-    service: TwitterService,
-    max_tweets: int = 50
+    connection: XConnection,
+    service: XService,
+    max_posts: int = 50
 ) -> int:
-    """Twitter 트윗 동기화"""
+    """X 포스트 동기화"""
     synced_count = 0
 
-    result = await service.get_user_tweets(connection.twitter_user_id, max_results=max_tweets)
+    result = await service.get_user_tweets(connection.x_user_id, max_results=max_posts)
     if not result or "data" not in result:
         return 0
 
-    tweets_data = result["data"]
+    posts_data = result["data"]
     media_dict = {}
 
     # 미디어 정보 매핑
@@ -254,19 +254,19 @@ async def sync_twitter_tweets(
         for media in result["includes"]["media"]:
             media_dict[media["media_key"]] = media
 
-    for tweet_data in tweets_data:
-        tweet_id = tweet_data["id"]
+    for post_data in posts_data:
+        post_id = post_data["id"]
 
-        # 기존 트윗 확인
-        existing_tweet = db.query(Tweet).filter(Tweet.tweet_id == tweet_id).first()
+        # 기존 포스트 확인
+        existing_post = db.query(XPost).filter(XPost.post_id == post_id).first()
 
         # 미디어 정보 추출
         media_url = None
         media_urls = []
         media_type = None
 
-        if "attachments" in tweet_data and "media_keys" in tweet_data["attachments"]:
-            for media_key in tweet_data["attachments"]["media_keys"]:
+        if "attachments" in post_data and "media_keys" in post_data["attachments"]:
+            for media_key in post_data["attachments"]["media_keys"]:
                 if media_key in media_dict:
                     media = media_dict[media_key]
                     media_type = media.get("type")
@@ -277,48 +277,48 @@ async def sync_twitter_tweets(
                             media_url = url
 
         # 통계 정보
-        public_metrics = tweet_data.get("public_metrics", {})
+        public_metrics = post_data.get("public_metrics", {})
 
-        if existing_tweet:
-            # 기존 트윗 업데이트
-            existing_tweet.text = tweet_data.get("text")
-            existing_tweet.retweet_count = public_metrics.get("retweet_count", 0)
-            existing_tweet.reply_count = public_metrics.get("reply_count", 0)
-            existing_tweet.like_count = public_metrics.get("like_count", 0)
-            existing_tweet.quote_count = public_metrics.get("quote_count", 0)
-            existing_tweet.bookmark_count = public_metrics.get("bookmark_count", 0)
-            existing_tweet.impression_count = public_metrics.get("impression_count", 0)
-            existing_tweet.media_type = media_type
-            existing_tweet.media_url = media_url
-            existing_tweet.media_urls = media_urls if media_urls else None
-            existing_tweet.last_stats_updated_at = datetime.utcnow()
+        if existing_post:
+            # 기존 포스트 업데이트
+            existing_post.text = post_data.get("text")
+            existing_post.repost_count = public_metrics.get("retweet_count", 0)
+            existing_post.reply_count = public_metrics.get("reply_count", 0)
+            existing_post.like_count = public_metrics.get("like_count", 0)
+            existing_post.quote_count = public_metrics.get("quote_count", 0)
+            existing_post.bookmark_count = public_metrics.get("bookmark_count", 0)
+            existing_post.impression_count = public_metrics.get("impression_count", 0)
+            existing_post.media_type = media_type
+            existing_post.media_url = media_url
+            existing_post.media_urls = media_urls if media_urls else None
+            existing_post.last_stats_updated_at = datetime.utcnow()
         else:
-            # 새 트윗 생성
-            new_tweet = Tweet(
+            # 새 포스트 생성
+            new_post = XPost(
                 connection_id=connection.id,
                 user_id=connection.user_id,
-                tweet_id=tweet_id,
-                text=tweet_data.get("text"),
-                created_at_twitter=datetime.fromisoformat(
-                    tweet_data["created_at"].replace("Z", "+00:00")
-                ) if "created_at" in tweet_data else None,
+                post_id=post_id,
+                text=post_data.get("text"),
+                created_at_x=datetime.fromisoformat(
+                    post_data["created_at"].replace("Z", "+00:00")
+                ) if "created_at" in post_data else None,
                 media_type=media_type,
                 media_url=media_url,
                 media_urls=media_urls if media_urls else None,
-                retweet_count=public_metrics.get("retweet_count", 0),
+                repost_count=public_metrics.get("retweet_count", 0),
                 reply_count=public_metrics.get("reply_count", 0),
                 like_count=public_metrics.get("like_count", 0),
                 quote_count=public_metrics.get("quote_count", 0),
                 bookmark_count=public_metrics.get("bookmark_count", 0),
                 impression_count=public_metrics.get("impression_count", 0),
-                conversation_id=tweet_data.get("conversation_id"),
-                in_reply_to_user_id=tweet_data.get("in_reply_to_user_id"),
-                referenced_tweets=tweet_data.get("referenced_tweets"),
+                conversation_id=post_data.get("conversation_id"),
+                in_reply_to_user_id=post_data.get("in_reply_to_user_id"),
+                referenced_posts=post_data.get("referenced_tweets"),
                 last_stats_updated_at=datetime.utcnow()
             )
-            db.add(new_tweet)
+            db.add(new_post)
             synced_count += 1
 
     db.commit()
-    logger.info(f"Synced {synced_count} new tweets for @{connection.username}")
+    logger.info(f"Synced {synced_count} new posts for @{connection.username}")
     return synced_count

@@ -45,7 +45,7 @@ class User(Base):
     youtube_connection = relationship("YouTubeConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     facebook_connection = relationship("FacebookConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     instagram_connection = relationship("InstagramConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    twitter_connection = relationship("TwitterConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    x_connection = relationship("XConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class UserPreference(Base):
@@ -606,18 +606,18 @@ class VideoGenerationJob(Base):
     user = relationship("User")
 
 
-class TwitterConnection(Base):
+class XConnection(Base):
     """
-    Twitter(X) 계정 연동 정보 모델
-    - Twitter API v2를 사용한 OAuth 2.0 연동
+    X(구 Twitter) 계정 연동 정보 모델
+    - X API v2를 사용한 OAuth 2.0 연동
     """
-    __tablename__ = "twitter_connections"
+    __tablename__ = "x_connections"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
 
-    # Twitter 사용자 정보
-    twitter_user_id = Column(String, nullable=False, index=True)  # Twitter 사용자 ID
+    # X 사용자 정보
+    x_user_id = Column(String, nullable=False, index=True)  # X 사용자 ID
     username = Column(String, nullable=True)  # @username (handle)
     name = Column(String, nullable=True)  # 표시 이름
     description = Column(Text, nullable=True)  # 자기소개
@@ -627,7 +627,7 @@ class TwitterConnection(Base):
     # 계정 통계
     followers_count = Column(Integer, default=0)  # 팔로워 수
     following_count = Column(Integer, default=0)  # 팔로잉 수
-    tweet_count = Column(Integer, default=0)  # 트윗 수
+    post_count = Column(Integer, default=0)  # 포스트 수
     listed_count = Column(Integer, default=0)  # 리스트에 추가된 수
 
     # OAuth 2.0 토큰 정보
@@ -643,43 +643,43 @@ class TwitterConnection(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    user = relationship("User", back_populates="twitter_connection")
-    tweets = relationship("Tweet", back_populates="connection", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="x_connection")
+    posts = relationship("XPost", back_populates="connection", cascade="all, delete-orphan")
 
 
-class Tweet(Base):
+class XPost(Base):
     """
-    Twitter 트윗 모델
-    - 연동된 계정의 트윗 목록 및 통계
+    X 포스트 모델
+    - 연동된 계정의 포스트 목록 및 통계
     """
-    __tablename__ = "tweets"
+    __tablename__ = "x_posts"
 
     id = Column(Integer, primary_key=True, index=True)
-    connection_id = Column(Integer, ForeignKey("twitter_connections.id"), nullable=False)
+    connection_id = Column(Integer, ForeignKey("x_connections.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
-    # 트윗 기본 정보
-    tweet_id = Column(String, nullable=False, unique=True, index=True)  # Twitter 트윗 ID
-    text = Column(Text, nullable=True)  # 트윗 텍스트
-    created_at_twitter = Column(DateTime(timezone=True), nullable=True)  # 트윗 작성 시간
+    # 포스트 기본 정보
+    post_id = Column(String, nullable=False, unique=True, index=True)  # X 포스트 ID
+    text = Column(Text, nullable=True)  # 포스트 텍스트
+    created_at_x = Column(DateTime(timezone=True), nullable=True)  # 포스트 작성 시간
 
     # 미디어 정보
     media_type = Column(String, nullable=True)  # photo, video, animated_gif
     media_url = Column(String, nullable=True)  # 첫 번째 미디어 URL
     media_urls = Column(JSON, nullable=True)  # 모든 미디어 URL 목록
 
-    # 트윗 통계
-    retweet_count = Column(Integer, default=0)  # 리트윗 수
+    # 포스트 통계
+    repost_count = Column(Integer, default=0)  # 리포스트 수
     reply_count = Column(Integer, default=0)  # 답글 수
     like_count = Column(Integer, default=0)  # 좋아요 수
-    quote_count = Column(Integer, default=0)  # 인용 트윗 수
+    quote_count = Column(Integer, default=0)  # 인용 포스트 수
     bookmark_count = Column(Integer, default=0)  # 북마크 수
     impression_count = Column(Integer, default=0)  # 노출 수
 
-    # 트윗 메타데이터
+    # 포스트 메타데이터
     conversation_id = Column(String, nullable=True)  # 대화 ID (스레드)
     in_reply_to_user_id = Column(String, nullable=True)  # 답글 대상 사용자 ID
-    referenced_tweets = Column(JSON, nullable=True)  # 참조된 트윗 목록
+    referenced_posts = Column(JSON, nullable=True)  # 참조된 포스트 목록
 
     # 동기화 정보
     last_stats_updated_at = Column(DateTime(timezone=True), nullable=True)
@@ -688,4 +688,4 @@ class Tweet(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    connection = relationship("TwitterConnection", back_populates="tweets")
+    connection = relationship("XConnection", back_populates="posts")

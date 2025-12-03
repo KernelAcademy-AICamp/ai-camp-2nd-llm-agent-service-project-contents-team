@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { twitterAPI } from '../../../services/api';
+import { xAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
-import './Twitter.css';
+import './X.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
-function Twitter() {
+function X() {
   const { user } = useAuth();
   const [connection, setConnection] = useState(null);
-  const [tweets, setTweets] = useState([]);
+  const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [activeTab, setActiveTab] = useState('tweets');
+  const [activeTab, setActiveTab] = useState('posts');
   const [error, setError] = useState(null);
 
   // URL 파라미터 확인 (연동 성공/실패)
@@ -19,36 +19,36 @@ function Twitter() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('connected') === 'true') {
       setError(null);
-      window.history.replaceState({}, '', '/twitter');
+      window.history.replaceState({}, '', '/x');
     }
     if (params.get('error')) {
-      setError('Twitter 연동에 실패했습니다. 다시 시도해주세요.');
-      window.history.replaceState({}, '', '/twitter');
+      setError('X 연동에 실패했습니다. 다시 시도해주세요.');
+      window.history.replaceState({}, '', '/x');
     }
   }, []);
 
   // 연동 상태 확인
   const fetchStatus = useCallback(async () => {
     try {
-      const data = await twitterAPI.getStatus();
+      const data = await xAPI.getStatus();
       setConnection(data);
       if (data) {
-        fetchTweets();
+        fetchPosts();
       }
     } catch (err) {
-      console.error('Failed to fetch Twitter status:', err);
+      console.error('Failed to fetch X status:', err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // 트윗 목록 조회
-  const fetchTweets = async () => {
+  // 포스트 목록 조회
+  const fetchPosts = async () => {
     try {
-      const data = await twitterAPI.getTweets(0, 50);
-      setTweets(data || []);
+      const data = await xAPI.getPosts(0, 50);
+      setPosts(data || []);
     } catch (err) {
-      console.error('Failed to fetch tweets:', err);
+      console.error('Failed to fetch posts:', err);
     }
   };
 
@@ -62,29 +62,29 @@ function Twitter() {
       setError('로그인이 필요합니다.');
       return;
     }
-    window.location.href = `${API_URL}/api/twitter/connect?user_id=${user.id}`;
+    window.location.href = `${API_URL}/api/x/connect?user_id=${user.id}`;
   };
 
   // 연동 해제
   const handleDisconnect = async () => {
-    if (!window.confirm('Twitter 연동을 해제하시겠습니까?')) return;
+    if (!window.confirm('X 연동을 해제하시겠습니까?')) return;
 
     try {
-      await twitterAPI.disconnect();
+      await xAPI.disconnect();
       setConnection(null);
-      setTweets([]);
+      setPosts([]);
     } catch (err) {
       setError('연동 해제에 실패했습니다.');
     }
   };
 
-  // 트윗 동기화
+  // 포스트 동기화
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const result = await twitterAPI.syncTweets();
-      alert(`동기화 완료! ${result.synced_count || 0}개의 트윗을 가져왔습니다.`);
-      fetchTweets();
+      const result = await xAPI.syncPosts();
+      alert(`동기화 완료! ${result.synced_count || 0}개의 포스트를 가져왔습니다.`);
+      fetchPosts();
       fetchStatus();
     } catch (err) {
       setError('동기화에 실패했습니다.');
@@ -115,17 +115,17 @@ function Twitter() {
 
   if (loading) {
     return (
-      <div className="twitter-page">
+      <div className="x-page">
         <div className="loading-spinner">로딩 중...</div>
       </div>
     );
   }
 
   return (
-    <div className="twitter-page">
-      <div className="twitter-header">
-        <h2>Twitter(X) 관리</h2>
-        <p>Twitter 계정을 연동하고 트윗을 관리하세요</p>
+    <div className="x-page">
+      <div className="x-header">
+        <h2>X 관리</h2>
+        <p>X 계정을 연동하고 포스트를 관리하세요</p>
       </div>
 
       {error && (
@@ -144,19 +144,19 @@ function Twitter() {
                 <path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
               </svg>
             </div>
-            <h3>Twitter(X) 계정 연동</h3>
-            <p>Twitter 계정을 연동하여 트윗을 관리하고 콘텐츠를 게시하세요.</p>
+            <h3>X 계정 연동</h3>
+            <p>X 계정을 연동하여 포스트를 관리하고 콘텐츠를 게시하세요.</p>
             <ul className="feature-list">
-              <li>트윗 목록 조회 및 관리</li>
-              <li>새 트윗 작성 및 게시</li>
-              <li>이미지/미디어 트윗 게시</li>
+              <li>포스트 목록 조회 및 관리</li>
+              <li>새 포스트 작성 및 게시</li>
+              <li>이미지/미디어 포스트 게시</li>
               <li>팔로워 및 참여도 통계 확인</li>
             </ul>
-            <button className="btn-connect-twitter" onClick={handleConnect}>
+            <button className="btn-connect-x" onClick={handleConnect}>
               <svg viewBox="0 0 24 24" width="20" height="20">
                 <path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
               </svg>
-              Twitter 계정 연동하기
+              X 계정 연동하기
             </button>
           </div>
         </div>
@@ -187,7 +187,7 @@ function Twitter() {
               </div>
               <div className="account-actions">
                 <button className="btn-secondary" onClick={handleSync} disabled={syncing}>
-                  {syncing ? '동기화 중...' : '트윗 동기화'}
+                  {syncing ? '동기화 중...' : '포스트 동기화'}
                 </button>
                 <button className="btn-danger" onClick={handleDisconnect}>
                   연동 해제
@@ -204,59 +204,59 @@ function Twitter() {
                 <span className="stat-label">팔로잉</span>
               </div>
               <div className="stat-item">
-                <span className="stat-value">{formatNumber(connection.tweet_count)}</span>
-                <span className="stat-label">트윗</span>
+                <span className="stat-value">{formatNumber(connection.post_count)}</span>
+                <span className="stat-label">포스트</span>
               </div>
             </div>
           </div>
 
           {/* 탭 네비게이션 */}
-          <div className="twitter-tabs">
+          <div className="x-tabs">
             <button
-              className={`tab-btn ${activeTab === 'tweets' ? 'active' : ''}`}
-              onClick={() => setActiveTab('tweets')}
+              className={`tab-btn ${activeTab === 'posts' ? 'active' : ''}`}
+              onClick={() => setActiveTab('posts')}
             >
-              트윗
+              포스트
             </button>
             <button
               className={`tab-btn ${activeTab === 'compose' ? 'active' : ''}`}
               onClick={() => setActiveTab('compose')}
             >
-              새 트윗
+              새 포스트
             </button>
           </div>
 
           {/* 탭 콘텐츠 */}
           <div className="tab-content">
-            {activeTab === 'tweets' && (
-              <div className="tweets-section">
+            {activeTab === 'posts' && (
+              <div className="posts-section">
                 <div className="section-header">
-                  <h3>내 트윗 ({tweets.length}개)</h3>
+                  <h3>내 포스트 ({posts.length}개)</h3>
                 </div>
-                {tweets.length === 0 ? (
+                {posts.length === 0 ? (
                   <div className="empty-state">
-                    <p>트윗이 없습니다. 동기화 버튼을 클릭하여 Twitter에서 트윗을 가져오세요.</p>
+                    <p>포스트가 없습니다. 동기화 버튼을 클릭하여 X에서 포스트를 가져오세요.</p>
                   </div>
                 ) : (
-                  <div className="tweet-list">
-                    {tweets.map((tweet) => (
-                      <div key={tweet.id} className="tweet-card">
-                        <div className="tweet-content">
-                          <p className="tweet-text">{tweet.text}</p>
-                          {tweet.media_url && (
-                            <div className="tweet-media">
-                              <img src={tweet.media_url} alt="Tweet media" />
+                  <div className="post-list">
+                    {posts.map((post) => (
+                      <div key={post.id} className="post-card">
+                        <div className="post-content">
+                          <p className="post-text">{post.text}</p>
+                          {post.media_url && (
+                            <div className="post-media">
+                              <img src={post.media_url} alt="Post media" />
                             </div>
                           )}
                         </div>
-                        <div className="tweet-stats">
-                          <span>❤️ {formatNumber(tweet.like_count)}</span>
-                          <span>🔁 {formatNumber(tweet.retweet_count)}</span>
-                          <span>💬 {formatNumber(tweet.reply_count)}</span>
-                          <span>👁️ {formatNumber(tweet.impression_count)}</span>
+                        <div className="post-stats">
+                          <span>❤️ {formatNumber(post.like_count)}</span>
+                          <span>🔁 {formatNumber(post.repost_count)}</span>
+                          <span>💬 {formatNumber(post.reply_count)}</span>
+                          <span>👁️ {formatNumber(post.impression_count)}</span>
                         </div>
-                        <div className="tweet-date">
-                          {formatDate(tweet.created_at)}
+                        <div className="post-date">
+                          {formatDate(post.created_at)}
                         </div>
                       </div>
                     ))}
@@ -266,9 +266,9 @@ function Twitter() {
             )}
 
             {activeTab === 'compose' && (
-              <TweetComposeForm onSuccess={() => {
-                fetchTweets();
-                setActiveTab('tweets');
+              <PostComposeForm onSuccess={() => {
+                fetchPosts();
+                setActiveTab('posts');
               }} />
             )}
           </div>
@@ -278,8 +278,8 @@ function Twitter() {
   );
 }
 
-// 트윗 작성 폼 컴포넌트
-function TweetComposeForm({ onSuccess }) {
+// 포스트 작성 폼 컴포넌트
+function PostComposeForm({ onSuccess }) {
   const [text, setText] = useState('');
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreview, setMediaPreview] = useState(null);
@@ -306,12 +306,12 @@ function TweetComposeForm({ onSuccess }) {
     e.preventDefault();
 
     if (!text.trim() && !mediaFile) {
-      alert('트윗 내용을 입력하거나 미디어를 첨부해주세요.');
+      alert('포스트 내용을 입력하거나 미디어를 첨부해주세요.');
       return;
     }
 
     if (text.length > 280) {
-      alert('트윗은 280자를 초과할 수 없습니다.');
+      alert('포스트는 280자를 초과할 수 없습니다.');
       return;
     }
 
@@ -322,19 +322,19 @@ function TweetComposeForm({ onSuccess }) {
         const formData = new FormData();
         formData.append('text', text);
         formData.append('media', mediaFile);
-        await twitterAPI.createMediaTweet(formData);
+        await xAPI.createMediaPost(formData);
       } else {
-        await twitterAPI.createTweet({ text });
+        await xAPI.createPost({ text });
       }
 
-      alert('트윗이 게시되었습니다!');
+      alert('포스트가 게시되었습니다!');
       setText('');
       setMediaFile(null);
       setMediaPreview(null);
       onSuccess();
     } catch (err) {
-      console.error('Tweet failed:', err);
-      alert('트윗 게시에 실패했습니다. 다시 시도해주세요.');
+      console.error('Post failed:', err);
+      alert('포스트 게시에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setPosting(false);
     }
@@ -342,7 +342,7 @@ function TweetComposeForm({ onSuccess }) {
 
   return (
     <div className="compose-section">
-      <h3>새 트윗 작성</h3>
+      <h3>새 포스트 작성</h3>
       <form onSubmit={handleSubmit} className="compose-form">
         <div className="form-group">
           <textarea
@@ -381,8 +381,8 @@ function TweetComposeForm({ onSuccess }) {
             📷 미디어 추가
           </label>
 
-          <button type="submit" className="btn-tweet" disabled={posting || (!text.trim() && !mediaFile)}>
-            {posting ? '게시 중...' : '트윗하기'}
+          <button type="submit" className="btn-post" disabled={posting || (!text.trim() && !mediaFile)}>
+            {posting ? '게시 중...' : '포스트하기'}
           </button>
         </div>
       </form>
@@ -390,4 +390,4 @@ function TweetComposeForm({ onSuccess }) {
   );
 }
 
-export default Twitter;
+export default X;

@@ -1,31 +1,31 @@
 /* ========================================
-   TWITTER PAGE - CLEAN STYLE
+   X PAGE - CLEAN STYLE
    ======================================== */
 
-.twitter-page {
+.x-page {
   padding: var(--space-lg);
   max-width: 1200px;
   margin: 0 auto;
 }
 
-.twitter-header {
+.x-header {
   margin-bottom: var(--space-xl);
 }
 
-.twitter-header h2 {
+.x-header h2 {
   font-size: 24px;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: var(--space-sm);
 }
 
-.twitter-header p {
+.x-header p {
   font-size: 14px;
   color: var(--text-tertiary);
 }
 
 /* Error Message */
-.twitter-page .error-message {
+.x-page .error-message {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -37,7 +37,7 @@
   font-weight: 500;
 }
 
-.twitter-page .error-message button {
+.x-page .error-message button {
   background: transparent;
   border: none;
   color: var(--error-dark);
@@ -46,7 +46,7 @@
 }
 
 /* Loading */
-.twitter-page .loading-spinner {
+.x-page .loading-spinner {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -56,14 +56,14 @@
 }
 
 /* Connect Section */
-.twitter-page .connect-section {
+.x-page .connect-section {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 500px;
 }
 
-.twitter-page .connect-card {
+.x-page .connect-card {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   padding: var(--space-2xl);
@@ -71,39 +71,39 @@
   max-width: 500px;
 }
 
-.twitter-page .connect-icon {
+.x-page .connect-icon {
   margin-bottom: var(--space-lg);
   color: #000000;
 }
 
-.twitter-page .connect-card h3 {
+.x-page .connect-card h3 {
   font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: var(--space-md);
 }
 
-.twitter-page .connect-card p {
+.x-page .connect-card p {
   font-size: 14px;
   color: var(--text-secondary);
   margin-bottom: var(--space-lg);
   line-height: 1.6;
 }
 
-.twitter-page .feature-list {
+.x-page .feature-list {
   text-align: left;
   margin-bottom: var(--space-xl);
   padding-left: var(--space-lg);
 }
 
-.twitter-page .feature-list li {
+.x-page .feature-list li {
   font-size: 14px;
   color: var(--text-secondary);
   margin-bottom: var(--space-sm);
   line-height: 1.5;
 }
 
-.btn-connect-twitter {
+.btn-connect-x {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -119,49 +119,49 @@
   transition: background 0.2s;
 }
 
-.btn-connect-twitter:hover {
+.btn-connect-x:hover {
   background: #1a1a1a;
 }
 
-.btn-connect-twitter svg {
+.btn-connect-x svg {
   width: 20px;
   height: 20px;
 }
 
 /* Account Info Card */
-.twitter-page .account-info-card {
+.x-page .account-info-card {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   padding: var(--space-lg);
   margin-bottom: var(--space-lg);
 }
 
-.twitter-page .account-header {
+.x-page .account-header {
   display: flex;
   align-items: flex-start;
   gap: var(--space-lg);
   margin-bottom: var(--space-lg);
 }
 
-.twitter-page .account-thumbnail {
+.x-page .account-thumbnail {
   width: 72px;
   height: 72px;
   border-radius: 50%;
   object-fit: cover;
 }
 
-.twitter-page .account-details {
+.x-page .account-details {
   flex: 1;
 }
 
-.twitter-page .account-details h3 {
+.x-page .account-details h3 {
   font-size: 18px;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: var(--space-xs);
 }
 
-.twitter-page .account-url {
+.x-page .account-url {
   font-size: 13px;
   color: var(--bauhaus-blue);
   text-decoration: none;
@@ -169,24 +169,24 @@
   margin-bottom: var(--space-sm);
 }
 
-.twitter-page .account-url:hover {
+.x-page .account-url:hover {
   text-decoration: underline;
 }
 
-.twitter-page .account-bio {
+.x-page .account-bio {
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.5;
   margin-top: var(--space-sm);
 }
 
-.twitter-page .account-actions {
+.x-page .account-actions {
   display: flex;
   gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
-.twitter-page .btn-secondary {
+.x-page .btn-secondary {
   padding: var(--space-sm) var(--space-md);
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
@@ -197,16 +197,16 @@
   transition: all 0.15s ease;
 }
 
-.twitter-page .btn-secondary:hover:not(:disabled) {
+.x-page .btn-secondary:hover:not(:disabled) {
   background: var(--bg-secondary);
 }
 
-.twitter-page .btn-secondary:disabled {
+.x-page .btn-secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.twitter-page .btn-danger {
+.x-page .btn-danger {
   padding: var(--space-sm) var(--space-md);
   background: var(--bg-primary);
   border: 1px solid var(--error-color);
@@ -217,12 +217,12 @@
   transition: all 0.15s ease;
 }
 
-.twitter-page .btn-danger:hover {
+.x-page .btn-danger:hover {
   background: var(--error-color);
   color: white;
 }
 
-.twitter-page .account-stats-bar {
+.x-page .account-stats-bar {
   display: flex;
   justify-content: center;
   gap: var(--space-2xl);
@@ -230,11 +230,11 @@
   border-top: 1px solid var(--border-color);
 }
 
-.twitter-page .stat-item {
+.x-page .stat-item {
   text-align: center;
 }
 
-.twitter-page .stat-value {
+.x-page .stat-value {
   display: block;
   font-size: 24px;
   font-weight: 700;
@@ -242,20 +242,20 @@
   margin-bottom: var(--space-xs);
 }
 
-.twitter-page .stat-label {
+.x-page .stat-label {
   font-size: 12px;
   color: var(--text-tertiary);
 }
 
 /* Tab Navigation */
-.twitter-tabs {
+.x-tabs {
   display: flex;
   gap: var(--space-sm);
   margin-bottom: var(--space-lg);
   border-bottom: 1px solid var(--border-color);
 }
 
-.twitter-tabs .tab-btn {
+.x-tabs .tab-btn {
   padding: var(--space-sm) var(--space-md);
   background: none;
   border: none;
@@ -267,15 +267,15 @@
   transition: color 0.15s ease;
 }
 
-.twitter-tabs .tab-btn:hover {
+.x-tabs .tab-btn:hover {
   color: #000000;
 }
 
-.twitter-tabs .tab-btn.active {
+.x-tabs .tab-btn.active {
   color: #000000;
 }
 
-.twitter-tabs .tab-btn.active::after {
+.x-tabs .tab-btn.active::after {
   content: '';
   position: absolute;
   bottom: -1px;
@@ -285,49 +285,49 @@
   background: #000000;
 }
 
-/* Tweets Section */
-.tweets-section .section-header {
+/* Posts Section */
+.posts-section .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-lg);
 }
 
-.tweets-section .section-header h3 {
+.posts-section .section-header h3 {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.twitter-page .empty-state {
+.x-page .empty-state {
   text-align: center;
   padding: var(--space-2xl);
   color: var(--text-tertiary);
 }
 
-/* Tweet List */
-.tweet-list {
+/* Post List */
+.post-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
 }
 
-.tweet-card {
+.post-card {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   padding: var(--space-lg);
   transition: border-color 0.15s ease;
 }
 
-.tweet-card:hover {
+.post-card:hover {
   border-color: #000000;
 }
 
-.tweet-content {
+.post-content {
   margin-bottom: var(--space-md);
 }
 
-.tweet-text {
+.post-text {
   font-size: 14px;
   line-height: 1.6;
   color: var(--text-primary);
@@ -335,19 +335,19 @@
   word-break: break-word;
 }
 
-.tweet-media {
+.post-media {
   margin-top: var(--space-md);
   border-radius: 4px;
   overflow: hidden;
 }
 
-.tweet-media img {
+.post-media img {
   width: 100%;
   max-height: 400px;
   object-fit: cover;
 }
 
-.tweet-stats {
+.post-stats {
   display: flex;
   gap: var(--space-lg);
   font-size: 13px;
@@ -355,7 +355,7 @@
   margin-bottom: var(--space-sm);
 }
 
-.tweet-date {
+.post-date {
   font-size: 12px;
   color: var(--text-tertiary);
 }
@@ -468,7 +468,7 @@
   background: var(--bg-tertiary);
 }
 
-.btn-tweet {
+.btn-post {
   padding: var(--space-sm) var(--space-xl);
   background: #000000;
   color: white;
@@ -479,40 +479,40 @@
   transition: background 0.15s ease;
 }
 
-.btn-tweet:hover:not(:disabled) {
+.btn-post:hover:not(:disabled) {
   background: #1a1a1a;
 }
 
-.btn-tweet:disabled {
+.btn-post:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .twitter-page {
+  .x-page {
     padding: var(--space-md);
   }
 
-  .twitter-page .connect-card {
+  .x-page .connect-card {
     padding: var(--space-lg);
   }
 
-  .twitter-page .account-header {
+  .x-page .account-header {
     flex-direction: column;
     align-items: center;
     text-align: center;
   }
 
-  .twitter-page .account-actions {
+  .x-page .account-actions {
     justify-content: center;
   }
 
-  .twitter-page .account-stats-bar {
+  .x-page .account-stats-bar {
     gap: var(--space-lg);
   }
 
-  .tweet-stats {
+  .post-stats {
     flex-wrap: wrap;
     gap: var(--space-sm);
   }
@@ -523,7 +523,7 @@
   }
 
   .media-upload-btn,
-  .btn-tweet {
+  .btn-post {
     width: 100%;
     text-align: center;
   }

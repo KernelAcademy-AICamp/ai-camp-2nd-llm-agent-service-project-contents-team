@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api, { youtubeAPI, facebookAPI, instagramAPI } from '../../services/api';
+import api, { youtubeAPI, facebookAPI, instagramAPI, twitterAPI } from '../../services/api';
 import './Settings.css';
 
 function Settings() {
@@ -8,6 +8,7 @@ function Settings() {
   const [youtubeConnection, setYoutubeConnection] = useState(null);
   const [facebookConnection, setFacebookConnection] = useState(null);
   const [instagramConnection, setInstagramConnection] = useState(null);
+  const [twitterConnection, setTwitterConnection] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState({ open: false, type: null });
@@ -51,6 +52,15 @@ function Settings() {
       }
     };
 
+    const fetchTwitterStatus = async () => {
+      try {
+        const data = await twitterAPI.getStatus();
+        setTwitterConnection(data);
+      } catch (err) {
+        console.error('Failed to fetch X status:', err);
+      }
+    };
+
     const fetchProfile = async () => {
       try {
         const response = await api.get('/api/user/profile');
@@ -65,6 +75,7 @@ function Settings() {
     fetchYoutubeStatus();
     fetchFacebookStatus();
     fetchInstagramStatus();
+    fetchTwitterStatus();
     fetchProfile();
   }, []);
 
@@ -431,13 +442,19 @@ function Settings() {
               {instagramConnection ? '관리하기' : '연동하기'}
             </span>
           </Link>
-          <div className="platform-item disabled">
+          <Link to="/x" className={`platform-item ${twitterConnection ? 'connected' : ''}`}>
             <div className="platform-info">
-              <div className="platform-name">Twitter (X)</div>
-              <div className="platform-status">개발 예정</div>
+              <div className="platform-name">X</div>
+              <div className="platform-status">
+                {twitterConnection
+                  ? `연동됨 - @${twitterConnection.username}`
+                  : '연동 가능'}
+              </div>
             </div>
-            <button className="btn-connect" disabled>준비 중</button>
-          </div>
+            <span className="btn-connect">
+              {twitterConnection ? '관리하기' : '연동하기'}
+            </span>
+          </Link>
         </div>
       </div>
 

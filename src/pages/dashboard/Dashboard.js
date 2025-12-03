@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { youtubeAPI, facebookAPI, instagramAPI } from '../../services/api';
+import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI } from '../../services/api';
 import './Dashboard.css';
 
 function Dashboard() {
@@ -9,6 +9,7 @@ function Dashboard() {
     youtube: { loading: true, connected: false, data: null, videos: [], analytics: null },
     facebook: { loading: true, connected: false, data: null, posts: [] },
     instagram: { loading: true, connected: false, data: null, posts: [] },
+    twitter: { loading: true, connected: false, data: null, tweets: [] },
   });
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -108,6 +109,30 @@ function Dashboard() {
         }));
       }
 
+      // Twitter 데이터 조회
+      try {
+        const twData = await twitterAPI.getStatus();
+        let tweets = [];
+
+        if (twData?.twitter_user_id) {
+          try {
+            tweets = await twitterAPI.getTweets(0, 100) || [];
+          } catch (e) {
+            console.error('Twitter tweets fetch error:', e);
+          }
+        }
+
+        setSnsStatus(prev => ({
+          ...prev,
+          twitter: { loading: false, connected: !!twData?.twitter_user_id, data: twData, tweets }
+        }));
+      } catch {
+        setSnsStatus(prev => ({
+          ...prev,
+          twitter: { loading: false, connected: false, data: null, tweets: [] }
+        }));
+      }
+
       setStatsLoading(false);
     };
 
@@ -124,13 +149,14 @@ function Dashboard() {
 
   // 통계 계산
   const calculateStats = () => {
-    const { youtube, facebook, instagram } = snsStatus;
+    const { youtube, facebook, instagram, twitter } = snsStatus;
 
-    // 총 콘텐츠 수 (YouTube 동영상 + Facebook 게시물 + Instagram 게시물)
+    // 총 콘텐츠 수 (YouTube 동영상 + Facebook 게시물 + Instagram 게시물 + X 트윗)
     const totalContents =
       (youtube.videos?.length || 0) +
       (facebook.posts?.length || 0) +
-      (instagram.posts?.length || 0);
+      (instagram.posts?.length || 0) +
+      (twitter.tweets?.length || 0);
 
     // 이번 주 생성 콘텐츠 (최근 7일 내 생성된 콘텐츠)
     const oneWeekAgo = new Date();
@@ -140,19 +166,21 @@ function Dashboard() {
       ...(youtube.videos || []).filter(v => new Date(v.published_at) >= oneWeekAgo),
       ...(facebook.posts || []).filter(p => new Date(p.created_time) >= oneWeekAgo),
       ...(instagram.posts || []).filter(p => new Date(p.timestamp) >= oneWeekAgo),
+      ...(twitter.tweets || []).filter(t => new Date(t.created_at) >= oneWeekAgo),
     ].length;
 
     // 총 팔로워/구독자 수
     const totalFollowers =
       (youtube.data?.subscriber_count || 0) +
       (facebook.data?.page_followers_count || 0) +
-      (instagram.data?.followers_count || 0);
+      (instagram.data?.followers_count || 0) +
+      (twitter.data?.followers_count || 0);
 
     // 총 조회수/노출수
     const totalViews = youtube.data?.view_count || 0;
 
     // 연동된 SNS 수
-    const connectedCount = [youtube, facebook, instagram].filter(s => s.connected).length;
+    const connectedCount = [youtube, facebook, instagram, twitter].filter(s => s.connected).length;
 
     return {
       totalContents,
@@ -169,7 +197,7 @@ function Dashboard() {
     {
       label: '총 콘텐츠',
       value: statsLoading ? '-' : formatNumber(calculatedStats.totalContents),
-      subLabel: 'YouTube + Facebook + Instagram'
+      subLabel: 'YouTube + Facebook + Instagram + X'
     },
     {
       label: '이번 주 생성',

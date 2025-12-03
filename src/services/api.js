@@ -314,64 +314,67 @@ export const instagramAPI = {
 };
 
 // ==========================================
-// Twitter(X) API
+// X API
 // ==========================================
-export const twitterAPI = {
+export const xAPI = {
   // 연동 상태 확인
   getStatus: async () => {
-    const response = await api.get('/api/twitter/status');
+    const response = await api.get('/api/x/status');
     return response.data;
   },
 
   // 연동 해제
   disconnect: async () => {
-    const response = await api.delete('/api/twitter/disconnect');
+    const response = await api.delete('/api/x/disconnect');
     return response.data;
   },
 
   // 계정 정보 새로고침
   refresh: async () => {
-    const response = await api.post('/api/twitter/refresh');
+    const response = await api.post('/api/x/refresh');
     return response.data;
   },
 
-  // 트윗 목록 조회
-  getTweets: async (skip = 0, limit = 20) => {
-    const response = await api.get(`/api/twitter/tweets?skip=${skip}&limit=${limit}`);
+  // 포스트 목록 조회
+  getPosts: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/x/posts?skip=${skip}&limit=${limit}`);
     return response.data;
   },
 
-  // 트윗 동기화
-  syncTweets: async () => {
-    const response = await api.post('/api/twitter/tweets/sync');
+  // 포스트 동기화
+  syncPosts: async () => {
+    const response = await api.post('/api/x/posts/sync');
     return response.data;
   },
 
-  // 트윗 작성
-  createTweet: async (data) => {
-    const response = await api.post('/api/twitter/tweets/create', data);
+  // 포스트 작성
+  createPost: async (data) => {
+    const response = await api.post('/api/x/posts/create', data);
     return response.data;
   },
 
-  // 이미지 트윗 작성
-  createMediaTweet: async (formData) => {
-    const response = await api.post('/api/twitter/tweets/create-media', formData, {
+  // 이미지 포스트 작성
+  createMediaPost: async (formData) => {
+    const response = await api.post('/api/x/posts/create-media', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },
 
-  // 트윗 삭제
-  deleteTweet: async (tweetId) => {
-    const response = await api.delete(`/api/twitter/tweets/${tweetId}`);
+  // 포스트 삭제
+  deletePost: async (postId) => {
+    const response = await api.delete(`/api/x/posts/${postId}`);
     return response.data;
   },
 
   // 계정 분석 데이터
   getAnalytics: async () => {
-    const response = await api.get('/api/twitter/analytics');
+    const response = await api.get('/api/x/analytics');
     return response.data;
   },
 };
+
+// 호환성을 위한 별칭 (기존 코드에서 twitterAPI 사용하는 경우)
+export const twitterAPI = xAPI;
 
 export default api;

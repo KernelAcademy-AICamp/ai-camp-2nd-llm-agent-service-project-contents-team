@@ -21,7 +21,7 @@ import AIVideoGenerator from './pages/content/AIVideoGenerator';
 import YouTube from './pages/connection_SNS/youtube/YouTube';
 import Facebook from './pages/connection_SNS/facebook/Facebook';
 import Instagram from './pages/connection_SNS/instagram/Instagram';
-import Twitter from './pages/connection_SNS/twitter/Twitter';
+import X from './pages/connection_SNS/x/X';
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import DeleteData from './pages/legal/DeleteData';
 import './App.css';
@@ -198,11 +198,11 @@ function App() {
             }
           />
           <Route
-            path="/twitter"
+            path="/x"
             element={
               <ProtectedRoute>
                 <Layout>
-                  <Twitter />
+                  <X />
                 </Layout>
               </ProtectedRoute>
             }

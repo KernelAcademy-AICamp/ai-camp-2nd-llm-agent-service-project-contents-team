@@ -415,6 +415,13 @@ async def sync_posts(
         db
     )
 
+    # 계정 정보도 함께 업데이트 (media_count 등)
+    account_info = await ig_service.get_account_info(connection.instagram_account_id)
+    if account_info:
+        connection.followers_count = account_info.get('followers_count', 0)
+        connection.follows_count = account_info.get('follows_count', 0)
+        connection.media_count = account_info.get('media_count', 0)
+
     connection.last_synced_at = datetime.utcnow()
     db.commit()
 
