@@ -15,7 +15,7 @@ function Sidebar() {
   const contentMenuItems = [
     { path: '/ai-content', label: 'AI 글 생성' },
     { path: '/image', label: 'AI 이미지 생성' },
-    { path: '/video', label: 'AI 동영상 생성' },
+    { path: '/ai-video', label: 'AI 동영상 생성' },
   ];
 
   const platformMenuItems = [

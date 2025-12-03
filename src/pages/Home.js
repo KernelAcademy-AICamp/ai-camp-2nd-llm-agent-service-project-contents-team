@@ -187,7 +187,7 @@ function Home() {
   const contentTools = [
     { label: '글 생성', path: '/ai-content' },
     { label: '이미지', path: '/image' },
-    { label: '동영상', path: '/video' },
+    { label: '동영상', path: '/ai-video' },
   ];
 
   // AI 응답에서 콘텐츠 생성 관련 키워드 감지
