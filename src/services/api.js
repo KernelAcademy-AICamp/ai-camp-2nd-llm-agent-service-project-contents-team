@@ -370,6 +370,11 @@ export const xAPI = {
   // 계정 분석 데이터
   getAnalytics: async () => {
     const response = await api.get('/api/x/analytics');
+    return response.data;
+  },
+};
+
+// ==========================================
 // AI 콘텐츠 API
 // ==========================================
 export const aiContentAPI = {

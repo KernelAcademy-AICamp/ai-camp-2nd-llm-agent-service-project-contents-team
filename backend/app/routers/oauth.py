@@ -107,7 +107,9 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         )
 
     except Exception as e:
+        import traceback
         print(f"Google OAuth error: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
         return RedirectResponse(url=f"{FRONTEND_URL}/login?error=oauth_failed")
 
 
@@ -162,7 +164,9 @@ async def kakao_callback(request: Request, db: Session = Depends(get_db)):
         )
 
     except Exception as e:
+        import traceback
         print(f"Kakao OAuth error: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
         return RedirectResponse(url=f"{FRONTEND_URL}/login?error=oauth_failed")
 
 
@@ -217,5 +221,7 @@ async def facebook_callback(request: Request, db: Session = Depends(get_db)):
         )
 
     except Exception as e:
+        import traceback
         print(f"Facebook OAuth error: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
         return RedirectResponse(url=f"{FRONTEND_URL}/login?error=oauth_failed")
