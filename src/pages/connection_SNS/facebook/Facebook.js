@@ -232,20 +232,20 @@ function Facebook() {
         // 연동됨 상태
         <>
           {/* 페이지 정보 */}
-          <div className="page-info-card">
-            <div className="page-header">
+          <div className="account-info-card">
+            <div className="account-header">
               <img
                 src={connection.page_picture_url || '/default-avatar.png'}
                 alt={connection.page_name}
-                className="page-thumbnail"
+                className="account-thumbnail"
               />
-              <div className="page-details">
+              <div className="account-details">
                 <h3>{connection.page_name}</h3>
                 {connection.page_category && (
-                  <span className="page-category">{connection.page_category}</span>
+                  <span className="account-category">{connection.page_category}</span>
                 )}
               </div>
-              <div className="page-actions">
+              <div className="account-actions">
                 <button className="btn-secondary" onClick={handleSync} disabled={syncing}>
                   {syncing ? '동기화 중...' : '게시물 동기화'}
                 </button>
@@ -257,7 +257,7 @@ function Facebook() {
                 </button>
               </div>
             </div>
-            <div className="page-stats-bar">
+            <div className="account-stats-bar">
               <div className="stat-item">
                 <span className="stat-value">{formatNumber(connection.page_fan_count)}</span>
                 <span className="stat-label">좋아요</span>

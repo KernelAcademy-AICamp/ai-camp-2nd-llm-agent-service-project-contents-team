@@ -45,6 +45,7 @@ class User(Base):
     youtube_connection = relationship("YouTubeConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     facebook_connection = relationship("FacebookConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     instagram_connection = relationship("InstagramConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    x_connection = relationship("XConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     ai_generated_contents = relationship("AIGeneratedContent", back_populates="user", cascade="all, delete-orphan")
     sns_published_contents = relationship("SNSPublishedContent", back_populates="user", cascade="all, delete-orphan")
 
@@ -607,6 +608,39 @@ class VideoGenerationJob(Base):
     user = relationship("User")
 
 
+class XConnection(Base):
+    """
+    X(구 Twitter) 계정 연동 정보 모델
+    - X API v2를 사용한 OAuth 2.0 연동
+    """
+    __tablename__ = "x_connections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+
+    # X 사용자 정보
+    x_user_id = Column(String, nullable=False, index=True)  # X 사용자 ID
+    username = Column(String, nullable=True)  # @username (handle)
+    name = Column(String, nullable=True)  # 표시 이름
+    description = Column(Text, nullable=True)  # 자기소개
+    profile_image_url = Column(String, nullable=True)  # 프로필 이미지 URL
+    verified = Column(Boolean, default=False)  # 인증 계정 여부
+
+    # 계정 통계
+    followers_count = Column(Integer, default=0)  # 팔로워 수
+    following_count = Column(Integer, default=0)  # 팔로잉 수
+    post_count = Column(Integer, default=0)  # 포스트 수
+    listed_count = Column(Integer, default=0)  # 리스트에 추가된 수
+
+    # OAuth 2.0 토큰 정보
+    access_token = Column(Text, nullable=False)  # 액세스 토큰
+    refresh_token = Column(Text, nullable=True)  # 리프레시 토큰
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)  # 토큰 만료 시간
+
+    # 연동 상태
+    is_active = Column(Boolean, default=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+    
 class AIGeneratedContent(Base):
     """
     AI 생성 콘텐츠 모델
@@ -648,6 +682,47 @@ class AIGeneratedContent(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
+    user = relationship("User", back_populates="x_connection")
+    posts = relationship("XPost", back_populates="connection", cascade="all, delete-orphan")
+
+
+class XPost(Base):
+    """
+    X 포스트 모델
+    - 연동된 계정의 포스트 목록 및 통계
+    """
+    __tablename__ = "x_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    connection_id = Column(Integer, ForeignKey("x_connections.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # 포스트 기본 정보
+    post_id = Column(String, nullable=False, unique=True, index=True)  # X 포스트 ID
+    text = Column(Text, nullable=True)  # 포스트 텍스트
+    created_at_x = Column(DateTime(timezone=True), nullable=True)  # 포스트 작성 시간
+
+    # 미디어 정보
+    media_type = Column(String, nullable=True)  # photo, video, animated_gif
+    media_url = Column(String, nullable=True)  # 첫 번째 미디어 URL
+    media_urls = Column(JSON, nullable=True)  # 모든 미디어 URL 목록
+
+    # 포스트 통계
+    repost_count = Column(Integer, default=0)  # 리포스트 수
+    reply_count = Column(Integer, default=0)  # 답글 수
+    like_count = Column(Integer, default=0)  # 좋아요 수
+    quote_count = Column(Integer, default=0)  # 인용 포스트 수
+    bookmark_count = Column(Integer, default=0)  # 북마크 수
+    impression_count = Column(Integer, default=0)  # 노출 수
+
+    # 포스트 메타데이터
+    conversation_id = Column(String, nullable=True)  # 대화 ID (스레드)
+    in_reply_to_user_id = Column(String, nullable=True)  # 답글 대상 사용자 ID
+    referenced_posts = Column(JSON, nullable=True)  # 참조된 포스트 목록
+
+    # 동기화 정보
+    last_stats_updated_at = Column(DateTime(timezone=True), nullable=True)
+
     user = relationship("User", back_populates="ai_generated_contents")
 
 
@@ -685,5 +760,6 @@ class SNSPublishedContent(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
+    connection = relationship("XConnection", back_populates="posts")
     user = relationship("User", back_populates="sns_published_contents")
     ai_content = relationship("AIGeneratedContent", backref="sns_publications")

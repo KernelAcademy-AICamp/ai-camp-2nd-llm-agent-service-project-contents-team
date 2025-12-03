@@ -11,7 +11,6 @@ import Home from './pages/Home';
 import Dashboard from './pages/dashboard/Dashboard';
 import ContentList from './pages/content/ContentList';
 import Templates from './pages/content/Templates';
-import Analytics from './pages/analytics/Analytics';
 import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
 import ImageStudio from './pages/content/ImageStudio';
@@ -23,6 +22,7 @@ import AIVideoGenerator from './pages/content/AIVideoGenerator';
 import YouTube from './pages/connection_SNS/youtube/YouTube';
 import Facebook from './pages/connection_SNS/facebook/Facebook';
 import Instagram from './pages/connection_SNS/instagram/Instagram';
+import X from './pages/connection_SNS/x/X';
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import DeleteData from './pages/legal/DeleteData';
 import './App.css';
@@ -150,16 +150,6 @@ function App() {
             }
           />
           <Route
-            path="/analytics"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Analytics />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/settings"
             element={
               <ProtectedRoute>
@@ -205,6 +195,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Instagram />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/x"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <X />
                 </Layout>
               </ProtectedRoute>
             }

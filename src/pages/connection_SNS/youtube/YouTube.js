@@ -170,27 +170,27 @@ function YouTube() {
         // 연동됨 상태
         <>
           {/* 채널 정보 */}
-          <div className="channel-info-card">
-            <div className="channel-header">
+          <div className="account-info-card">
+            <div className="account-header">
               <img
                 src={connection.channel_thumbnail_url || '/default-avatar.png'}
                 alt={connection.channel_title}
-                className="channel-thumbnail"
+                className="account-thumbnail"
               />
-              <div className="channel-details">
+              <div className="account-details">
                 <h3>{connection.channel_title}</h3>
                 {connection.channel_custom_url && (
                   <a
                     href={`https://youtube.com/${connection.channel_custom_url}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="channel-url"
+                    className="account-url"
                   >
                     {connection.channel_custom_url}
                   </a>
                 )}
               </div>
-              <div className="channel-actions">
+              <div className="account-actions">
                 <button className="btn-secondary" onClick={handleSync} disabled={syncing}>
                   {syncing ? '동기화 중...' : '동영상 동기화'}
                 </button>
@@ -199,7 +199,7 @@ function YouTube() {
                 </button>
               </div>
             </div>
-            <div className="channel-stats">
+            <div className="account-stats-bar">
               <div className="stat-item">
                 <span className="stat-value">{formatNumber(connection.subscriber_count)}</span>
                 <span className="stat-label">구독자</span>

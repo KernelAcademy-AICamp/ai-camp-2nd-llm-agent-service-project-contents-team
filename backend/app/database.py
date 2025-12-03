@@ -21,7 +21,7 @@ if DATABASE_URL.startswith("postgresql"):
         max_overflow=20,           # 최대 초과 연결 수
         pool_pre_ping=True,        # 연결 유효성 검사
         pool_recycle=3600,         # 1시간마다 연결 재활용
-        echo=ENV == "development"  # 개발 환경에서만 SQL 로그 출력
+        echo=False                 # SQL 로그 출력 비활성화 (성능 향상)
     )
 else:
     raise ValueError(f"지원하지 않는 데이터베이스입니다: {DATABASE_URL.split('://')[0]}. PostgreSQL만 지원합니다.")

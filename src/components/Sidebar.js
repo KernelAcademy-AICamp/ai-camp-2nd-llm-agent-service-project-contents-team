@@ -22,12 +22,12 @@ function Sidebar() {
     { path: '/youtube', label: 'YouTube' },
     { path: '/facebook', label: 'Facebook' },
     { path: '/instagram', label: 'Instagram' },
+    { path: '/x', label: 'X' },
   ];
 
   const managementMenuItems = [
     { path: '/contents', label: '콘텐츠 관리' },
     { path: '/templates', label: '템플릿' },
-    { path: '/analytics', label: '분석' },
     { path: '/settings', label: '설정' },
   ];
 
@@ -51,8 +51,17 @@ function Sidebar() {
     // 드롭다운을 열린 상태로 유지 (setIsContentMenuOpen(false) 제거)
   };
 
+  const handleLogoClick = () => {
+    navigate('/home');
+  };
+
   return (
     <aside className="sidebar">
+      {/* 로고 */}
+      <div className="sidebar-logo" onClick={handleLogoClick}>
+        <img src="/ddukddak_colored.png" alt="콘텐츠 크리에이터" />
+      </div>
+
       <nav className="sidebar-nav">
         {menuItems.map((item) => (
           <Link

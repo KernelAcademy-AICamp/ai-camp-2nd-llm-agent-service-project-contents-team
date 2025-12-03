@@ -314,6 +314,62 @@ export const instagramAPI = {
 };
 
 // ==========================================
+// X API
+// ==========================================
+export const xAPI = {
+  // 연동 상태 확인
+  getStatus: async () => {
+    const response = await api.get('/api/x/status');
+    return response.data;
+  },
+
+  // 연동 해제
+  disconnect: async () => {
+    const response = await api.delete('/api/x/disconnect');
+    return response.data;
+  },
+
+  // 계정 정보 새로고침
+  refresh: async () => {
+    const response = await api.post('/api/x/refresh');
+    return response.data;
+  },
+
+  // 포스트 목록 조회
+  getPosts: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/x/posts?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 포스트 동기화
+  syncPosts: async () => {
+    const response = await api.post('/api/x/posts/sync');
+    return response.data;
+  },
+
+  // 포스트 작성
+  createPost: async (data) => {
+    const response = await api.post('/api/x/posts/create', data);
+    return response.data;
+  },
+
+  // 이미지 포스트 작성
+  createMediaPost: async (formData) => {
+    const response = await api.post('/api/x/posts/create-media', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // 포스트 삭제
+  deletePost: async (postId) => {
+    const response = await api.delete(`/api/x/posts/${postId}`);
+    return response.data;
+  },
+
+  // 계정 분석 데이터
+  getAnalytics: async () => {
+    const response = await api.get('/api/x/analytics');
 // AI 콘텐츠 API
 // ==========================================
 export const aiContentAPI = {
@@ -372,5 +428,8 @@ export const snsContentAPI = {
     return response.data;
   },
 };
+
+// 호환성을 위한 별칭 (기존 코드에서 twitterAPI 사용하는 경우)
+export const twitterAPI = xAPI;
 
 export default api;

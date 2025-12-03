@@ -51,7 +51,11 @@ function Home() {
       const response = await api.get('/api/chat/sessions', {
         params: { limit: 50, offset: 0 }
       });
-      setSessions(response.data.sessions);
+      // 최신순으로 정렬 (updated_at 기준 내림차순)
+      const sortedSessions = [...response.data.sessions].sort((a, b) => {
+        return new Date(b.updated_at) - new Date(a.updated_at);
+      });
+      setSessions(sortedSessions);
     } catch (error) {
       console.error('세션 목록 로드 실패:', error);
     } finally {
@@ -394,6 +398,13 @@ function Home() {
     }
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return '좋은 아침이에요';
+    if (hour < 18) return '좋은 오후예요';
+    return '좋은 저녁이에요';
+  };
+
   return (
     <div className="home-page">
       {/* 왼쪽 채팅 히스토리 사이드바 */}
@@ -456,10 +467,10 @@ function Home() {
               <img src="/ddukddak_colored.png" alt="로고" className="avatar-logo" />
             </div>
             <h1 className="welcome-title">
-              안녕하세요, {user?.username || 'User'}님!
+              {getGreeting()}, {user?.username || 'User'}님!
             </h1>
             <p className="welcome-subtitle">
-              무엇을 도와드릴까요? 궁금한 것을 물어보세요.
+              오늘도 멋진 콘텐츠를 만들어볼까요?
             </p>
           </div>
 
