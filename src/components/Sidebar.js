@@ -22,6 +22,7 @@ function Sidebar() {
     { path: '/youtube', label: 'YouTube' },
     { path: '/facebook', label: 'Facebook' },
     { path: '/instagram', label: 'Instagram' },
+    { path: '/twitter', label: 'Twitter(X)' },
   ];
 
   const managementMenuItems = [

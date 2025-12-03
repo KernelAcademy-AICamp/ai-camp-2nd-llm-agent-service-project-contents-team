@@ -1,13 +1,16 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { youtubeAPI, facebookAPI, instagramAPI } from '../../services/api';
 import './Dashboard.css';
 
 function Dashboard() {
-  const stats = [
-    { label: '총 콘텐츠', value: '24', change: '+12%' },
-    { label: '이번 주 생성', value: '8', change: '+25%' },
-    { label: '예약된 포스트', value: '12', change: '+8%' },
-    { label: '총 조회수', value: '1.2K', change: '+15%' },
-  ];
+  const navigate = useNavigate();
+  const [snsStatus, setSnsStatus] = useState({
+    youtube: { loading: true, connected: false, data: null, videos: [], analytics: null },
+    facebook: { loading: true, connected: false, data: null, posts: [] },
+    instagram: { loading: true, connected: false, data: null, posts: [] },
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const recentContents = [
     { id: 1, title: '신제품 런칭 홍보 콘텐츠', type: '소셜 미디어', status: '발행됨', date: '2025-11-10' },
@@ -15,10 +18,183 @@ function Dashboard() {
     { id: 3, title: '고객 리뷰 소개 영상', type: '비디오', status: '작성 중', date: '2025-11-12' },
   ];
 
+  const quickActions = [
+    { label: '콘텐츠 생성', path: '/content/ai-generator', desc: 'AI로 콘텐츠 생성' },
+    { label: '템플릿 선택', path: '/content/templates', desc: '다양한 템플릿 활용' },
+    { label: '이미지 생성', path: '/content/image-generator', desc: 'AI 이미지 만들기' },
+    { label: '비디오 제작', path: '/content/video-creator', desc: '영상 콘텐츠 제작' },
+  ];
+
+  // SNS 연동 상태 및 데이터 조회
+  useEffect(() => {
+    const fetchSNSData = async () => {
+      setStatsLoading(true);
+
+      // YouTube 데이터 조회
+      try {
+        const ytData = await youtubeAPI.getStatus();
+        let videos = [];
+        let analytics = null;
+
+        if (ytData) {
+          try {
+            videos = await youtubeAPI.getVideos(0, 100) || [];
+          } catch (e) {
+            console.error('YouTube videos fetch error:', e);
+          }
+          try {
+            analytics = await youtubeAPI.getAnalyticsSummary();
+          } catch (e) {
+            console.error('YouTube analytics fetch error:', e);
+          }
+        }
+
+        setSnsStatus(prev => ({
+          ...prev,
+          youtube: { loading: false, connected: !!ytData, data: ytData, videos, analytics }
+        }));
+      } catch {
+        setSnsStatus(prev => ({
+          ...prev,
+          youtube: { loading: false, connected: false, data: null, videos: [], analytics: null }
+        }));
+      }
+
+      // Facebook 데이터 조회
+      try {
+        const fbData = await facebookAPI.getStatus();
+        let posts = [];
+
+        if (fbData?.page_id) {
+          try {
+            posts = await facebookAPI.getPosts(0, 100) || [];
+          } catch (e) {
+            console.error('Facebook posts fetch error:', e);
+          }
+        }
+
+        setSnsStatus(prev => ({
+          ...prev,
+          facebook: { loading: false, connected: !!fbData?.page_id, data: fbData, posts }
+        }));
+      } catch {
+        setSnsStatus(prev => ({
+          ...prev,
+          facebook: { loading: false, connected: false, data: null, posts: [] }
+        }));
+      }
+
+      // Instagram 데이터 조회
+      try {
+        const igData = await instagramAPI.getStatus();
+        let posts = [];
+
+        if (igData?.instagram_account_id) {
+          try {
+            posts = await instagramAPI.getPosts(0, 100) || [];
+          } catch (e) {
+            console.error('Instagram posts fetch error:', e);
+          }
+        }
+
+        setSnsStatus(prev => ({
+          ...prev,
+          instagram: { loading: false, connected: !!igData?.instagram_account_id, data: igData, posts }
+        }));
+      } catch {
+        setSnsStatus(prev => ({
+          ...prev,
+          instagram: { loading: false, connected: false, data: null, posts: [] }
+        }));
+      }
+
+      setStatsLoading(false);
+    };
+
+    fetchSNSData();
+  }, []);
+
+  // 숫자 포맷팅
+  const formatNumber = (num) => {
+    if (!num) return '0';
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toLocaleString();
+  };
+
+  // 통계 계산
+  const calculateStats = () => {
+    const { youtube, facebook, instagram } = snsStatus;
+
+    // 총 콘텐츠 수 (YouTube 동영상 + Facebook 게시물 + Instagram 게시물)
+    const totalContents =
+      (youtube.videos?.length || 0) +
+      (facebook.posts?.length || 0) +
+      (instagram.posts?.length || 0);
+
+    // 이번 주 생성 콘텐츠 (최근 7일 내 생성된 콘텐츠)
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const thisWeekContents = [
+      ...(youtube.videos || []).filter(v => new Date(v.published_at) >= oneWeekAgo),
+      ...(facebook.posts || []).filter(p => new Date(p.created_time) >= oneWeekAgo),
+      ...(instagram.posts || []).filter(p => new Date(p.timestamp) >= oneWeekAgo),
+    ].length;
+
+    // 총 팔로워/구독자 수
+    const totalFollowers =
+      (youtube.data?.subscriber_count || 0) +
+      (facebook.data?.page_followers_count || 0) +
+      (instagram.data?.followers_count || 0);
+
+    // 총 조회수/노출수
+    const totalViews = youtube.data?.view_count || 0;
+
+    // 연동된 SNS 수
+    const connectedCount = [youtube, facebook, instagram].filter(s => s.connected).length;
+
+    return {
+      totalContents,
+      thisWeekContents,
+      totalFollowers,
+      totalViews,
+      connectedCount,
+    };
+  };
+
+  const calculatedStats = calculateStats();
+
+  const stats = [
+    {
+      label: '총 콘텐츠',
+      value: statsLoading ? '-' : formatNumber(calculatedStats.totalContents),
+      subLabel: 'YouTube + Facebook + Instagram'
+    },
+    {
+      label: '이번 주 생성',
+      value: statsLoading ? '-' : formatNumber(calculatedStats.thisWeekContents),
+      subLabel: '최근 7일'
+    },
+    {
+      label: '총 팔로워',
+      value: statsLoading ? '-' : formatNumber(calculatedStats.totalFollowers),
+      subLabel: '전체 채널 합계'
+    },
+    {
+      label: '총 조회수',
+      value: statsLoading ? '-' : formatNumber(calculatedStats.totalViews),
+      subLabel: 'YouTube 채널'
+    },
+  ];
+
+  // 연동된 SNS가 없는 경우 안내 메시지
+  const hasNoConnections = !statsLoading && calculatedStats.connectedCount === 0;
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h2>대시보드</h2>
+        <h2>Dashboard</h2>
       </div>
 
       <div className="stats-grid">
@@ -26,16 +202,35 @@ function Dashboard() {
           <div key={index} className="stat-card">
             <div className="stat-content">
               <div className="stat-label">{stat.label}</div>
-              <div className="stat-value">{stat.value}</div>
-              <div className="stat-change positive">{stat.change}</div>
+              <div className="stat-value">
+                {statsLoading ? (
+                  <span className="stat-loading"></span>
+                ) : (
+                  stat.value
+                )}
+              </div>
+              {stat.subLabel && (
+                <div className="stat-sub-label">{stat.subLabel}</div>
+              )}
             </div>
           </div>
         ))}
       </div>
 
+      {hasNoConnections && (
+        <div className="no-connection-notice">
+          <p>SNS 계정을 연동하면 실제 통계를 확인할 수 있습니다.</p>
+        </div>
+      )}
+
       <div className="dashboard-content">
         <div className="content-section">
-          <h3>최근 콘텐츠</h3>
+          <div className="section-title">
+            <h3>최근 콘텐츠</h3>
+            <button className="view-all-btn" onClick={() => navigate('/content/list')}>
+              전체보기 →
+            </button>
+          </div>
           <div className="content-list">
             {recentContents.map((content) => (
               <div key={content.id} className="content-item">
@@ -43,6 +238,7 @@ function Dashboard() {
                   <h4>{content.title}</h4>
                   <div className="content-meta">
                     <span className="content-type">{content.type}</span>
+                    <span className="meta-divider">•</span>
                     <span className="content-date">{content.date}</span>
                   </div>
                 </div>
@@ -52,23 +248,31 @@ function Dashboard() {
               </div>
             ))}
           </div>
+          {recentContents.length === 0 && (
+            <div className="empty-state">
+              <p>아직 생성된 콘텐츠가 없어요</p>
+              <button className="create-first-btn" onClick={() => navigate('/content/ai-generator')}>
+                첫 콘텐츠 만들기
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="quick-actions">
           <h3>빠른 작업</h3>
           <div className="action-buttons">
-            <button className="action-btn">
-              <span>콘텐츠 생성</span>
-            </button>
-            <button className="action-btn">
-              <span>템플릿 선택</span>
-            </button>
-            <button className="action-btn">
-              <span>스케줄 설정</span>
-            </button>
-            <button className="action-btn">
-              <span>분석 보기</span>
-            </button>
+            {quickActions.map((action, index) => (
+              <button
+                key={index}
+                className="action-btn"
+                onClick={() => navigate(action.path)}
+              >
+                <div className="action-text">
+                  <span className="action-label">{action.label}</span>
+                  <span className="action-desc">{action.desc}</span>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </div>

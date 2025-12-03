@@ -4,7 +4,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user, blog, chat, brand_analysis, youtube, facebook, instagram, ai_video_generation, sns_publish
+from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user, blog, chat, brand_analysis, youtube, facebook, instagram, twitter, ai_video_generation, sns_publish
 from .database import engine, Base
 
 
@@ -55,6 +55,7 @@ app.include_router(brand_analysis.router)
 app.include_router(youtube.router)
 app.include_router(facebook.router)
 app.include_router(instagram.router)
+app.include_router(twitter.router)
 app.include_router(ai_video_generation.router)
 app.include_router(sns_publish.router)
 

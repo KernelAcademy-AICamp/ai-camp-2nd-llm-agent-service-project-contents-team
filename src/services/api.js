@@ -313,4 +313,65 @@ export const instagramAPI = {
   },
 };
 
+// ==========================================
+// Twitter(X) API
+// ==========================================
+export const twitterAPI = {
+  // 연동 상태 확인
+  getStatus: async () => {
+    const response = await api.get('/api/twitter/status');
+    return response.data;
+  },
+
+  // 연동 해제
+  disconnect: async () => {
+    const response = await api.delete('/api/twitter/disconnect');
+    return response.data;
+  },
+
+  // 계정 정보 새로고침
+  refresh: async () => {
+    const response = await api.post('/api/twitter/refresh');
+    return response.data;
+  },
+
+  // 트윗 목록 조회
+  getTweets: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/twitter/tweets?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 트윗 동기화
+  syncTweets: async () => {
+    const response = await api.post('/api/twitter/tweets/sync');
+    return response.data;
+  },
+
+  // 트윗 작성
+  createTweet: async (data) => {
+    const response = await api.post('/api/twitter/tweets/create', data);
+    return response.data;
+  },
+
+  // 이미지 트윗 작성
+  createMediaTweet: async (formData) => {
+    const response = await api.post('/api/twitter/tweets/create-media', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // 트윗 삭제
+  deleteTweet: async (tweetId) => {
+    const response = await api.delete(`/api/twitter/tweets/${tweetId}`);
+    return response.data;
+  },
+
+  // 계정 분석 데이터
+  getAnalytics: async () => {
+    const response = await api.get('/api/twitter/analytics');
+    return response.data;
+  },
+};
+
 export default api;
