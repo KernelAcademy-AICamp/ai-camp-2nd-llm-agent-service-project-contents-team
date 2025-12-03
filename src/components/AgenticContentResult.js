@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import SNSPublishModal from './sns/SNSPublishModal';
 import './AgenticContentResult.css';
 
-function AgenticContentResult({ result, onEdit, onSave }) {
+function AgenticContentResult({ result, onEdit }) {
   const [activeTab, setActiveTab] = useState('blog');
   const [showPublishModal, setShowPublishModal] = useState(false);
 
@@ -247,9 +247,6 @@ function AgenticContentResult({ result, onEdit, onSave }) {
         <div className="header-actions">
           <button className="btn-secondary" onClick={onEdit}>
             다시 생성
-          </button>
-          <button className="btn-primary" onClick={onSave}>
-            저장하기
           </button>
         </div>
       </div>

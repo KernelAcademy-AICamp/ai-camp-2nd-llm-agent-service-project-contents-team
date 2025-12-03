@@ -4,7 +4,7 @@ import AgenticContentForm from '../../components/AgenticContentForm';
 import AgenticContentResult from '../../components/AgenticContentResult';
 import { generateAgenticContent } from '../../services/agenticService';
 import { useContent } from '../../contexts/ContentContext';
-import { aiContentAPI } from '../../services/api';
+import { aiContentAPI, snsContentAPI } from '../../services/api';
 import './ContentCommon.css';
 import './AIContentGenerator.css';
 
@@ -24,6 +24,44 @@ function AIContentGenerator() {
     }
   }, [location.state]);
 
+  // 자동 저장 함수 (생성 완료 시 호출)
+  const autoSaveContent = async (content) => {
+    try {
+      // AI 생성 콘텐츠 저장
+      const saveData = {
+        input_text: content.analysis?.subject || '',
+        input_image_count: content.uploadedImages?.length || 0,
+        blog_title: content.blog?.title || '',
+        blog_content: content.blog?.content || '',
+        blog_tags: content.blog?.tags || [],
+        sns_content: content.sns?.content || '',
+        sns_hashtags: content.sns?.tags || [],
+        analysis_data: content.analysis || null,
+        blog_score: content.critique?.blog?.score || null,
+        sns_score: content.critique?.sns?.score || null,
+        critique_data: content.critique || null,
+        generation_attempts: content.metadata?.attempts || 1
+      };
+
+      await aiContentAPI.save(saveData);
+      console.log('✅ AI 콘텐츠 자동 저장 완료');
+
+      // SNS 콘텐츠도 별도 저장 (Instagram용)
+      if (content.sns?.content) {
+        await snsContentAPI.save({
+          platform: 'instagram',
+          caption: content.sns.content || '',
+          hashtags: content.sns.tags || [],
+          image_urls: content.uploadedImages || [],
+          status: 'draft'
+        });
+        console.log('✅ SNS 콘텐츠 자동 저장 완료');
+      }
+    } catch (error) {
+      console.error('콘텐츠 자동 저장 실패:', error);
+    }
+  };
+
   const handleGenerate = async (formData) => {
     setIsGenerating(true);
     setGeneratedContent(null);
@@ -41,6 +79,9 @@ function AIContentGenerator() {
       setGeneratedContent(result);
       setProgressMessage('');
       setCurrentStep('');
+
+      // 생성 완료 시 자동 저장
+      await autoSaveContent(result);
     } catch (error) {
       console.error('❌ AI 콘텐츠 생성 오류:', error);
       alert('콘텐츠 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -55,33 +96,6 @@ function AIContentGenerator() {
     setGeneratedContent(null);
     setProgressMessage('');
     setCurrentStep('');
-  };
-
-  const handleSave = async () => {
-    if (!generatedContent) return;
-
-    try {
-      const saveData = {
-        input_text: generatedContent.analysis?.subject || '',
-        input_image_count: generatedContent.uploadedImages?.length || 0,
-        blog_title: generatedContent.blog?.title || '',
-        blog_content: generatedContent.blog?.content || '',
-        blog_tags: generatedContent.blog?.tags || [],
-        sns_content: generatedContent.sns?.content || '',
-        sns_hashtags: generatedContent.sns?.tags || [],
-        analysis_data: generatedContent.analysis || null,
-        blog_score: generatedContent.critique?.blog?.score || null,
-        sns_score: generatedContent.critique?.sns?.score || null,
-        critique_data: generatedContent.critique || null,
-        generation_attempts: generatedContent.metadata?.attempts || 1
-      };
-
-      await aiContentAPI.save(saveData);
-      alert('콘텐츠가 저장되었습니다.');
-    } catch (error) {
-      console.error('콘텐츠 저장 실패:', error);
-      alert('콘텐츠 저장에 실패했습니다.');
-    }
   };
 
   // 진행 상태에 따른 아이콘
@@ -249,7 +263,6 @@ function AIContentGenerator() {
           <AgenticContentResult
             result={generatedContent}
             onEdit={handleEdit}
-            onSave={handleSave}
           />
         )}
       </div>
