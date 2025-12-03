@@ -58,6 +58,18 @@ class UserPreferenceUpdate(UserPreferenceBase):
     pass
 
 
+class ProfileUpdate(BaseModel):
+    """프로필 업데이트 스키마 (Settings 페이지용)"""
+    # 비즈니스 정보
+    brand_name: Optional[str] = None
+    business_type: Optional[str] = None
+    business_description: Optional[str] = None
+    # 타겟 고객
+    target_audience: Optional[Dict[str, Any]] = None
+    # 스타일 선호도
+    preferences: Optional[UserPreferenceBase] = None
+
+
 class UserPreference(UserPreferenceBase):
     """사용자 선호도 응답 스키마"""
     id: int
