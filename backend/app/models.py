@@ -46,6 +46,7 @@ class User(Base):
     facebook_connection = relationship("FacebookConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     instagram_connection = relationship("InstagramConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     ai_generated_contents = relationship("AIGeneratedContent", back_populates="user", cascade="all, delete-orphan")
+    sns_published_contents = relationship("SNSPublishedContent", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserPreference(Base):
@@ -648,3 +649,41 @@ class AIGeneratedContent(Base):
 
     # Relationships
     user = relationship("User", back_populates="ai_generated_contents")
+
+
+class SNSPublishedContent(Base):
+    """
+    SNS 발행 콘텐츠 모델
+    - 인스타그램/페이스북에 발행된 콘텐츠 저장
+    """
+    __tablename__ = "sns_published_contents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # 플랫폼 정보
+    platform = Column(String, nullable=False)  # instagram, facebook
+
+    # 콘텐츠
+    caption = Column(Text, nullable=False)  # 본문/캡션
+    hashtags = Column(JSON, nullable=True)  # ["해시태그1", "해시태그2"]
+    image_urls = Column(JSON, nullable=True)  # 이미지 URL 배열
+
+    # 발행 정보
+    post_id = Column(String, nullable=True)  # 플랫폼에서 반환된 게시물 ID
+    post_url = Column(String, nullable=True)  # 게시물 URL
+
+    # AI 생성 콘텐츠 연결 (선택적)
+    ai_content_id = Column(Integer, ForeignKey("ai_generated_contents.id"), nullable=True)
+
+    # 상태
+    status = Column(String, default="published")  # draft, published, failed, deleted
+
+    # 타임스탬프
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="sns_published_contents")
+    ai_content = relationship("AIGeneratedContent", backref="sns_publications")

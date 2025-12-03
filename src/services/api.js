@@ -342,4 +342,35 @@ export const aiContentAPI = {
   },
 };
 
+// ==========================================
+// SNS 발행 콘텐츠 API
+// ==========================================
+export const snsContentAPI = {
+  // SNS 콘텐츠 저장
+  save: async (data) => {
+    const response = await api.post('/api/sns-content/save', data);
+    return response.data;
+  },
+
+  // 콘텐츠 목록 조회 (플랫폼 필터 가능)
+  list: async (platform = null, skip = 0, limit = 20) => {
+    let url = `/api/sns-content/list?skip=${skip}&limit=${limit}`;
+    if (platform) url += `&platform=${platform}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  // 특정 콘텐츠 조회
+  get: async (contentId) => {
+    const response = await api.get(`/api/sns-content/${contentId}`);
+    return response.data;
+  },
+
+  // 콘텐츠 삭제
+  delete: async (contentId) => {
+    const response = await api.delete(`/api/sns-content/${contentId}`);
+    return response.data;
+  },
+};
+
 export default api;
