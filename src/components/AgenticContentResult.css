@@ -828,12 +828,12 @@
 }
 
 .btn-download-images {
-  padding: 6px 12px;
+  padding: 10px 20px;
   background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
   color: white;
   border: none;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
