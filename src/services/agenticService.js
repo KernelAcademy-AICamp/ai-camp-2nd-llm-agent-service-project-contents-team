@@ -230,7 +230,7 @@ ${feedback.sns ? `SNS: ${feedback.sns.join(', ')}` : ''}
 **중요**: 위 브랜드 가이드라인을 반드시 준수하여 일관성 있는 브랜드 톤으로 작성하세요.
 ` : '';
 
-    const prompt = `당신은 전문 콘텐츠 작가입니다. 분석된 정보를 바탕으로 두 가지 플랫폼용 콘텐츠를 생성하세요.
+    const prompt = `당신은 전문 콘텐츠 작가입니다. 분석된 정보를 바탕으로 네 가지 플랫폼용 콘텐츠를 생성하세요.
 
 **분석 정보:**
 - 주제: ${analysisData.subject}
@@ -262,6 +262,18 @@ ${imageInstructions}
    - CTA(행동 유도) 포함
    - 해시태그 최적화
 
+3. **X(구 Twitter)용** (280자 이내)
+   - 간결하고 임팩트 있게
+   - 트렌디한 표현 사용
+   - 해시태그 2-3개만 사용
+   - 링크 공간 고려
+
+4. **Threads용** (500자 이내)
+   - 인스타그램보다 조금 더 길게
+   - 대화하듯 친근한 톤
+   - 스토리텔링 요소
+   - 해시태그 3-5개
+
 **응답 형식 (JSON):**
 {
   "blog": {
@@ -272,12 +284,22 @@ ${imageInstructions}
   "sns": {
     "content": "SNS 본문 (이모지 포함)",
     "tags": ["해시태그1", "해시태그2", "해시태그3", "해시태그4", "해시태그5"]
+  },
+  "x": {
+    "content": "X 본문 (280자 이내)",
+    "tags": ["해시태그1", "해시태그2"]
+  },
+  "threads": {
+    "content": "Threads 본문 (500자 이내)",
+    "tags": ["해시태그1", "해시태그2", "해시태그3"]
   }
 }
 
 **중요:**
 - 블로그 태그는 최소 7개, 최대 10개
-- SNS 태그는 최소 5개, 최대 15개
+- SNS(인스타/페이스북) 태그는 최소 5개, 최대 15개
+- X 태그는 2-3개
+- Threads 태그는 3-5개
 - 각 플랫폼의 특성에 맞는 길이와 톤 유지
 - JSON만 응답하세요`;
 
@@ -303,8 +325,20 @@ class CriticAgent {
     this.model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   }
 
-  async critique(blogContent, snsContent, analysisData) {
+  async critique(blogContent, snsContent, analysisData, xContent = null, threadsContent = null) {
     console.log('🔍 Critic Agent: 콘텐츠 평가 중...');
+
+    const xSection = xContent ? `
+**X 콘텐츠:**
+본문: ${xContent.content}
+태그: ${xContent.tags?.join(', ') || ''}
+` : '';
+
+    const threadsSection = threadsContent ? `
+**Threads 콘텐츠:**
+본문: ${threadsContent.content}
+태그: ${threadsContent.tags?.join(', ') || ''}
+` : '';
 
     const prompt = `당신은 콘텐츠 품질을 평가하는 전문 비평가입니다.
 
@@ -318,17 +352,17 @@ class CriticAgent {
 본문: ${blogContent.content}
 태그: ${blogContent.tags.join(', ')}
 
-**SNS 콘텐츠:**
+**SNS 콘텐츠 (인스타/페이스북):**
 본문: ${snsContent.content}
 태그: ${snsContent.tags.join(', ')}
-
+${xSection}${threadsSection}
 **평가 기준:**
 1. SEO 최적화 (키워드 포함, 자연스러움)
 2. 플랫폼 적합성 (길이, 톤)
 3. 타겟 적합성
 4. 가독성
 5. 감성/공감
-6. CTA 포함 여부 (SNS)
+6. CTA 포함 여부
 7. 태그 품질
 
 각 콘텐츠를 0-100점으로 평가하고, 개선점을 제시하세요.
@@ -352,6 +386,18 @@ JSON 형식:
     "engagementScore": 90,
     "hashtagScore": 85
   },
+  "x": {
+    "score": 85,
+    "strengths": ["장점1"],
+    "weaknesses": ["약점1"],
+    "improvements": ["개선사항1"]
+  },
+  "threads": {
+    "score": 86,
+    "strengths": ["장점1"],
+    "weaknesses": ["약점1"],
+    "improvements": ["개선사항1"]
+  },
   "overallRecommendation": "통과/개선필요"
 }`;
 
@@ -370,11 +416,14 @@ JSON 형식:
 }
 
 // ============================================
-// Main Agentic Workflow (Single API Call - Maximum Speed)
+// Main Agentic Workflow (with Quality Check)
 // ============================================
 export const generateAgenticContent = async ({ textInput, images = [], styleTone = '' }, onProgress) => {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const criticAgent = new CriticAgent();
+    const writerAgent = new WriterAgent();
+    const MAX_ATTEMPTS = 2;
 
     const updateProgress = (message, step) => {
       if (onProgress) {
@@ -406,7 +455,7 @@ export const generateAgenticContent = async ({ textInput, images = [], styleTone
       : '';
 
     // ⚡ 단일 API 호출로 분석 + 생성 동시 처리
-    const prompt = `당신은 콘텐츠 전문가입니다. 입력을 분석하고 네이버 블로그와 SNS용 콘텐츠를 생성하세요.
+    const prompt = `당신은 콘텐츠 전문가입니다. 입력을 분석하고 각 플랫폼용 콘텐츠를 생성하세요.
 
 입력: ${textInput || '이미지 기반 콘텐츠'}
 이미지: ${images.length}개
@@ -428,8 +477,16 @@ ${styleInstruction}
     "tags": ["태그1", "태그2", "태그3", "태그4", "태그5", "태그6", "태그7"]
   },
   "sns": {
-    "content": "SNS 본문 (150-250자, 이모지 포함, CTA 포함)",
+    "content": "Instagram/Facebook용 본문 (150-250자, 이모지 포함, CTA 포함)",
     "tags": ["#해시태그1", "#해시태그2", "#해시태그3", "#해시태그4", "#해시태그5"]
+  },
+  "x": {
+    "content": "X(트위터)용 본문 (280자 이내, 간결하고 임팩트 있게, 핵심 메시지 전달, 이모지 적절히)",
+    "tags": ["#해시태그1", "#해시태그2", "#해시태그3"]
+  },
+  "threads": {
+    "content": "Threads용 본문 (500자 이내, 대화체로 친근하게, 스토리텔링, 이모지 활용)",
+    "tags": ["#해시태그1", "#해시태그2", "#해시태그3", "#해시태그4"]
   }
 }
 
@@ -444,25 +501,87 @@ ${styleInstruction}
       throw new Error('응답 파싱 실패');
     }
 
-    const content = JSON.parse(jsonMatch[0]);
+    let content = JSON.parse(jsonMatch[0]);
     const imageDataUrls = await imageDataUrlsPromise;
 
-    updateProgress('완료!', 'complete');
+    // 디버깅: 파싱된 콘텐츠 확인
+    console.log('📦 파싱된 콘텐츠 키:', Object.keys(content));
+    console.log('📦 X 콘텐츠:', content.x ? '있음' : '없음', content.x);
+    console.log('📦 Threads 콘텐츠:', content.threads ? '있음' : '없음', content.threads);
 
-    const defaultCritique = {
-      blog: { score: 85, strengths: ['AI 최적화'], weaknesses: [], improvements: [], seoScore: 85, readabilityScore: 85 },
-      sns: { score: 85, strengths: ['AI 최적화'], weaknesses: [], improvements: [], engagementScore: 85, hashtagScore: 85 },
-      overallRecommendation: '통과'
+    // 분석 데이터 기본값 설정
+    const analysisData = content.analysis || {
+      subject: textInput,
+      category: '일반',
+      keywords: [],
+      mood: '친근함',
+      targetAudience: ['일반'],
+      highlights: [],
+      recommendedTone: '친근함'
     };
+
+    // 🔍 품질 검사 활성화
+    updateProgress('품질 검사 중...', 'critiquing');
+    let critique = await criticAgent.critique(content.blog, content.sns, analysisData, content.x, content.threads);
+    let attempts = 1;
+
+    console.log(`🔍 품질 검사 결과 - 블로그: ${critique.blog?.score}점, SNS: ${critique.sns?.score}점, X: ${critique.x?.score}점, Threads: ${critique.threads?.score}점`);
+
+    // 80점 미만이면 재생성 (최대 MAX_ATTEMPTS 회)
+    while ((critique.blog.score < 80 || critique.sns.score < 80) && attempts < MAX_ATTEMPTS) {
+      attempts++;
+      console.log(`🔄 품질 미달로 재생성 중... (시도 ${attempts}/${MAX_ATTEMPTS})`);
+      updateProgress(`품질 개선 중... (시도 ${attempts}/${MAX_ATTEMPTS})`, 'writing');
+
+      // 피드백을 반영하여 재생성
+      const feedback = {
+        blog: critique.blog.score < 80 ? critique.blog.improvements : null,
+        sns: critique.sns.score < 80 ? critique.sns.improvements : null
+      };
+
+      const improvedContent = await writerAgent.generateContent(analysisData, feedback, images.length);
+
+      // 기존 콘텐츠 업데이트
+      if (feedback.blog) {
+        content.blog = improvedContent.blog;
+      }
+      if (feedback.sns) {
+        content.sns = improvedContent.sns;
+      }
+      // X와 Threads도 업데이트
+      if (improvedContent.x) {
+        content.x = improvedContent.x;
+      }
+      if (improvedContent.threads) {
+        content.threads = improvedContent.threads;
+      }
+
+      // 다시 품질 검사
+      updateProgress('재검사 중...', 'critiquing');
+      critique = await criticAgent.critique(content.blog, content.sns, analysisData, content.x, content.threads);
+      console.log(`🔍 재검사 결과 - 블로그: ${critique.blog?.score}점, SNS: ${critique.sns?.score}점`);
+    }
+
+    updateProgress('완료!', 'complete');
 
     return {
       success: true,
       blog: content.blog,
       sns: content.sns,
-      analysis: content.analysis || { subject: textInput, category: '일반', keywords: [], mood: '친근함', targetAudience: ['일반'], highlights: [], recommendedTone: '친근함' },
-      critique: defaultCritique,
+      x: content.x,
+      threads: content.threads,
+      analysis: analysisData,
+      critique: critique,
       uploadedImages: imageDataUrls,
-      metadata: { attempts: 0, finalScores: { blog: 85, sns: 85 } }
+      metadata: {
+        attempts: attempts,
+        finalScores: {
+          blog: critique.blog?.score,
+          sns: critique.sns?.score,
+          x: critique.x?.score,
+          threads: critique.threads?.score
+        }
+      }
     };
 
   } catch (error) {

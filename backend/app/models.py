@@ -49,6 +49,7 @@ class User(Base):
     threads_connection = relationship("ThreadsConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     ai_generated_contents = relationship("AIGeneratedContent", back_populates="user", cascade="all, delete-orphan")
     sns_published_contents = relationship("SNSPublishedContent", back_populates="user", cascade="all, delete-orphan")
+    content_sessions = relationship("ContentGenerationSession", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserPreference(Base):
@@ -696,7 +697,7 @@ class XPost(Base):
 
 class AIGeneratedContent(Base):
     """
-    AI 생성 콘텐츠 모델
+    AI 생성 콘텐츠 모델 (레거시 - 기존 데이터 유지용)
     - AI 글 생성 기능으로 생성된 블로그 및 SNS 콘텐츠 저장
     """
     __tablename__ = "ai_generated_contents"
@@ -720,6 +721,14 @@ class AIGeneratedContent(Base):
     sns_content = Column(Text, nullable=True)  # SNS 본문
     sns_hashtags = Column(JSON, nullable=True)  # ["해시태그1", "해시태그2"]
 
+    # X 콘텐츠
+    x_content = Column(Text, nullable=True)  # X 본문
+    x_hashtags = Column(JSON, nullable=True)  # ["해시태그1", "해시태그2"]
+
+    # Threads 콘텐츠
+    threads_content = Column(Text, nullable=True)  # Threads 본문
+    threads_hashtags = Column(JSON, nullable=True)  # ["해시태그1", "해시태그2"]
+
     # AI 분석 결과
     analysis_data = Column(JSON, nullable=True)  # 분석 결과 전체 (JSON)
 
@@ -739,6 +748,168 @@ class AIGeneratedContent(Base):
 
     # Relationships
     user = relationship("User", back_populates="ai_generated_contents")
+
+
+# ============================================
+# 새로운 콘텐츠 생성 테이블 구조 (v2)
+# ============================================
+
+class ContentGenerationSession(Base):
+    """
+    콘텐츠 생성 세션 (사용자 입력값 저장)
+    - 사용자가 입력한 주제, 생성 타입, 스타일, 선택한 플랫폼 등 저장
+    - 각 플랫폼별 결과 테이블과 연결
+    """
+    __tablename__ = "content_generation_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # 사용자 입력값
+    topic = Column(Text, nullable=False)  # 주제
+    content_type = Column(String, nullable=False)  # text, image, both
+    style = Column(String, nullable=False)  # casual, professional, friendly, etc.
+    selected_platforms = Column(JSON, nullable=False)  # ["blog", "sns", "x", "threads"]
+
+    # AI 분석 결과
+    analysis_data = Column(JSON, nullable=True)  # 분석 결과 전체 (JSON)
+    critique_data = Column(JSON, nullable=True)  # 평가 결과 전체 (JSON)
+
+    # 이미지 설정
+    requested_image_count = Column(Integer, default=0)  # 요청한 이미지 갯수
+
+    # 메타데이터
+    generation_attempts = Column(Integer, default=1)  # 생성 시도 횟수
+    status = Column(String, default="generated")  # generated, published, archived
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="content_sessions")
+    blog_content = relationship("GeneratedBlogContent", back_populates="session", uselist=False, cascade="all, delete-orphan")
+    sns_content = relationship("GeneratedSNSContent", back_populates="session", uselist=False, cascade="all, delete-orphan")
+    x_content = relationship("GeneratedXContent", back_populates="session", uselist=False, cascade="all, delete-orphan")
+    threads_content = relationship("GeneratedThreadsContent", back_populates="session", uselist=False, cascade="all, delete-orphan")
+    images = relationship("GeneratedImage", back_populates="session", cascade="all, delete-orphan")
+
+
+class GeneratedBlogContent(Base):
+    """
+    생성된 블로그 콘텐츠
+    """
+    __tablename__ = "generated_blog_contents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("content_generation_sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # 블로그 콘텐츠
+    title = Column(String, nullable=False)  # 블로그 제목
+    content = Column(Text, nullable=False)  # 블로그 본문 (마크다운)
+    tags = Column(JSON, nullable=True)  # ["태그1", "태그2"]
+
+    # 평가 점수
+    score = Column(Integer, nullable=True)  # 블로그 품질 점수 (0-100)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    session = relationship("ContentGenerationSession", back_populates="blog_content")
+    user = relationship("User")
+
+
+class GeneratedSNSContent(Base):
+    """
+    생성된 SNS 콘텐츠 (Instagram/Facebook)
+    """
+    __tablename__ = "generated_sns_contents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("content_generation_sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # SNS 콘텐츠
+    content = Column(Text, nullable=False)  # SNS 본문
+    hashtags = Column(JSON, nullable=True)  # ["#해시태그1", "#해시태그2"]
+
+    # 평가 점수
+    score = Column(Integer, nullable=True)  # SNS 품질 점수 (0-100)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    session = relationship("ContentGenerationSession", back_populates="sns_content")
+    user = relationship("User")
+
+
+class GeneratedXContent(Base):
+    """
+    생성된 X(Twitter) 콘텐츠
+    """
+    __tablename__ = "generated_x_contents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("content_generation_sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # X 콘텐츠
+    content = Column(Text, nullable=False)  # X 본문 (280자 이내)
+    hashtags = Column(JSON, nullable=True)  # ["#해시태그1", "#해시태그2"]
+
+    # 평가 점수
+    score = Column(Integer, nullable=True)  # X 품질 점수 (0-100)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    session = relationship("ContentGenerationSession", back_populates="x_content")
+    user = relationship("User")
+
+
+class GeneratedThreadsContent(Base):
+    """
+    생성된 Threads 콘텐츠
+    """
+    __tablename__ = "generated_threads_contents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("content_generation_sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # Threads 콘텐츠
+    content = Column(Text, nullable=False)  # Threads 본문 (500자 이내)
+    hashtags = Column(JSON, nullable=True)  # ["#해시태그1", "#해시태그2"]
+
+    # 평가 점수
+    score = Column(Integer, nullable=True)  # Threads 품질 점수 (0-100)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    session = relationship("ContentGenerationSession", back_populates="threads_content")
+    user = relationship("User")
+
+
+class GeneratedImage(Base):
+    """
+    생성된 이미지
+    """
+    __tablename__ = "generated_images"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("content_generation_sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # 이미지 정보
+    image_url = Column(String, nullable=False)  # 이미지 URL
+    prompt = Column(Text, nullable=True)  # 생성에 사용된 프롬프트
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    session = relationship("ContentGenerationSession", back_populates="images")
+    user = relationship("User")
 
 
 class SNSPublishedContent(Base):

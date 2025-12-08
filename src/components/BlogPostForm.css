@@ -347,89 +347,6 @@
   border-color: #667eea;
 }
 
-.parse-btn {
-  align-self: flex-start;
-  padding: 10px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s;
-}
-
-.parse-btn:hover {
-  transform: translateY(-1px);
-}
-
-.parsed-result {
-  margin-top: 16px;
-  padding: 16px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border-left: 4px solid #667eea;
-}
-
-.parsed-title {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-}
-
-.parsed-list {
-  margin: 0 0 16px 0;
-  padding-left: 20px;
-  list-style: none;
-}
-
-.parsed-list li {
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: #555;
-}
-
-.parsed-list li strong {
-  color: #667eea;
-  margin-right: 8px;
-}
-
-.parsed-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.btn-secondary-small,
-.btn-primary-small {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-secondary-small {
-  background: #f0f0f0;
-  color: #333;
-}
-
-.btn-secondary-small:hover {
-  background: #e0e0e0;
-}
-
-.btn-primary-small {
-  background: #667eea;
-  color: white;
-}
-
-.btn-primary-small:hover {
-  background: #5568d3;
-}
-
 /* 상세 입력 모드 */
 .detailed-mode {
   padding: 0;
@@ -548,15 +465,6 @@
 .tips-section input:focus {
   outline: none;
   border-color: #667eea;
-}
-
-.coming-soon {
-  margin: 0;
-  padding: 40px;
-  text-align: center;
-  font-size: 14px;
-  color: #888;
-  font-style: italic;
 }
 
 /* 이미지 업로드 섹션 */

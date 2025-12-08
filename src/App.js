@@ -14,10 +14,7 @@ import Templates from './pages/content/Templates';
 import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
 import ImageStudio from './pages/content/ImageStudio';
-import VideoCreator from './pages/content/VideoCreator';
 import MyPage from './pages/profile/MyPage';
-import AIContentGenerator from './pages/content/AIContentGenerator';
-import ImageGenerator from './pages/content/ImageGenerator';
 import AIVideoGenerator from './pages/content/AIVideoGenerator';
 import ContentHub from './pages/content/ContentHub';
 import ContentCreatorSimple from './pages/content/ContentCreatorSimple';
@@ -93,16 +90,6 @@ function App() {
             }
           />
           <Route
-            path="/ai-content"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <AIContentGenerator />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/image-studio"
             element={
               <ProtectedRoute>
@@ -113,31 +100,11 @@ function App() {
             }
           />
           <Route
-            path="/image"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <ImageGenerator />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/cardnews"
             element={
               <ProtectedRoute>
                 <Layout>
                   <CardNews />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/video"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <VideoCreator />
                 </Layout>
               </ProtectedRoute>
             }

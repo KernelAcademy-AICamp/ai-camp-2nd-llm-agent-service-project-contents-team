@@ -8,7 +8,6 @@ function Sidebar() {
   const [isContentMenuOpen, setIsContentMenuOpen] = useState(false);
 
   const menuItems = [
-    { path: '/home', label: '뚝딱 도우미' },
     { path: '/dashboard', label: '대시보드' },
   ];
 
@@ -17,17 +16,21 @@ function Sidebar() {
     { path: '/ai-video', label: 'AI 동영상 생성' },
   ];
 
+  const contentManagementItems = [
+    { path: '/contents', label: '콘텐츠 관리' },
+    { path: '/templates', label: '템플릿' },
+  ];
+
   const platformMenuItems = [
     { path: '/youtube', label: 'YouTube' },
     { path: '/facebook', label: 'Facebook' },
     { path: '/instagram', label: 'Instagram' },
-    { path: '/x', label: 'X' },
     { path: '/threads', label: 'Threads' },
+    { path: '/x', label: 'X' },
   ];
 
   const managementMenuItems = [
-    { path: '/contents', label: '콘텐츠 관리' },
-    { path: '/templates', label: '템플릿' },
+    { path: '/home', label: '뚝딱 도우미' },
     { path: '/settings', label: '설정' },
   ];
 
@@ -75,20 +78,13 @@ function Sidebar() {
 
         {/* 콘텐츠 생성 드롭다운 */}
         <div className="sidebar-dropdown">
-          <div className="sidebar-dropdown-header">
-            <Link
-              to="/content"
-              className={`sidebar-item sidebar-dropdown-trigger ${isContentMenuActive ? 'active' : ''}`}
-            >
-              <span className="sidebar-label">콘텐츠 생성</span>
-            </Link>
-            <button
-              className={`sidebar-dropdown-toggle ${isContentMenuOpen ? 'open' : ''}`}
-              onClick={toggleContentMenu}
-            >
-              ▼
-            </button>
-          </div>
+          <button
+            className={`sidebar-item sidebar-dropdown-trigger ${isContentMenuActive ? 'active' : ''}`}
+            onClick={toggleContentMenu}
+          >
+            <span className="sidebar-label">콘텐츠 생성</span>
+            <span className={`sidebar-dropdown-arrow ${isContentMenuOpen ? 'open' : ''}`}>▼</span>
+          </button>
 
           {isContentMenuOpen && (
             <div className="sidebar-dropdown-menu">
@@ -104,6 +100,17 @@ function Sidebar() {
             </div>
           )}
         </div>
+
+        {/* 콘텐츠 관리 메뉴 */}
+        {contentManagementItems.map((item) => (
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
+          >
+            <span className="sidebar-label">{item.label}</span>
+          </Link>
+        ))}
 
         {/* 플랫폼 연동 메뉴 */}
         <div className="sidebar-divider"></div>
