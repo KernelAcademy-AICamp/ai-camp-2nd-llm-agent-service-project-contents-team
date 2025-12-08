@@ -1,7 +1,7 @@
 """
 AI 비디오 생성 서비스
 - Master Planning Agent: 제품 분석 + 스토리보드 생성
-- Image Generation: Gemini 2.5 Flash로 각 컷 이미지 생성
+- Image Generation: Vertex AI Gemini 2.5 Flash로 각 컷 이미지 생성
 - Video Generation: Veo 3.1로 컷 사이 트랜지션 비디오 생성
 - Video Composition: moviepy/ffmpeg로 최종 비디오 합성
 """
@@ -9,10 +9,13 @@ import os
 import json
 import base64
 import httpx
+import asyncio
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import anthropic
 import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel as VertexGenerativeModel, Part
 from sqlalchemy.orm import Session
 
 from ..models import VideoGenerationJob, User, BrandAnalysis
@@ -20,8 +23,19 @@ from ..logger import get_logger
 
 logger = get_logger(__name__)
 
-# Google Gemini 설정
+# Google Gemini 설정 (기존 코드와의 호환성 유지)
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+# Vertex AI 초기화 (GOOGLE_APPLICATION_CREDENTIALS 사용)
+try:
+    location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+    vertexai.init(
+        project=os.getenv("GOOGLE_CLOUD_PROJECT"),
+        location=location
+    )
+    logger.info(f"Vertex AI initialized: project={os.getenv('GOOGLE_CLOUD_PROJECT')}, location={location}")
+except Exception as e:
+    logger.warning(f"Failed to initialize Vertex AI: {e}")
 
 
 class MasterPlanningAgent:
@@ -274,18 +288,28 @@ class MasterPlanningAgent:
 
 위 제품 이미지를 분석하고, {cut_count}개의 컷으로 구성된 약 {duration_seconds}초 길이의 마케팅 비디오 스토리보드를 JSON 배열로 생성해주세요."""
 
-        # Gemini API 호출
-        logger.info(f"Calling Gemini API for storyboard generation ({cut_count} cuts, {duration_seconds}s)")
+        # Vertex AI Gemini API 호출
+        logger.info(f"Calling Vertex AI Gemini API for storyboard generation ({cut_count} cuts, {duration_seconds}s)")
 
-        # Gemini 모델 초기화
-        gemini_model = genai.GenerativeModel(self.model)
+        # Vertex AI Gemini 모델 초기화
+        gemini_model = VertexGenerativeModel(self.model)
 
-        # image_data를 PIL Image로 변환
+        # image_data를 PIL Image로 변환 후 Vertex AI Part 객체로 변환
         from PIL import Image
         import io
 
         image_bytes = base64.b64decode(image_data["data"])
         pil_image = Image.open(io.BytesIO(image_bytes))
+
+        # PIL Image → Vertex AI Part 객체 변환
+        img_byte_arr = io.BytesIO()
+        pil_image.save(img_byte_arr, format='JPEG')
+        img_bytes = img_byte_arr.getvalue()
+
+        image_part = Part.from_data(
+            data=img_bytes,
+            mime_type="image/jpeg"
+        )
 
         # System prompt와 user message를 결합 (Gemini는 system 파라미터 미지원)
         combined_prompt = f"""{system_prompt}
@@ -294,8 +318,8 @@ class MasterPlanningAgent:
 
 {user_message}"""
 
-        # Gemini API 호출
-        response = gemini_model.generate_content([combined_prompt, pil_image])
+        # Vertex AI Gemini API 호출 (Part 객체 사용)
+        response = gemini_model.generate_content([combined_prompt, image_part])
 
         # 응답 파싱
         response_text = response.text
@@ -353,12 +377,14 @@ class MasterPlanningAgent:
 class ImageGenerationAgent:
     """
     Image Generation Agent
-    - Gemini 2.5 Flash Image 모델을 사용하여 스토리보드 각 컷의 이미지 생성
-    - 생성된 이미지를 Cloudinary에 업로드
+    - Vertex AI Gemini 2.5 Flash Image 모델을 사용하여 스토리보드 각 컷의 이미지 생성
+    - 9:16 세로 비율 (숏폼 최적화)
+    - 생성된 이미지를 로컬 파일 시스템에 PNG로 저장
     """
 
     def __init__(self, model: str = "gemini-2.5-flash-image"):
         self.model = model
+        logger.info(f"ImageGenerationAgent initialized with Vertex AI model: {self.model}")
 
     async def generate_images(
         self,
@@ -388,9 +414,9 @@ class ImageGenerationAgent:
             db.commit()
 
             logger.info(f"Starting image generation for job {job.id}: {len(cuts)} cuts")
+            logger.info(f"Using Vertex AI Gemini model: {self.model}")
 
             generated_images = []
-            image_model = genai.GenerativeModel(self.model)
 
             for i, cut in enumerate(cuts, 1):
                 try:
@@ -429,6 +455,12 @@ class ImageGenerationAgent:
 
                     logger.info(f"Image generated and uploaded for cut {cut_number}: {image_url}")
 
+                    # 쿼터 초과 방지를 위한 요청 간격 추가
+                    if i < len(cuts):
+                        wait_time = 3  # 3초 대기
+                        logger.info(f"다음 이미지 생성 전 {wait_time}초 대기 중... (쿼터 최적화)")
+                        await asyncio.sleep(wait_time)
+
                 except Exception as e:
                     logger.error(f"Error generating image for cut {cut.get('cut', i)}: {str(e)}")
                     # 일부 이미지 생성 실패해도 계속 진행
@@ -457,31 +489,72 @@ class ImageGenerationAgent:
 
     async def _generate_with_gemini_image(self, prompt: str) -> bytes:
         """
-        Gemini 2.5 Flash Image 모델을 사용하여 이미지 생성
+        Vertex AI Gemini 2.5 Flash Image 모델을 사용하여 이미지 생성
+        Exponential backoff 재시도 로직 포함 (429 쿼터 에러 대응)
         """
-        try:
-            # Gemini 이미지 생성 모델 사용
-            image_model = genai.GenerativeModel(self.model)
+        import base64
+        from vertexai.generative_models import GenerativeModel
+        from google.api_core.exceptions import ResourceExhausted, TooManyRequests
 
-            response = image_model.generate_content([prompt])
+        max_retries = 5
+        base_delay = 2  # 초기 대기 시간 (초)
 
-            # 이미지 데이터 추출
-            if not response.candidates or not response.candidates[0].content.parts:
-                raise ValueError("No image generated")
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Vertex AI Gemini 2.5 Flash Image로 이미지 생성 중... (시도 {attempt + 1}/{max_retries}, 프롬프트: {prompt[:50]}...)")
 
-            # inline_data에서 이미지 바이트 추출
-            for part in response.candidates[0].content.parts:
-                if hasattr(part, 'inline_data') and part.inline_data:
-                    # base64 디코딩
-                    import base64
-                    image_bytes = base64.b64decode(part.inline_data.data)
-                    return image_bytes
+                # Vertex AI Gemini 모델 초기화
+                model = GenerativeModel("gemini-2.5-flash-image")
 
-            raise ValueError("No image data found in response")
+                # 이미지 생성 요청
+                response = model.generate_content([
+                    f"Generate an image with 9:16 aspect ratio (vertical, for short-form video): {prompt}"
+                ])
 
-        except Exception as e:
-            logger.error(f"Gemini 2.5 Flash Image generation failed: {str(e)}")
-            raise
+                # 응답에서 이미지 추출
+                if response.candidates and len(response.candidates) > 0:
+                    candidate = response.candidates[0]
+
+                    if candidate.content and candidate.content.parts:
+                        for part in candidate.content.parts:
+                            # inline_data 또는 inlineData 형식 확인
+                            inline_data = getattr(part, 'inline_data', None) or getattr(part, 'inlineData', None)
+
+                            if inline_data:
+                                # Vertex AI는 inline_data.data에 bytes 형식으로 저장
+                                if hasattr(inline_data, 'data'):
+                                    image_bytes = inline_data.data
+                                    mime_type = getattr(inline_data, 'mime_type', 'image/png')
+
+                                    logger.info(f"✅ 이미지 생성 완료 (시도 {attempt + 1}, MIME type: {mime_type}, size: {len(image_bytes)} bytes)")
+                                    return image_bytes
+                                # 또는 Base64 문자열로 저장되어 있을 수도 있음
+                                elif isinstance(inline_data.get('data') if hasattr(inline_data, 'get') else None, str):
+                                    image_data_base64 = inline_data['data']
+                                    image_bytes = base64.b64decode(image_data_base64)
+
+                                    logger.info(f"✅ 이미지 생성 완료 (시도 {attempt + 1}, Base64 디코딩, size: {len(image_bytes)} bytes)")
+                                    return image_bytes
+
+                # 이미지를 찾지 못한 경우
+                logger.error(f"Vertex AI Gemini 응답에서 이미지를 찾지 못함: {response}")
+                raise ValueError("Vertex AI Gemini로부터 이미지를 추출하지 못했습니다.")
+
+            except (ResourceExhausted, TooManyRequests) as e:
+                # 429 쿼터 에러 발생 시 exponential backoff 재시도
+                if attempt < max_retries - 1:
+                    wait_time = base_delay * (2 ** attempt)  # 2, 4, 8, 16, 32초
+                    logger.warning(f"⚠️  429 쿼터 에러 발생 (시도 {attempt + 1}/{max_retries}): {str(e)}")
+                    logger.info(f"🔄 {wait_time}초 후 재시도... (exponential backoff)")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"❌ 최대 재시도 횟수({max_retries})에 도달. 이미지 생성 실패: {str(e)}")
+                    raise
+
+            except Exception as e:
+                # 429 외의 에러는 즉시 실패
+                logger.error(f"❌ Vertex AI Gemini 2.5 Flash Image 생성 실패: {str(e)}")
+                raise
 
     async def _upload_to_cloudinary(
         self,
@@ -490,31 +563,36 @@ class ImageGenerationAgent:
         job_id: int,
         cut_number: int
     ) -> str:
-        """이미지를 Cloudinary에 업로드"""
-        import cloudinary.uploader
-
+        """이미지를 로컬 파일 시스템에 PNG로 저장"""
         try:
-            upload_result = cloudinary.uploader.upload(
-                image_data,
-                folder=f"ai_video_images/{user_id}/{job_id}",
-                public_id=f"cut_{cut_number}",
-                resource_type="image"
-            )
-            return upload_result["secure_url"]
+            # 저장 경로 생성
+            save_dir = Path("uploads") / "ai_video_images" / str(user_id) / str(job_id)
+            save_dir.mkdir(parents=True, exist_ok=True)
+
+            # 파일 저장 (PNG 형식)
+            file_path = save_dir / f"cut_{cut_number}.png"
+            with open(file_path, 'wb') as f:
+                f.write(image_data)
+
+            # URL 반환 (FastAPI static files 경로)
+            file_url = f"/uploads/ai_video_images/{user_id}/{job_id}/cut_{cut_number}.png"
+            logger.info(f"Image saved to local filesystem as PNG: {file_url}")
+            return file_url
         except Exception as e:
-            logger.error(f"Failed to upload image to Cloudinary: {str(e)}")
+            logger.error(f"Failed to save image to local filesystem: {str(e)}")
             raise
 
 
 class VideoGenerationAgent:
     """
     Video Generation Agent
-    - Veo 3.1을 사용하여 이미지 간 트랜지션 비디오 생성
+    - Vertex AI Veo 3.1을 사용하여 이미지 간 트랜지션 비디오 생성
     - 생성된 비디오를 Cloudinary에 업로드
     """
 
-    def __init__(self, model: str = "veo-3.1-fast-generate-preview"):
+    def __init__(self, model: str = "veo-3.1-fast-generate-001"):
         self.model = model
+        logger.info(f"VideoGenerationAgent initialized with Vertex AI model: {self.model}")
 
     async def generate_transition_videos(
         self,
@@ -557,7 +635,9 @@ class VideoGenerationAgent:
                 return []
 
             generated_videos = []
-            veo_model = genai.GenerativeModel(self.model)
+            # Vertex AI 모델 사용
+            veo_model = VertexGenerativeModel(self.model)
+            logger.info(f"Using Vertex AI Veo model: {self.model}")
 
             # 유효한 이미지만 필터링
             valid_images = [img for img in images if img.get('url')]
@@ -628,16 +708,10 @@ class VideoGenerationAgent:
                     from_image_data = await self._download_image(from_image['url'])
                     to_image_data = await self._download_image(to_image['url'])
 
-                    # Veo 3.1 API 호출
+                    # Veo 3.1 API 호출 (Part 객체 사용)
                     response = veo_model.generate_content([
-                        {
-                            "mime_type": "image/jpeg",
-                            "data": base64.b64encode(from_image_data).decode('utf-8')
-                        },
-                        {
-                            "mime_type": "image/jpeg",
-                            "data": base64.b64encode(to_image_data).decode('utf-8')
-                        },
+                        Part.from_data(data=from_image_data, mime_type="image/png"),
+                        Part.from_data(data=to_image_data, mime_type="image/png"),
                         video_prompt
                     ])
 
@@ -705,11 +779,42 @@ class VideoGenerationAgent:
         return prompts.get(effect, "Smooth transition from the first image to the second image. Professional, cinematic camera movement.")
 
     async def _download_image(self, url: str) -> bytes:
-        """이미지 URL에서 이미지 다운로드"""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.content
+        """
+        이미지 다운로드 (로컬 파일 또는 HTTP)
+        - 상대 경로(/uploads/...)인 경우: 로컬 파일 시스템에서 직접 읽기
+        - 절대 URL(http://, https://)인 경우: HTTP로 다운로드
+        """
+        # 상대 경로인 경우 로컬 파일 시스템에서 직접 읽기
+        if url.startswith('/uploads/'):
+            try:
+                # /uploads/ 경로를 실제 파일 시스템 경로로 변환
+                # 파일 위치 기준 절대 경로 사용 (환경 독립적)
+                # backend/app/services/ → backend/app/ → backend/ → 프로젝트루트/
+                file_path = Path(__file__).parent.parent.parent / url.lstrip('/')
+
+                logger.info(f"Reading image from local filesystem: {file_path}")
+
+                with open(file_path, 'rb') as f:
+                    image_data = f.read()
+
+                logger.info(f"Successfully read local image: {len(image_data)} bytes")
+                return image_data
+
+            except Exception as e:
+                logger.error(f"Failed to read local image {file_path}: {str(e)}")
+                raise
+        else:
+            # 절대 URL인 경우 HTTP로 다운로드
+            try:
+                logger.info(f"Downloading image from URL: {url}")
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(url)
+                    response.raise_for_status()
+                    logger.info(f"Successfully downloaded image: {len(response.content)} bytes")
+                    return response.content
+            except Exception as e:
+                logger.error(f"Failed to download image from {url}: {str(e)}")
+                raise
 
     async def _upload_to_cloudinary(
         self,
@@ -718,19 +823,23 @@ class VideoGenerationAgent:
         job_id: int,
         transition_name: str
     ) -> str:
-        """비디오를 Cloudinary에 업로드"""
-        import cloudinary.uploader
-
+        """비디오를 로컬 파일 시스템에 저장"""
         try:
-            upload_result = cloudinary.uploader.upload(
-                video_data,
-                folder=f"ai_video_transitions/{user_id}/{job_id}",
-                public_id=f"transition_{transition_name}",
-                resource_type="video"
-            )
-            return upload_result["secure_url"]
+            # 저장 경로 생성
+            save_dir = Path("uploads") / "ai_video_transitions" / str(user_id) / str(job_id)
+            save_dir.mkdir(parents=True, exist_ok=True)
+
+            # 파일 저장
+            file_path = save_dir / f"transition_{transition_name}.mp4"
+            with open(file_path, 'wb') as f:
+                f.write(video_data)
+
+            # URL 반환 (FastAPI static files 경로)
+            file_url = f"/uploads/ai_video_transitions/{user_id}/{job_id}/transition_{transition_name}.mp4"
+            logger.info(f"Video saved to local filesystem: {file_url}")
+            return file_url
         except Exception as e:
-            logger.error(f"Failed to upload video to Cloudinary: {str(e)}")
+            logger.error(f"Failed to save video to local filesystem: {str(e)}")
             raise
 
 
@@ -764,8 +873,7 @@ class VideoCompositionAgent:
         Returns:
             전환 클립
         """
-        from moviepy.editor import CompositeVideoClip, concatenate_videoclips
-        from moviepy.video.fx.all import resize, crop
+        from moviepy import CompositeVideoClip, concatenate_videoclips
 
         try:
             if effect == "dissolve":
@@ -786,7 +894,7 @@ class VideoCompositionAgent:
 
             elif effect == "fade":
                 # 검은 화면을 통한 페이드 전환
-                from moviepy.editor import ColorClip
+                from moviepy import ColorClip
 
                 fade_duration = duration / 2
                 from_clip_fade = from_clip.subclip(max(0, from_clip.duration - fade_duration), from_clip.duration).fadeout(fade_duration)
@@ -875,7 +983,7 @@ class VideoCompositionAgent:
         """
         import tempfile
         import os
-        from moviepy.editor import (
+        from moviepy import (
             ImageClip,
             VideoFileClip,
             concatenate_videoclips,
@@ -1120,11 +1228,42 @@ class VideoCompositionAgent:
             raise
 
     async def _download_file(self, url: str) -> bytes:
-        """파일 URL에서 다운로드"""
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url)
-            response.raise_for_status()
-            return response.content
+        """
+        파일 다운로드 (로컬 파일 또는 HTTP)
+        - 상대 경로(/uploads/...)인 경우: 로컬 파일 시스템에서 직접 읽기
+        - 절대 URL(http://, https://)인 경우: HTTP로 다운로드
+        """
+        # 상대 경로인 경우 로컬 파일 시스템에서 직접 읽기
+        if url.startswith('/uploads/'):
+            try:
+                # /uploads/ 경로를 실제 파일 시스템 경로로 변환
+                # 파일 위치 기준 절대 경로 사용 (환경 독립적)
+                # backend/app/services/ → backend/app/ → backend/ → 프로젝트루트/
+                file_path = Path(__file__).parent.parent.parent / url.lstrip('/')
+
+                logger.info(f"Reading file from local filesystem: {file_path}")
+
+                with open(file_path, 'rb') as f:
+                    file_data = f.read()
+
+                logger.info(f"Successfully read local file: {len(file_data)} bytes")
+                return file_data
+
+            except Exception as e:
+                logger.error(f"Failed to read local file {file_path}: {str(e)}")
+                raise
+        else:
+            # 절대 URL인 경우 HTTP로 다운로드
+            try:
+                logger.info(f"Downloading file from URL: {url}")
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(url)
+                    response.raise_for_status()
+                    logger.info(f"Successfully downloaded file: {len(response.content)} bytes")
+                    return response.content
+            except Exception as e:
+                logger.error(f"Failed to download file from {url}: {str(e)}")
+                raise
 
     async def _upload_to_cloudinary(
         self,
@@ -1132,19 +1271,23 @@ class VideoCompositionAgent:
         user_id: int,
         job_id: int
     ) -> str:
-        """최종 비디오를 Cloudinary에 업로드"""
-        import cloudinary.uploader
-
+        """최종 비디오를 로컬 파일 시스템에 저장"""
         try:
-            upload_result = cloudinary.uploader.upload(
-                video_data,
-                folder=f"ai_video_final/{user_id}",
-                public_id=f"video_{job_id}",
-                resource_type="video"
-            )
-            return upload_result["secure_url"]
+            # 저장 경로 생성
+            save_dir = Path("uploads") / "ai_video_final" / str(user_id)
+            save_dir.mkdir(parents=True, exist_ok=True)
+
+            # 파일 저장
+            file_path = save_dir / f"video_{job_id}.mp4"
+            with open(file_path, 'wb') as f:
+                f.write(video_data)
+
+            # URL 반환 (FastAPI static files 경로)
+            file_url = f"/uploads/ai_video_final/{user_id}/video_{job_id}.mp4"
+            logger.info(f"Final video saved to local filesystem: {file_url}")
+            return file_url
         except Exception as e:
-            logger.error(f"Failed to upload final video to Cloudinary: {str(e)}")
+            logger.error(f"Failed to save final video to local filesystem: {str(e)}")
             raise
 
     async def _generate_and_upload_thumbnail(
@@ -1154,26 +1297,22 @@ class VideoCompositionAgent:
         user_id: int,
         job_id: int
     ) -> str:
-        """비디오에서 썸네일 생성 및 업로드"""
-        import cloudinary.uploader
-
+        """비디오에서 썸네일 생성 및 로컬 파일 시스템에 저장"""
         try:
-            # 첫 번째 프레임을 썸네일로 사용
-            thumbnail_path = os.path.join(temp_dir, f"thumbnail_{job_id}.jpg")
-            video_clip.save_frame(thumbnail_path, t=0)
+            # 저장 경로 생성
+            save_dir = Path("uploads") / "ai_video_thumbnails" / str(user_id)
+            save_dir.mkdir(parents=True, exist_ok=True)
 
-            # Cloudinary에 업로드
-            with open(thumbnail_path, 'rb') as f:
-                upload_result = cloudinary.uploader.upload(
-                    f.read(),
-                    folder=f"ai_video_thumbnails/{user_id}",
-                    public_id=f"thumbnail_{job_id}",
-                    resource_type="image"
-                )
+            # 첫 번째 프레임을 썸네일로 저장
+            thumbnail_path = save_dir / f"thumbnail_{job_id}.jpg"
+            video_clip.save_frame(str(thumbnail_path), t=0)
 
-            return upload_result["secure_url"]
+            # URL 반환 (FastAPI static files 경로)
+            file_url = f"/uploads/ai_video_thumbnails/{user_id}/thumbnail_{job_id}.jpg"
+            logger.info(f"Thumbnail saved to local filesystem: {file_url}")
+            return file_url
         except Exception as e:
-            logger.error(f"Failed to generate/upload thumbnail: {str(e)}")
+            logger.error(f"Failed to generate/save thumbnail: {str(e)}")
             return None
 
 

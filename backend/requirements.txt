@@ -10,6 +10,7 @@ httpx==0.28.1
 itsdangerous==2.2.0
 google-generativeai==0.8.3
 google-genai
+google-cloud-aiplatform
 anthropic==0.39.0
 Pillow==11.0.0
 psycopg2-binary==2.9.9
