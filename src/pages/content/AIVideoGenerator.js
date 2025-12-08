@@ -3,11 +3,14 @@ import axios from 'axios';
 import './ContentCommon.css';
 import './AIVideoGenerator.css';
 
+// API 베이스 URL
+const API_BASE_URL = 'http://localhost:8000';
+
 function AIVideoGenerator() {
   // 탭 상태
   const [activeTab, setActiveTab] = useState('create');
 
-  // 단계 상태: 'input' (제품 정보 입력), 'recommendation' (AI 추천), 'generating' (생성 중)
+  // 단계 상태: 'input' (제품 정보 입력), 'generating' (생성 중)
   const [step, setStep] = useState('input');
 
   // 티어 옵션
@@ -23,10 +26,6 @@ function AIVideoGenerator() {
   // 이미지 업로드
   const [productImage, setProductImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-
-  // AI 추천 결과
-  const [aiRecommendation, setAiRecommendation] = useState(null);
-  const [analyzingProduct, setAnalyzingProduct] = useState(false);
 
   // 생성 상태
   const [loading, setLoading] = useState(false);
@@ -62,12 +61,24 @@ function AIVideoGenerator() {
     };
   }, [currentJob]);
 
+  // URL 헬퍼 함수: 상대 경로를 절대 URL로 변환
+  const getFullUrl = (path) => {
+    if (!path) return null;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path; // 이미 절대 URL
+    }
+    return `${API_BASE_URL}${path}`; // 상대 경로에 베이스 URL 추가
+  };
+
   const loadTiers = async () => {
     try {
       const response = await axios.get('http://localhost:8000/api/ai-video/tiers');
       setTiers(response.data);
-      if (response.data.length > 0) {
-        setSelectedTier(response.data[1].tier); // 기본값: Standard
+      // 기본값: Standard (index 1)
+      if (response.data.length > 1) {
+        setSelectedTier(response.data[1].tier);
+      } else if (response.data.length > 0) {
+        setSelectedTier(response.data[0].tier);
       }
     } catch (err) {
       console.error('Failed to load tiers:', err);
@@ -147,47 +158,8 @@ function AIVideoGenerator() {
     }));
   };
 
-  const handleAnalyzeProduct = async (e) => {
+  const handleGenerateVideo = async (e) => {
     e.preventDefault();
-    setAnalyzingProduct(true);
-    setError(null);
-
-    try {
-      const token = localStorage.getItem('access_token');
-
-      // FormData 생성
-      const data = new FormData();
-      data.append('product_name', formData.product_name);
-      if (formData.product_description) {
-        data.append('product_description', formData.product_description);
-      }
-      if (productImage) {
-        data.append('image', productImage);
-      }
-
-      const response = await axios.post(
-        'http://localhost:8000/api/ai-video/analyze-product',
-        data,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        }
-      );
-
-      setAiRecommendation(response.data);
-      setSelectedTier(response.data.recommended_tier);
-      setStep('recommendation');
-    } catch (err) {
-      setError(err.response?.data?.detail || '제품 분석 중 오류가 발생했습니다.');
-      console.error('Product analysis error:', err);
-    } finally {
-      setAnalyzingProduct(false);
-    }
-  };
-
-  const handleGenerateVideo = async () => {
     setLoading(true);
     setError(null);
     setCurrentJob(null);
@@ -229,10 +201,20 @@ function AIVideoGenerator() {
     }
   };
 
-  const handleBackToInput = () => {
+  const handleReset = () => {
     setStep('input');
-    setAiRecommendation(null);
-    setSelectedTier(null);
+    setFormData({
+      product_name: '',
+      product_description: ''
+    });
+    setProductImage(null);
+    setImagePreview(null);
+    setCurrentJob(null);
+    setError(null);
+    // 티어를 기본값(Standard)으로 리셋
+    if (tiers.length > 1) {
+      setSelectedTier(tiers[1].tier);
+    }
   };
 
   const handleDeleteJob = async (jobId) => {
@@ -326,10 +308,9 @@ function AIVideoGenerator() {
                 </div>
               </div>
             )}
-
-            {/* Step 1: 제품 정보 입력 */}
+            {/* Step 1: 제품 정보 입력 및 티어 선택 */}
             {step === 'input' && (
-              <form onSubmit={handleAnalyzeProduct}>
+              <form onSubmit={handleGenerateVideo}>
                 {/* 제품 이미지 업로드 */}
                 <div className="form-group">
                   <label>제품 이미지 *</label>
@@ -391,7 +372,6 @@ function AIVideoGenerator() {
                     rows="3"
                   />
                 </div>
-
                 {/* AI 분석 버튼 */}
                 <button
                   type="submit"
@@ -432,13 +412,14 @@ function AIVideoGenerator() {
                 </div>
 
                 {/* 티어 선택 */}
-                <div className="form-group" style={{ marginTop: '1.5rem' }}>
-                  <label>영상 길이</label>
+                <div className="form-group">
+                  <label>영상 길이 선택 *</label>
+                  <p className="form-hint">원하는 비디오 길이를 선택하세요</p>
                   <div className="tier-options">
                     {tiers.map(tier => (
                       <div
                         key={tier.tier}
-                        className={`tier-card ${selectedTier === tier.tier ? 'selected' : ''} ${aiRecommendation.recommended_tier === tier.tier ? 'recommended' : ''}`}
+                        className={`tier-card ${selectedTier === tier.tier ? 'selected' : ''}`}
                         onClick={() => setSelectedTier(tier.tier)}
                       >
                         {aiRecommendation.recommended_tier === tier.tier && (
@@ -456,30 +437,79 @@ function AIVideoGenerator() {
                   </div>
                 </div>
 
-                {/* 액션 버튼들 */}
-                <div className="action-buttons">
-                  <button
-                    type="button"
-                    onClick={handleBackToInput}
-                    className="btn-secondary"
-                  >
-                    다시 입력
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleGenerateVideo}
-                    className="btn-generate"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <span className="spinner"></span>
-                        생성 중...
-                      </>
-                    ) : (
-                      '비디오 생성하기'
-                    )}
-                  </button>
+                {/* 비디오 생성 버튼 */}
+                <button
+                  type="submit"
+                  className="btn-generate"
+                  disabled={loading || !selectedTier}
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner"></span>
+                      비디오 생성 시작 중...
+                    </>
+                  ) : (
+                    <>
+                      <span>🎬</span>
+                      비디오 생성하기
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+
+            {/* 안내 사항 */}
+            {step === 'input' && (
+              <div className="info-box">
+                <h4>🎥 AI 마케팅 비디오 생성 기능</h4>
+                <ul>
+                  <li>제품 이미지 1장으로 완전한 마케팅 비디오 생성</li>
+                  <li>원하는 영상 길이(Short/Standard/Premium) 직접 선택</li>
+                  <li>스토리보드 자동 구성 및 이미지 생성</li>
+                  <li>전환 최적화로 90% 비용 절감 (Veo 3.1 + FFmpeg)</li>
+                  <li>브랜드 톤앤매너 자동 반영</li>
+                  <li>예상 소요 시간: 2-5분</li>
+                  <li>요금: Short $0.99 | Standard $1.49 | Premium $1.99</li>
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* 오른쪽: 미리보기/안내 */}
+          <div className="result-section">
+            {error && (
+              <div className="error-message">
+                <span className="error-icon">⚠️</span>
+                <div>
+                  <strong>오류 발생</strong>
+                  <p>{error}</p>
+                </div>
+              </div>
+            )}
+
+            {!error && step === 'input' && (
+              <div className="placeholder-result">
+                <span className="placeholder-icon">🎬</span>
+                <h3>AI 마케팅 비디오 생성</h3>
+                <p>제품 정보와 원하는 영상 길이를 선택하고 비디오를 생성하세요</p>
+                <div className="feature-list">
+                  <div className="feature-item">
+                    <span>🤖</span>
+                    <p>AI 자동 스토리보드</p>
+                  </div>
+                  <div className="feature-item">
+                    <span>🎨</span>
+                    <p>고품질 이미지 생성</p>
+                  </div>
+                  <div className="feature-item">
+                    <span>🎥</span>
+                    <p>시네마틱 전환 효과</p>
+                  </div>
+                  <div className="feature-item">
+                    <span>💰</span>
+                    <p>90% 비용 최적화</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -542,19 +572,19 @@ function AIVideoGenerator() {
 
               <div className="video-preview">
                 <video
-                  src={currentJob.final_video_url}
+                  src={getFullUrl(currentJob.final_video_url)}
                   controls
                   autoPlay
                   loop
                   className="generated-video"
-                  poster={currentJob.thumbnail_url}
+                  poster={getFullUrl(currentJob.thumbnail_url)}
                 >
                   Your browser does not support the video tag.
                 </video>
 
                 <div className="video-actions">
                   <a
-                    href={currentJob.final_video_url}
+                    href={getFullUrl(currentJob.final_video_url)}
                     download={`${currentJob.product_name}.mp4`}
                     className="btn-download"
                     target="_blank"
@@ -564,7 +594,7 @@ function AIVideoGenerator() {
                     다운로드
                   </a>
                   <button
-                    onClick={() => navigator.clipboard.writeText(currentJob.final_video_url)}
+                    onClick={() => navigator.clipboard.writeText(getFullUrl(currentJob.final_video_url))}
                     className="btn-copy"
                   >
                     <span>🔗</span>
@@ -634,7 +664,7 @@ function AIVideoGenerator() {
 
                   {job.thumbnail_url && (
                     <div className="history-thumbnail">
-                      <img src={job.thumbnail_url} alt={job.product_name} />
+                      <img src={getFullUrl(job.thumbnail_url)} alt={job.product_name} />
                     </div>
                   )}
 
@@ -678,7 +708,7 @@ function AIVideoGenerator() {
                           보기
                         </button>
                         <a
-                          href={job.final_video_url}
+                          href={getFullUrl(job.final_video_url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="btn-action btn-download"

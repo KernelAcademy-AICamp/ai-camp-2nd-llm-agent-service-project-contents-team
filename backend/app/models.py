@@ -597,9 +597,9 @@ class VideoGenerationJob(Base):
     error_message = Column(Text, nullable=True)  # 에러 메시지
 
     # AI 모델 사용 정보
-    planning_model = Column(String, default="claude-3-5-sonnet-20241022")  # 스토리보드 생성 모델
-    image_model = Column(String, default="gemini-2.0-flash-exp")  # 이미지 생성 모델
-    video_model = Column(String, default="veo-3.1-fast-generate-preview")  # 비디오 생성 모델
+    planning_model = Column(String, default="gemini-2.5-flash")  # 스토리보드 생성 모델 (Vertex AI)
+    image_model = Column(String, default="gemini-2.5-flash-image")  # 이미지 생성 모델 (Vertex AI)
+    video_model = Column(String, default="veo-3.1-fast-generate-001")  # 비디오 생성 모델 (Vertex AI)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
