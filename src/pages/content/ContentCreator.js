@@ -46,7 +46,7 @@ function ContentCreator() {
   // AI 동영상 또는 카드뉴스 선택 시 해당 페이지로 이동
   useEffect(() => {
     if (contentType === 'ai-video') {
-      navigate('/video');
+      navigate('/ai-video');
     } else if (contentType === 'cardnews') {
       navigate('/cardnews');
     }

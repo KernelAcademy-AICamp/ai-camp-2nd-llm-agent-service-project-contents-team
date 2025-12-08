@@ -296,17 +296,24 @@ function AIVideoGenerator() {
 
       {/* 비디오 생성 탭 */}
       {activeTab === 'create' && (
-        <div className="content-grid">
-          {/* 왼쪽: 입력 폼 */}
+        <div className="content-grid single-column">
           <div className="form-section">
+            {/* 에러 메시지 */}
+            {error && (
+              <div className="error-message" style={{ marginBottom: '1.5rem' }}>
+                <span className="error-icon">⚠️</span>
+                <div>
+                  <strong>오류 발생</strong>
+                  <p>{error}</p>
+                </div>
+              </div>
+            )}
             {/* Step 1: 제품 정보 입력 및 티어 선택 */}
             {step === 'input' && (
               <form onSubmit={handleGenerateVideo}>
                 {/* 제품 이미지 업로드 */}
                 <div className="form-group">
                   <label>제품 이미지 *</label>
-                  <p className="form-hint">제품의 대표 이미지를 업로드해주세요</p>
-
                   {!imagePreview ? (
                     <div className="image-upload-area">
                       <input
@@ -319,7 +326,7 @@ function AIVideoGenerator() {
                       />
                       <label htmlFor="product-image" className="upload-label">
                         <span className="upload-icon">📸</span>
-                        <span>클릭하여 제품 이미지 업로드</span>
+                        <span>클릭하여 이미지 업로드</span>
                         <span className="upload-hint">PNG, JPG, WebP (최대 10MB)</span>
                       </label>
                     </div>
@@ -335,7 +342,7 @@ function AIVideoGenerator() {
                         onClick={handleRemoveImage}
                         className="btn-remove-image"
                       >
-                        ✕ 이미지 제거
+                        ✕ 제거
                       </button>
                     </div>
                   )}
@@ -361,9 +368,47 @@ function AIVideoGenerator() {
                     name="product_description"
                     value={formData.product_description}
                     onChange={handleInputChange}
-                    placeholder="제품의 주요 특징이나 장점을 입력하세요 (선택사항)"
+                    placeholder="제품의 주요 특징이나 장점을 입력하세요"
                     rows="3"
                   />
+                </div>
+                {/* AI 분석 버튼 */}
+                <button
+                  type="submit"
+                  className="btn-generate"
+                  disabled={analyzingProduct}
+                >
+                  {analyzingProduct ? (
+                    <>
+                      <span className="spinner"></span>
+                      AI가 제품 분석 중...
+                    </>
+                  ) : (
+                    'AI 분석하기'
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* Step 2: AI 추천 및 티어 선택 */}
+            {step === 'recommendation' && aiRecommendation && (
+              <div>
+                {/* AI 추천 결과 */}
+                <div className="ai-recommendation">
+                  <div className="recommendation-card">
+                    <div className="recommendation-header">
+                      <span className="recommended-badge">AI 추천</span>
+                      <h4>
+                        {aiRecommendation.recommended_tier === 'short' ? 'Short' :
+                         aiRecommendation.recommended_tier === 'standard' ? 'Standard' :
+                         'Premium'}
+                      </h4>
+                      <span className="confidence-score">
+                        신뢰도 {Math.round(aiRecommendation.confidence * 100)}%
+                      </span>
+                    </div>
+                    <p className="recommendation-reason">{aiRecommendation.reason}</p>
+                  </div>
                 </div>
 
                 {/* 티어 선택 */}
@@ -377,14 +422,15 @@ function AIVideoGenerator() {
                         className={`tier-card ${selectedTier === tier.tier ? 'selected' : ''}`}
                         onClick={() => setSelectedTier(tier.tier)}
                       >
+                        {aiRecommendation.recommended_tier === tier.tier && (
+                          <div className="recommended-label">추천</div>
+                        )}
                         <div className="tier-header">
                           <h4>{tier.tier === 'short' ? 'Short' : tier.tier === 'standard' ? 'Standard' : 'Premium'}</h4>
                           <span className="tier-price">${tier.cost}</span>
                         </div>
                         <div className="tier-details">
-                          <p>{tier.duration_seconds}초 영상</p>
-                          <p>{tier.cut_count}개 컷</p>
-                          <p className="tier-description">{tier.description}</p>
+                          <p>{tier.duration_seconds}초 · {tier.cut_count}컷</p>
                         </div>
                       </div>
                     ))}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api, { youtubeAPI, facebookAPI, instagramAPI, twitterAPI } from '../../services/api';
+import api, { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI } from '../../services/api';
 import './Settings.css';
 
 function Settings() {
@@ -9,6 +9,7 @@ function Settings() {
   const [facebookConnection, setFacebookConnection] = useState(null);
   const [instagramConnection, setInstagramConnection] = useState(null);
   const [twitterConnection, setTwitterConnection] = useState(null);
+  const [threadsConnection, setThreadsConnection] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState({ open: false, type: null });
@@ -61,6 +62,15 @@ function Settings() {
       }
     };
 
+    const fetchThreadsStatus = async () => {
+      try {
+        const data = await threadsAPI.getStatus();
+        setThreadsConnection(data);
+      } catch (err) {
+        console.error('Failed to fetch Threads status:', err);
+      }
+    };
+
     const fetchProfile = async () => {
       try {
         const response = await api.get('/api/user/profile');
@@ -76,6 +86,7 @@ function Settings() {
     fetchFacebookStatus();
     fetchInstagramStatus();
     fetchTwitterStatus();
+    fetchThreadsStatus();
     fetchProfile();
   }, []);
 
@@ -399,7 +410,7 @@ function Settings() {
       <div className="settings-section">
         <div className="section-header">
           <h3>소셜 미디어 플랫폼</h3>
-          <span className="section-count">4개 플랫폼</span>
+          <span className="section-count">5개 플랫폼</span>
         </div>
         <p className="section-description">소셜 미디어 플랫폼을 연동하여 콘텐츠를 관리하세요.</p>
         <div className="platform-list">
@@ -453,6 +464,19 @@ function Settings() {
             </div>
             <span className="btn-connect">
               {twitterConnection ? '관리하기' : '연동하기'}
+            </span>
+          </Link>
+          <Link to="/threads" className={`platform-item ${threadsConnection ? 'connected' : ''}`}>
+            <div className="platform-info">
+              <div className="platform-name">Threads</div>
+              <div className="platform-status">
+                {threadsConnection
+                  ? `연동됨 - @${threadsConnection.username}`
+                  : '연동 가능'}
+              </div>
+            </div>
+            <span className="btn-connect">
+              {threadsConnection ? '관리하기' : '연동하기'}
             </span>
           </Link>
         </div>

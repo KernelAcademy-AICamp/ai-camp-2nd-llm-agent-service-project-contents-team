@@ -23,6 +23,9 @@ class AIContentSaveRequest(BaseModel):
     input_text: Optional[str] = None
     input_image_count: int = 0
 
+    # 생성된 이미지 URL 목록
+    generated_image_urls: Optional[List[str]] = None
+
     # 블로그 콘텐츠
     blog_title: str
     blog_content: str
@@ -50,6 +53,7 @@ class AIContentResponse(BaseModel):
     user_id: int
     input_text: Optional[str]
     input_image_count: int
+    generated_image_urls: Optional[List[str]]
     blog_title: str
     blog_content: str
     blog_tags: Optional[List[str]]
@@ -83,6 +87,7 @@ async def save_ai_content(
             user_id=current_user.id,
             input_text=request.input_text,
             input_image_count=request.input_image_count,
+            generated_image_urls=request.generated_image_urls,
             blog_title=request.blog_title,
             blog_content=request.blog_content,
             blog_tags=request.blog_tags,
@@ -107,6 +112,7 @@ async def save_ai_content(
             user_id=content.user_id,
             input_text=content.input_text,
             input_image_count=content.input_image_count,
+            generated_image_urls=content.generated_image_urls,
             blog_title=content.blog_title,
             blog_content=content.blog_content,
             blog_tags=content.blog_tags,
@@ -148,6 +154,7 @@ async def list_ai_contents(
             user_id=c.user_id,
             input_text=c.input_text,
             input_image_count=c.input_image_count,
+            generated_image_urls=c.generated_image_urls,
             blog_title=c.blog_title,
             blog_content=c.blog_content,
             blog_tags=c.blog_tags,
@@ -187,6 +194,7 @@ async def get_ai_content(
         user_id=content.user_id,
         input_text=content.input_text,
         input_image_count=content.input_image_count,
+        generated_image_urls=content.generated_image_urls,
         blog_title=content.blog_title,
         blog_content=content.blog_content,
         blog_tags=content.blog_tags,

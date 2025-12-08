@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI } from '../../services/api';
 import './Dashboard.css';
 
 function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [snsStatus, setSnsStatus] = useState({
     youtube: { loading: true, connected: false, data: null, videos: [], analytics: null },
     facebook: { loading: true, connected: false, data: null, posts: [] },
@@ -219,10 +221,19 @@ function Dashboard() {
   // 연동된 SNS가 없는 경우 안내 메시지
   const hasNoConnections = !statsLoading && calculatedStats.connectedCount === 0;
 
+  // 시간대별 인사말
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return '좋은 아침이에요';
+    if (hour < 18) return '좋은 오후예요';
+    return '좋은 저녁이에요';
+  };
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
         <h2>Dashboard</h2>
+        <p className="dashboard-greeting">{getGreeting()}, {user?.username || 'User'}님!</p>
       </div>
 
       <div className="stats-grid">

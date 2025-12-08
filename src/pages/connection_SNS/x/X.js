@@ -14,16 +14,13 @@ function X() {
   const [activeTab, setActiveTab] = useState('posts');
   const [error, setError] = useState(null);
 
-  // URL 파라미터 확인 (연동 성공/실패)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('connected') === 'true') {
-      setError(null);
-      window.history.replaceState({}, '', '/x');
-    }
-    if (params.get('error')) {
-      setError('X 연동에 실패했습니다. 다시 시도해주세요.');
-      window.history.replaceState({}, '', '/x');
+  // 포스트 목록 조회
+  const fetchPosts = useCallback(async () => {
+    try {
+      const data = await xAPI.getPosts(0, 50);
+      setPosts(data || []);
+    } catch (err) {
+      console.error('Failed to fetch posts:', err);
     }
   }, []);
 
@@ -40,19 +37,22 @@ function X() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchPosts]);
 
-  // 포스트 목록 조회
-  const fetchPosts = async () => {
-    try {
-      const data = await xAPI.getPosts(0, 50);
-      setPosts(data || []);
-    } catch (err) {
-      console.error('Failed to fetch posts:', err);
-    }
-  };
-
+  // 초기 로드 및 URL 파라미터 확인
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get('connected') === 'true') {
+      setError(null);
+      window.history.replaceState({}, '', '/x');
+    }
+    if (params.get('error')) {
+      setError('X 연동에 실패했습니다. 다시 시도해주세요.');
+      window.history.replaceState({}, '', '/x');
+    }
+
+    // 상태 가져오기
     fetchStatus();
   }, [fetchStatus]);
 

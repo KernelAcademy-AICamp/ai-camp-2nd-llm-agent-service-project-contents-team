@@ -444,3 +444,49 @@ async def get_session_messages(
             status_code=500,
             detail=f"세션 메시지 조회 중 오류가 발생했습니다: {str(e)}"
         )
+
+
+@router.delete("/chat/sessions/{session_id}")
+async def delete_chat_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """
+    채팅 세션 삭제
+    세션과 관련된 모든 메시지도 함께 삭제됩니다.
+    """
+    try:
+        logger.info(f"채팅 세션 삭제 요청 (user_id: {current_user.id}, session_id: {session_id})")
+
+        # 세션 조회 및 소유권 확인
+        session = db.query(models.ChatSession).filter(
+            models.ChatSession.id == session_id,
+            models.ChatSession.user_id == current_user.id
+        ).first()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
+
+        # 관련 메시지 먼저 삭제
+        deleted_messages = db.query(models.ChatMessage).filter(
+            models.ChatMessage.session_id == session_id
+        ).delete()
+
+        # 세션 삭제
+        db.delete(session)
+        db.commit()
+
+        logger.info(f"채팅 세션 삭제 완료 (session_id: {session_id}, deleted_messages: {deleted_messages})")
+
+        return {"message": "세션이 삭제되었습니다.", "deleted_messages": deleted_messages}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"채팅 세션 삭제 실패: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"세션 삭제 중 오류가 발생했습니다: {str(e)}"
+        )

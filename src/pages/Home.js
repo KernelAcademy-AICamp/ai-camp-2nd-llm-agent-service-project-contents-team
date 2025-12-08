@@ -170,6 +170,30 @@ function Home() {
     loadSessionHistory(sessionId);
   };
 
+  // 세션 삭제
+  const handleDeleteSession = async (e, sessionId) => {
+    e.stopPropagation(); // 클릭 이벤트 전파 방지
+
+    if (!window.confirm('이 대화를 삭제하시겠습니까?')) return;
+
+    try {
+      await api.delete(`/api/chat/sessions/${sessionId}`);
+
+      // 삭제된 세션이 현재 보고 있는 세션이면 초기화
+      if (currentSessionId === sessionId) {
+        setMessages([]);
+        setCurrentSessionId(null);
+        setFollowUpPrompts([]);
+      }
+
+      // 세션 목록 갱신
+      loadSessions();
+    } catch (error) {
+      console.error('세션 삭제 실패:', error);
+      alert('대화 삭제에 실패했습니다.');
+    }
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -187,7 +211,7 @@ function Home() {
   const contentTools = [
     { label: '글 생성', path: '/ai-content' },
     { label: '이미지', path: '/image' },
-    { label: '동영상', path: '/video' },
+    { label: '동영상', path: '/ai-video' },
   ];
 
   // AI 응답에서 콘텐츠 생성 관련 키워드 감지
@@ -398,13 +422,6 @@ function Home() {
     }
   };
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return '좋은 아침이에요';
-    if (hour < 18) return '좋은 오후예요';
-    return '좋은 저녁이에요';
-  };
-
   return (
     <div className="home-page">
       {/* 왼쪽 채팅 히스토리 사이드바 */}
@@ -443,8 +460,17 @@ function Home() {
                 className={`sidebar-session-item ${currentSessionId === session.id ? 'active' : ''}`}
                 onClick={() => handleSelectSession(session.id)}
               >
-                <div className="session-title">{session.title}</div>
-                <div className="session-time">{formatDate(session.updated_at)}</div>
+                <div className="session-info">
+                  <div className="session-title">{session.title}</div>
+                  <div className="session-time">{formatDate(session.updated_at)}</div>
+                </div>
+                <button
+                  className="session-delete-btn"
+                  onClick={(e) => handleDeleteSession(e, session.id)}
+                  title="대화 삭제"
+                >
+                  ✕
+                </button>
               </div>
             ))
           )}
@@ -466,14 +492,59 @@ function Home() {
             <div className="welcome-avatar">
               <img src="/ddukddak_colored.png" alt="로고" className="avatar-logo" />
             </div>
-            <h1 className="welcome-title">
-              {getGreeting()}, {user?.username || 'User'}님!
-            </h1>
             <p className="welcome-subtitle">
-              오늘도 멋진 콘텐츠를 만들어볼까요?
+              궁금한 점이 있으시면 언제든 물어보세요!
             </p>
           </div>
 
+          {/* 가이드 질문 버튼들 */}
+          <div className="guide-prompts">
+            <p className="guide-prompts-label">이런 것들을 물어보세요</p>
+            <div className="guide-prompts-grid">
+              <button
+                className="guide-prompt-btn"
+                onClick={() => handleFollowUpClick('이 서비스는 어떻게 사용하나요?')}
+              >
+                <span className="guide-icon">🚀</span>
+                <span className="guide-text">서비스 시작하기</span>
+              </button>
+              <button
+                className="guide-prompt-btn"
+                onClick={() => handleFollowUpClick('AI로 글을 생성하고 싶어요')}
+              >
+                <span className="guide-icon">✍️</span>
+                <span className="guide-text">AI 글 생성하기</span>
+              </button>
+              <button
+                className="guide-prompt-btn"
+                onClick={() => handleFollowUpClick('AI 이미지는 어떻게 만드나요?')}
+              >
+                <span className="guide-icon">🎨</span>
+                <span className="guide-text">AI 이미지 만들기</span>
+              </button>
+              <button
+                className="guide-prompt-btn"
+                onClick={() => handleFollowUpClick('SNS 계정 연동은 어떻게 하나요?')}
+              >
+                <span className="guide-icon">🔗</span>
+                <span className="guide-text">SNS 연동하기</span>
+              </button>
+              <button
+                className="guide-prompt-btn"
+                onClick={() => handleFollowUpClick('AI 동영상은 어떻게 만드나요?')}
+              >
+                <span className="guide-icon">🎬</span>
+                <span className="guide-text">AI 동영상 만들기</span>
+              </button>
+              <button
+                className="guide-prompt-btn"
+                onClick={() => handleFollowUpClick('템플릿은 어떻게 사용하나요?')}
+              >
+                <span className="guide-icon">📋</span>
+                <span className="guide-text">템플릿 사용법</span>
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="chat-messages">

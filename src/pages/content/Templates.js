@@ -196,7 +196,7 @@ function Templates() {
     const routes = {
       text: '/ai-content',
       image: '/image',
-      video: '/video'
+      video: '/ai-video'
     };
 
     navigate(routes[template.type], {

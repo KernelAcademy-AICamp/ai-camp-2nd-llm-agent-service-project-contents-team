@@ -19,10 +19,13 @@ import MyPage from './pages/profile/MyPage';
 import AIContentGenerator from './pages/content/AIContentGenerator';
 import ImageGenerator from './pages/content/ImageGenerator';
 import AIVideoGenerator from './pages/content/AIVideoGenerator';
+import ContentHub from './pages/content/ContentHub';
+import ContentCreatorSimple from './pages/content/ContentCreatorSimple';
 import YouTube from './pages/connection_SNS/youtube/YouTube';
 import Facebook from './pages/connection_SNS/facebook/Facebook';
 import Instagram from './pages/connection_SNS/instagram/Instagram';
 import X from './pages/connection_SNS/x/X';
+import Threads from './pages/connection_SNS/threads/Threads';
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import DeleteData from './pages/legal/DeleteData';
 import './App.css';
@@ -59,12 +62,32 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard"
             element={
               <ProtectedRoute>
                 <Layout>
                   <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/content"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ContentHub />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/create"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ContentCreatorSimple />
                 </Layout>
               </ProtectedRoute>
             }
@@ -205,6 +228,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <X />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/threads"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Threads />
                 </Layout>
               </ProtectedRoute>
             }

@@ -1,0 +1,533 @@
+/* ========================================
+   THREADS PAGE - CLEAN STYLE
+   ======================================== */
+
+.threads-page {
+  padding: var(--space-lg);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.threads-header {
+  margin-bottom: var(--space-xl);
+}
+
+.threads-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.threads-header p {
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+/* Error Message */
+.threads-page .error-message {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md);
+  background: var(--error-light);
+  border: 1px solid var(--error-color);
+  margin-bottom: var(--space-lg);
+  color: var(--error-dark);
+  font-weight: 500;
+}
+
+.threads-page .error-message button {
+  background: transparent;
+  border: none;
+  color: var(--error-dark);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Loading */
+.threads-page .loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+  font-size: 14px;
+  color: var(--text-tertiary);
+}
+
+/* Connect Section */
+.threads-page .connect-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 500px;
+}
+
+.threads-page .connect-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: var(--space-2xl);
+  text-align: center;
+  max-width: 500px;
+}
+
+.threads-page .connect-icon {
+  margin-bottom: var(--space-lg);
+  color: #000000;
+}
+
+.threads-page .connect-card h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+}
+
+.threads-page .connect-card p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-lg);
+  line-height: 1.6;
+}
+
+.threads-page .feature-list {
+  text-align: left;
+  margin-bottom: var(--space-xl);
+  padding-left: var(--space-lg);
+}
+
+.threads-page .feature-list li {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+  line-height: 1.5;
+}
+
+.btn-connect-threads {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-md) var(--space-xl);
+  background: #000000;
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-connect-threads:hover {
+  background: #1a1a1a;
+}
+
+.btn-connect-threads svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Account Info Card */
+.threads-page .account-info-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.threads-page .account-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.threads-page .account-thumbnail {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.threads-page .account-details {
+  flex: 1;
+}
+
+.threads-page .account-details h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.threads-page .account-url {
+  font-size: 13px;
+  color: var(--bauhaus-blue);
+  text-decoration: none;
+  display: block;
+  margin-bottom: var(--space-sm);
+}
+
+.threads-page .account-url:hover {
+  text-decoration: underline;
+}
+
+.threads-page .account-bio {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: var(--space-sm);
+}
+
+.threads-page .account-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.threads-page .btn-secondary {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.threads-page .btn-secondary:hover:not(:disabled) {
+  background: var(--bg-secondary);
+}
+
+.threads-page .btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.threads-page .btn-danger {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--error-color);
+  color: var(--error-color);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.threads-page .btn-danger:hover {
+  background: var(--error-color);
+  color: white;
+}
+
+.threads-page .account-stats-bar {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-color);
+}
+
+.threads-page .stat-item {
+  text-align: center;
+}
+
+.threads-page .stat-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.threads-page .stat-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* Tab Navigation */
+.threads-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.threads-tabs .tab-btn {
+  padding: var(--space-sm) var(--space-md);
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease;
+}
+
+.threads-tabs .tab-btn:hover {
+  color: #000000;
+}
+
+.threads-tabs .tab-btn.active {
+  color: #000000;
+}
+
+.threads-tabs .tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #000000;
+}
+
+/* Posts Section */
+.threads-page .posts-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.threads-page .posts-section .section-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.threads-page .empty-state {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-tertiary);
+}
+
+/* Post List */
+.threads-page .post-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.threads-page .post-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  transition: border-color 0.15s ease;
+}
+
+.threads-page .post-card:hover {
+  border-color: #000000;
+}
+
+.threads-page .post-content {
+  margin-bottom: var(--space-md);
+}
+
+.threads-page .post-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.threads-page .post-media {
+  margin-top: var(--space-md);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.threads-page .post-media img,
+.threads-page .post-media video {
+  width: 100%;
+  max-height: 400px;
+  object-fit: cover;
+}
+
+.threads-page .post-stats {
+  display: flex;
+  gap: var(--space-lg);
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-sm);
+}
+
+.threads-page .post-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.threads-page .post-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.threads-page .view-on-threads {
+  font-size: 12px;
+  color: var(--bauhaus-blue);
+  text-decoration: none;
+}
+
+.threads-page .view-on-threads:hover {
+  text-decoration: underline;
+}
+
+/* Compose Section */
+.threads-page .compose-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-lg);
+}
+
+.threads-page .compose-form {
+  max-width: 600px;
+}
+
+.threads-page .compose-form .form-group {
+  margin-bottom: var(--space-md);
+  position: relative;
+}
+
+.threads-page .compose-form label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.threads-page .compose-form textarea {
+  width: 100%;
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  font-size: 16px;
+  color: var(--text-primary);
+  resize: vertical;
+  min-height: 120px;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.threads-page .compose-form textarea:focus {
+  outline: none;
+  border-color: #000000;
+}
+
+.threads-page .compose-form textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.threads-page .compose-form input[type="url"] {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: border-color 0.15s ease;
+}
+
+.threads-page .compose-form input[type="url"]:focus {
+  outline: none;
+  border-color: #000000;
+}
+
+.threads-page .char-count {
+  text-align: right;
+  margin-top: var(--space-xs);
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.threads-page .char-count .warning {
+  color: var(--error-color);
+  font-weight: 600;
+}
+
+/* Media Preview */
+.threads-page .media-preview {
+  position: relative;
+  margin-bottom: var(--space-md);
+  display: inline-block;
+}
+
+.threads-page .media-preview img {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+/* Compose Actions */
+.threads-page .compose-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+}
+
+.threads-page .btn-post {
+  padding: var(--space-sm) var(--space-xl);
+  background: #000000;
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.threads-page .btn-post:hover:not(:disabled) {
+  background: #1a1a1a;
+}
+
+.threads-page .btn-post:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .threads-page {
+    padding: var(--space-md);
+  }
+
+  .threads-page .connect-card {
+    padding: var(--space-lg);
+  }
+
+  .threads-page .account-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .threads-page .account-actions {
+    justify-content: center;
+  }
+
+  .threads-page .account-stats-bar {
+    gap: var(--space-lg);
+  }
+
+  .threads-page .post-stats {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .threads-page .compose-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .threads-page .btn-post {
+    width: 100%;
+    text-align: center;
+  }
+}

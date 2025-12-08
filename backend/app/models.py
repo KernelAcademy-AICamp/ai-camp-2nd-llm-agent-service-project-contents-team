@@ -46,6 +46,7 @@ class User(Base):
     facebook_connection = relationship("FacebookConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     instagram_connection = relationship("InstagramConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     x_connection = relationship("XConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    threads_connection = relationship("ThreadsConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     ai_generated_contents = relationship("AIGeneratedContent", back_populates="user", cascade="all, delete-orphan")
     sns_published_contents = relationship("SNSPublishedContent", back_populates="user", cascade="all, delete-orphan")
 
@@ -707,6 +708,9 @@ class AIGeneratedContent(Base):
     input_text = Column(Text, nullable=True)  # 사용자 입력 텍스트
     input_image_count = Column(Integer, default=0)  # 업로드된 이미지 개수
 
+    # 생성된 이미지 URL 목록
+    generated_image_urls = Column(JSON, nullable=True)  # ["url1", "url2", ...]
+
     # 블로그 콘텐츠
     blog_title = Column(String, nullable=False)  # 블로그 제목
     blog_content = Column(Text, nullable=False)  # 블로그 본문 (마크다운)
@@ -773,3 +777,81 @@ class SNSPublishedContent(Base):
     # Relationships
     user = relationship("User", back_populates="sns_published_contents")
     ai_content = relationship("AIGeneratedContent", backref="sns_publications")
+
+
+class ThreadsConnection(Base):
+    """
+    Threads 계정 연동 정보 모델
+    - Meta의 Threads API를 사용한 OAuth 연동
+    - Instagram 계정과 연결된 Threads 프로필
+    """
+    __tablename__ = "threads_connections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+
+    # Threads 사용자 정보
+    threads_user_id = Column(String, nullable=False, index=True)  # Threads 사용자 ID
+    username = Column(String, nullable=True)  # @username
+    name = Column(String, nullable=True)  # 표시 이름
+    threads_profile_picture_url = Column(String, nullable=True)  # 프로필 이미지 URL
+    threads_biography = Column(Text, nullable=True)  # 자기소개
+
+    # 계정 통계
+    followers_count = Column(Integer, default=0)  # 팔로워 수
+
+    # OAuth 토큰 정보
+    access_token = Column(Text, nullable=False)  # 액세스 토큰
+    refresh_token = Column(Text, nullable=True)  # 리프레시 토큰 (장기 토큰)
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)  # 토큰 만료 시간
+
+    # 연동 상태
+    is_active = Column(Boolean, default=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="threads_connection")
+    posts = relationship("ThreadsPost", back_populates="connection", cascade="all, delete-orphan")
+
+
+class ThreadsPost(Base):
+    """
+    Threads 포스트 모델
+    - 연동된 계정의 포스트 목록 및 통계
+    """
+    __tablename__ = "threads_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    connection_id = Column(Integer, ForeignKey("threads_connections.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # 포스트 기본 정보
+    threads_post_id = Column(String, nullable=False, unique=True, index=True)  # Threads 미디어 ID
+    media_type = Column(String, nullable=True)  # TEXT_POST, IMAGE, VIDEO, CAROUSEL
+    media_url = Column(String, nullable=True)  # 미디어 URL
+    thumbnail_url = Column(String, nullable=True)  # 썸네일 URL (비디오용)
+    permalink = Column(String, nullable=True)  # 포스트 링크
+    text = Column(Text, nullable=True)  # 포스트 텍스트
+    timestamp = Column(DateTime(timezone=True), nullable=True)  # 게시 시간
+
+    # 포스트 상태
+    is_quote_post = Column(Boolean, default=False)  # 인용 포스트 여부
+
+    # 포스트 통계
+    like_count = Column(Integer, default=0)  # 좋아요 수
+    reply_count = Column(Integer, default=0)  # 답글 수
+    repost_count = Column(Integer, default=0)  # 리포스트 수
+    quote_count = Column(Integer, default=0)  # 인용 포스트 수
+    views_count = Column(Integer, default=0)  # 조회수
+
+    # 동기화 정보
+    last_stats_updated_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    connection = relationship("ThreadsConnection", back_populates="posts")

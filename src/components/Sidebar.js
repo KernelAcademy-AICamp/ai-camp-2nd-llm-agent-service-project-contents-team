@@ -8,14 +8,13 @@ function Sidebar() {
   const [isContentMenuOpen, setIsContentMenuOpen] = useState(false);
 
   const menuItems = [
-    { path: '/home', label: '홈' },
+    { path: '/home', label: '뚝딱 도우미' },
     { path: '/dashboard', label: '대시보드' },
   ];
 
   const contentMenuItems = [
-    { path: '/ai-content', label: 'AI 글 생성' },
-    { path: '/image', label: 'AI 이미지 생성' },
-    { path: '/video', label: 'AI 동영상 생성' },
+    { path: '/create', label: '글 + 이미지 생성' },
+    { path: '/ai-video', label: 'AI 동영상 생성' },
   ];
 
   const platformMenuItems = [
@@ -23,6 +22,7 @@ function Sidebar() {
     { path: '/facebook', label: 'Facebook' },
     { path: '/instagram', label: 'Instagram' },
     { path: '/x', label: 'X' },
+    { path: '/threads', label: 'Threads' },
   ];
 
   const managementMenuItems = [
@@ -31,7 +31,7 @@ function Sidebar() {
     { path: '/settings', label: '설정' },
   ];
 
-  const isContentMenuActive = contentMenuItems.some(item =>
+  const isContentMenuActive = location.pathname === '/content' || contentMenuItems.some(item =>
     location.pathname === item.path
   );
 
@@ -75,13 +75,20 @@ function Sidebar() {
 
         {/* 콘텐츠 생성 드롭다운 */}
         <div className="sidebar-dropdown">
-          <button
-            className={`sidebar-item sidebar-dropdown-trigger ${isContentMenuActive ? 'active' : ''}`}
-            onClick={toggleContentMenu}
-          >
-            <span className="sidebar-label">콘텐츠 생성</span>
-            <span className={`sidebar-dropdown-arrow ${isContentMenuOpen ? 'open' : ''}`}>▼</span>
-          </button>
+          <div className="sidebar-dropdown-header">
+            <Link
+              to="/content"
+              className={`sidebar-item sidebar-dropdown-trigger ${isContentMenuActive ? 'active' : ''}`}
+            >
+              <span className="sidebar-label">콘텐츠 생성</span>
+            </Link>
+            <button
+              className={`sidebar-dropdown-toggle ${isContentMenuOpen ? 'open' : ''}`}
+              onClick={toggleContentMenu}
+            >
+              ▼
+            </button>
+          </div>
 
           {isContentMenuOpen && (
             <div className="sidebar-dropdown-menu">
