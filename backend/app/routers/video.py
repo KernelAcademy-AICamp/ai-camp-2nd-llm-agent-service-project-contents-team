@@ -8,6 +8,8 @@ import re
 import httpx
 import urllib.parse
 import google.generativeai as genai
+from google import genai as vertex_genai  # Vertex AI용 genai
+from google.genai import types
 
 from .. import models, auth
 from ..database import get_db
@@ -671,8 +673,6 @@ async def generate_veo31_video(
     logger.info(f"Veo 3.1 동영상 생성 시작 (user_id: {current_user.id}, prompt: {request.prompt[:50]}..., has_image: {has_image})")
 
     try:
-        from google import genai
-        from google.genai import types
         import base64
 
         # 한글 프롬프트 영어로 번역
@@ -691,8 +691,13 @@ async def generate_veo31_video(
             except Exception as e:
                 logger.warning(f"번역 실패 (원본 프롬프트 사용): {e}")
 
-        # Veo 3.1 클라이언트 생성
-        client = genai.Client(api_key=google_api_key)
+        # Vertex AI Veo 3.1 클라이언트 생성
+        client = vertex_genai.Client(
+            vertexai=True,
+            project=os.getenv("GOOGLE_CLOUD_PROJECT"),
+            location=os.getenv("GOOGLE_CLOUD_LOCATION")
+        )
+        logger.info(f"Using Vertex AI: project={os.getenv('GOOGLE_CLOUD_PROJECT')}, location={os.getenv('GOOGLE_CLOUD_LOCATION')}")
 
         # 이미지 데이터 처리 (있는 경우)
         image_obj = None

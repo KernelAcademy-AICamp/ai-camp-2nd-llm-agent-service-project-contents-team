@@ -83,14 +83,6 @@ class VideoGenerationJobResponse(BaseModel):
         from_attributes = True
 
 
-class ProductAnalysisResponse(BaseModel):
-    """제품 분석 결과 응답"""
-    recommended_tier: str  # short, standard, premium
-    confidence: float  # 0.0 ~ 1.0
-    reason: str
-    analysis: dict  # 제품 특징, 복잡도 등
-
-
 # ===== 티어 설정 =====
 
 TIER_CONFIG = {
@@ -137,121 +129,6 @@ async def get_tier_options():
     ]
 
 
-@router.post("/analyze-product", response_model=ProductAnalysisResponse)
-async def analyze_product(
-    product_name: str = Form(...),
-    product_description: Optional[str] = Form(None),
-    image: UploadFile = File(...),
-    current_user: models.User = Depends(auth.get_current_active_user)
-):
-    """
-    제품 분석 및 티어 추천
-    AI가 제품 이미지와 정보를 분석하여 최적의 티어를 추천합니다.
-    """
-    try:
-        logger.info(f"Analyzing product for user {current_user.id}: {product_name}")
-        logger.info(f"STEP 1: Reading uploaded image file")
-
-        # 업로드된 이미지를 직접 읽어서 base64로 인코딩 (Cloudinary 사용 안 함)
-        import base64
-
-        # 파일 내용 읽기
-        image_content = await image.read()
-        logger.info(f"STEP 2: Image file read, size: {len(image_content)} bytes")
-
-        # Content type 확인
-        content_type = image.content_type or "image/jpeg"
-        media_type = content_type.split("/")[-1]
-
-        # base64 인코딩
-        image_base64 = base64.b64encode(image_content).decode("utf-8")
-
-        logger.info(f"STEP 3: Image encoded to base64, size: {len(image_base64)} chars")
-
-        # Gemini API 호출하여 제품 분석
-        logger.info(f"STEP 4: Using Gemini 2.5 Flash for product analysis")
-
-        # Gemini 모델 초기화 (이미 모듈 레벨에서 genai.configure 되어있음)
-        model = genai.GenerativeModel("gemini-2.5-flash")
-
-        # PIL Image 객체로 변환 (Gemini는 PIL Image를 선호)
-        from PIL import Image as PILImage
-        pil_image = PILImage.open(io.BytesIO(image_content))
-        logger.info(f"STEP 5: Converted to PIL Image, size: {pil_image.size}")
-
-        prompt = f"""당신은 마케팅 비디오 제작 전문가입니다.
-제품 이미지와 정보를 분석하여 최적의 비디오 길이(티어)를 추천해주세요.
-
-**제품 정보:**
-- 제품명: {product_name}
-- 제품 설명: {product_description or '제공되지 않음'}
-
-**티어 옵션:**
-- short: 15초, 4컷 - 심플한 제품, 단일 특징 강조
-- standard: 25초, 6컷 - 일반적인 제품, 여러 특징 소개
-- premium: 40초, 8컷 - 복잡한 제품, 스토리텔링 필요
-
-**분석 기준:**
-1. 제품 복잡도 (단순 vs 복잡)
-2. 전달할 정보량 (적음 vs 많음)
-3. 타겟 플랫폼 (숏폼 vs 일반)
-4. 시각적 요소 (단순 vs 다양)
-
-**응답 형식 (JSON만 반환):**
-{{
-  "recommended_tier": "standard",
-  "confidence": 0.85,
-  "reason": "이 제품은 여러 특징이 있어 6개 컷으로 충분히 소개할 수 있습니다.",
-  "analysis": {{
-    "complexity": "medium",
-    "features_count": 3,
-    "visual_richness": "high",
-    "suggested_platform": "instagram_reels"
-  }}
-}}
-
-위 제품 이미지를 분석하고 최적의 비디오 티어를 추천해주세요. JSON만 반환하세요."""
-
-        # Gemini API 호출
-        response = model.generate_content([prompt, pil_image])
-
-        # 응답 파싱
-        response_text = response.text
-        logger.info(f"Gemini analysis response: {response_text[:200]}...")
-
-        # JSON 파싱
-        if "```json" in response_text:
-            json_start = response_text.find("```json") + 7
-            json_end = response_text.find("```", json_start)
-            response_text = response_text[json_start:json_end].strip()
-        elif "```" in response_text:
-            json_start = response_text.find("```") + 3
-            json_end = response_text.find("```", json_start)
-            response_text = response_text[json_start:json_end].strip()
-
-        result = json.loads(response_text)
-
-        # 응답 검증
-        if result["recommended_tier"] not in TIER_CONFIG:
-            result["recommended_tier"] = "standard"  # 기본값
-
-        logger.info(f"Recommended tier for '{product_name}': {result['recommended_tier']} (confidence: {result['confidence']})")
-
-        return ProductAnalysisResponse(
-            recommended_tier=result["recommended_tier"],
-            confidence=result.get("confidence", 0.8),
-            reason=result["reason"],
-            analysis=result.get("analysis", {})
-        )
-
-    except Exception as e:
-        logger.error(f"Error analyzing product: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to analyze product: {str(e)}"
-        )
-
-
 def run_pipeline_in_background(job_id: int):
     """
     백그라운드에서 비디오 생성 파이프라인을 실행하는 래퍼 함수
@@ -296,7 +173,7 @@ async def create_video_generation_job(
     tier_config = TIER_CONFIG[tier]
 
     try:
-        # 1. 이미지를 로컬 파일 시스템에 저장
+        # 1. 이미지를 로컬 파일 시스템에 저장 (backend/uploads/)
         logger.info(f"Saving product image for user {current_user.id} to local filesystem")
 
         # 업로드 디렉토리 생성
@@ -327,7 +204,11 @@ async def create_video_generation_job(
             cut_count=tier_config["cut_count"],
             duration_seconds=tier_config["duration_seconds"],
             cost=tier_config["cost"],
-            status="pending"
+            status="pending",
+            # 실제 사용하는 모델명 명시
+            planning_model="gemini-2.5-flash",
+            image_model="gemini-2.5-flash-image",
+            video_model="veo-3.1-fast-generate-001"
         )
         db.add(job)
         db.commit()
