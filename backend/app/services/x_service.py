@@ -15,6 +15,11 @@ from ..logger import get_logger
 logger = get_logger(__name__)
 
 
+class XTokenExpiredError(Exception):
+    """X 토큰이 만료되어 갱신할 수 없을 때 발생하는 예외"""
+    pass
+
+
 # X API v2 기본 URL
 X_API_URL = "https://api.twitter.com/2"
 X_TOKEN_URL = "https://api.twitter.com/2/oauth2/token"
@@ -86,10 +91,13 @@ class XService:
                 new_token = await self._refresh_access_token()
                 if new_token:
                     return await self._make_request(method, url, params, json_data, retry_on_401=False)
-                return None
+                # 토큰 갱신 실패 - 예외 발생
+                logger.error("X token expired and refresh failed - need to reconnect")
+                raise XTokenExpiredError("X 토큰이 만료되었습니다. 다시 연동해주세요.")
 
             if response.status_code >= 400:
-                logger.error(f"X API error: {response.status_code} - {response.text}")
+                logger.error(f"X API error: {response.status_code} - URL: {url}")
+                logger.error(f"X API response: {response.text}")
                 return None
 
             # DELETE 요청은 빈 응답일 수 있음
@@ -144,7 +152,14 @@ class XService:
         if pagination_token:
             params["pagination_token"] = pagination_token
 
-        return await self._make_request("GET", url, params=params)
+        logger.info(f"Fetching tweets for user_id: {user_id}")
+        result = await self._make_request("GET", url, params=params)
+        if result:
+            tweet_count = len(result.get("data", []))
+            logger.info(f"Fetched {tweet_count} tweets from X API")
+        else:
+            logger.warning(f"No tweets returned from X API for user_id: {user_id}")
+        return result
 
     async def get_tweet_by_id(self, tweet_id: str) -> Optional[Dict]:
         """트윗 ID로 상세 정보 조회"""
@@ -244,9 +259,19 @@ async def sync_x_posts(
 
     result = await service.get_user_tweets(connection.x_user_id, max_results=max_posts)
     if not result or "data" not in result:
+        logger.warning(f"No data in result: {result}")
         return 0
 
     posts_data = result["data"]
+    logger.info(f"Processing {len(posts_data)} posts from X API")
+
+    # 각 포스트 정보 로깅 (디버깅용)
+    for idx, post in enumerate(posts_data):
+        is_retweet = "referenced_tweets" in post and any(
+            ref.get("type") == "retweeted" for ref in post.get("referenced_tweets", [])
+        )
+        logger.info(f"Post {idx+1}: id={post.get('id')}, is_retweet={is_retweet}, text={post.get('text', '')[:50]}...")
+
     media_dict = {}
 
     # 미디어 정보 매핑

@@ -87,7 +87,14 @@ function X() {
       fetchPosts();
       fetchStatus();
     } catch (err) {
-      setError('동기화에 실패했습니다.');
+      // 401 에러 시 토큰 만료로 자동 연동 해제됨
+      if (err.response?.status === 401) {
+        setError('X 토큰이 만료되어 연동이 해제되었습니다. 다시 연동해주세요.');
+        setConnection(null);
+        setPosts([]);
+      } else {
+        setError('동기화에 실패했습니다.');
+      }
     } finally {
       setSyncing(false);
     }

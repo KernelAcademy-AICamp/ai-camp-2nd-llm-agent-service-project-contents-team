@@ -8,7 +8,8 @@ import re
 import httpx
 import urllib.parse
 import google.generativeai as genai
-from google import genai as vertex_genai  # Vertex AI용 genai
+# google-genai 패키지 (Vertex AI용)
+from google import genai as vertex_genai
 from google.genai import types
 
 from .. import models, auth

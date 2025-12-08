@@ -16,11 +16,19 @@ from pydantic import BaseModel
 from ..database import get_db
 from ..auth import get_current_user
 from ..models import User, XConnection, XPost
-from ..services.x_service import XService, sync_x_user_info, sync_x_posts
+from ..services.x_service import XService, sync_x_user_info, sync_x_posts, XTokenExpiredError
 from ..logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/x", tags=["x"])
+
+
+def auto_disconnect_x(db: Session, connection: XConnection, user_id: int):
+    """토큰 만료 시 자동 연동 해제"""
+    logger.info(f"Auto-disconnecting X for user {user_id} due to token expiration")
+    db.query(XPost).filter(XPost.connection_id == connection.id).delete()
+    db.delete(connection)
+    db.commit()
 
 # X API 설정
 X_CLIENT_ID = os.getenv("X_CLIENT_ID")
@@ -290,14 +298,21 @@ async def refresh_x_info(
     if not connection:
         raise HTTPException(status_code=404, detail="X connection not found")
 
-    service = XService(connection.access_token, connection.refresh_token)
-    success = await sync_x_user_info(db, connection, service)
+    try:
+        service = XService(connection.access_token, connection.refresh_token)
+        success = await sync_x_user_info(db, connection, service)
 
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to refresh X info")
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to refresh X info")
 
-    db.refresh(connection)
-    return connection
+        db.refresh(connection)
+        return connection
+    except XTokenExpiredError:
+        auto_disconnect_x(db, connection, current_user.id)
+        raise HTTPException(
+            status_code=401,
+            detail="X 토큰이 만료되었습니다. 다시 연동해주세요."
+        )
 
 
 # ===== 포스트 API =====
@@ -354,10 +369,17 @@ async def sync_posts(
     if not connection:
         raise HTTPException(status_code=404, detail="X connection not found")
 
-    service = XService(connection.access_token, connection.refresh_token)
-    synced_count = await sync_x_posts(db, connection, service)
-
-    return {"synced_count": synced_count, "message": f"Synced {synced_count} posts"}
+    try:
+        service = XService(connection.access_token, connection.refresh_token)
+        synced_count = await sync_x_posts(db, connection, service)
+        return {"synced_count": synced_count, "message": f"Synced {synced_count} posts"}
+    except XTokenExpiredError:
+        # 토큰 만료 - 자동 연동 해제
+        auto_disconnect_x(db, connection, current_user.id)
+        raise HTTPException(
+            status_code=401,
+            detail="X 토큰이 만료되었습니다. 다시 연동해주세요."
+        )
 
 
 @router.post("/posts/create")
@@ -379,25 +401,32 @@ async def create_post(
     if len(post_data.text) > 280:
         raise HTTPException(status_code=400, detail="Post exceeds 280 characters")
 
-    service = XService(connection.access_token, connection.refresh_token)
-    result = await service.create_tweet(post_data.text, post_data.reply_to)
+    try:
+        service = XService(connection.access_token, connection.refresh_token)
+        result = await service.create_tweet(post_data.text, post_data.reply_to)
 
-    if not result:
-        raise HTTPException(status_code=500, detail="Failed to create post")
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to create post")
 
-    # 로컬 DB에 포스트 저장
-    new_post = XPost(
-        connection_id=connection.id,
-        user_id=current_user.id,
-        post_id=result["id"],
-        text=post_data.text,
-        created_at_x=datetime.utcnow()
-    )
-    db.add(new_post)
-    db.commit()
+        # 로컬 DB에 포스트 저장
+        new_post = XPost(
+            connection_id=connection.id,
+            user_id=current_user.id,
+            post_id=result["id"],
+            text=post_data.text,
+            created_at_x=datetime.utcnow()
+        )
+        db.add(new_post)
+        db.commit()
 
-    logger.info(f"Post created for user {current_user.id}: {result['id']}")
-    return {"post_id": result["id"], "message": "Post created successfully"}
+        logger.info(f"Post created for user {current_user.id}: {result['id']}")
+        return {"post_id": result["id"], "message": "Post created successfully"}
+    except XTokenExpiredError:
+        auto_disconnect_x(db, connection, current_user.id)
+        raise HTTPException(
+            status_code=401,
+            detail="X 토큰이 만료되었습니다. 다시 연동해주세요."
+        )
 
 
 @router.delete("/posts/{post_id}")
@@ -421,19 +450,26 @@ async def delete_post(
         XPost.connection_id == connection.id
     ).first()
 
-    service = XService(connection.access_token, connection.refresh_token)
-    success = await service.delete_tweet(post_id)
+    try:
+        service = XService(connection.access_token, connection.refresh_token)
+        success = await service.delete_tweet(post_id)
 
-    if not success:
-        raise HTTPException(status_code=500, detail="Failed to delete post")
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to delete post")
 
-    # 로컬 DB에서 삭제
-    if post:
-        db.delete(post)
-        db.commit()
+        # 로컬 DB에서 삭제
+        if post:
+            db.delete(post)
+            db.commit()
 
-    logger.info(f"Post deleted for user {current_user.id}: {post_id}")
-    return {"message": "Post deleted successfully"}
+        logger.info(f"Post deleted for user {current_user.id}: {post_id}")
+        return {"message": "Post deleted successfully"}
+    except XTokenExpiredError:
+        auto_disconnect_x(db, connection, current_user.id)
+        raise HTTPException(
+            status_code=401,
+            detail="X 토큰이 만료되었습니다. 다시 연동해주세요."
+        )
 
 
 # ===== 분석 API =====
