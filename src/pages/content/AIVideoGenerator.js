@@ -314,17 +314,25 @@ function AIVideoGenerator() {
 
       {/* 비디오 생성 탭 */}
       {activeTab === 'create' && (
-        <div className="content-grid">
-          {/* 왼쪽: 입력 폼 */}
+        <div className="content-grid single-column">
           <div className="form-section">
+            {/* 에러 메시지 */}
+            {error && (
+              <div className="error-message" style={{ marginBottom: '1.5rem' }}>
+                <span className="error-icon">⚠️</span>
+                <div>
+                  <strong>오류 발생</strong>
+                  <p>{error}</p>
+                </div>
+              </div>
+            )}
+
             {/* Step 1: 제품 정보 입력 */}
             {step === 'input' && (
               <form onSubmit={handleAnalyzeProduct}>
                 {/* 제품 이미지 업로드 */}
                 <div className="form-group">
                   <label>제품 이미지 *</label>
-                  <p className="form-hint">제품의 대표 이미지를 업로드해주세요</p>
-
                   {!imagePreview ? (
                     <div className="image-upload-area">
                       <input
@@ -337,7 +345,7 @@ function AIVideoGenerator() {
                       />
                       <label htmlFor="product-image" className="upload-label">
                         <span className="upload-icon">📸</span>
-                        <span>클릭하여 제품 이미지 업로드</span>
+                        <span>클릭하여 이미지 업로드</span>
                         <span className="upload-hint">PNG, JPG, WebP (최대 10MB)</span>
                       </label>
                     </div>
@@ -353,7 +361,7 @@ function AIVideoGenerator() {
                         onClick={handleRemoveImage}
                         className="btn-remove-image"
                       >
-                        ✕ 이미지 제거
+                        ✕ 제거
                       </button>
                     </div>
                   )}
@@ -379,7 +387,7 @@ function AIVideoGenerator() {
                     name="product_description"
                     value={formData.product_description}
                     onChange={handleInputChange}
-                    placeholder="제품의 주요 특징이나 장점을 입력하세요 (선택사항)"
+                    placeholder="제품의 주요 특징이나 장점을 입력하세요"
                     rows="3"
                   />
                 </div>
@@ -396,10 +404,7 @@ function AIVideoGenerator() {
                       AI가 제품 분석 중...
                     </>
                   ) : (
-                    <>
-                      <span>🤖</span>
-                      AI 분석하기
-                    </>
+                    'AI 분석하기'
                   )}
                 </button>
               </form>
@@ -410,17 +415,16 @@ function AIVideoGenerator() {
               <div>
                 {/* AI 추천 결과 */}
                 <div className="ai-recommendation">
-                  <h3>🤖 AI 추천 결과</h3>
                   <div className="recommendation-card">
                     <div className="recommendation-header">
-                      <span className="recommended-badge">추천</span>
+                      <span className="recommended-badge">AI 추천</span>
                       <h4>
                         {aiRecommendation.recommended_tier === 'short' ? 'Short' :
                          aiRecommendation.recommended_tier === 'standard' ? 'Standard' :
                          'Premium'}
                       </h4>
                       <span className="confidence-score">
-                        신뢰도: {Math.round(aiRecommendation.confidence * 100)}%
+                        신뢰도 {Math.round(aiRecommendation.confidence * 100)}%
                       </span>
                     </div>
                     <p className="recommendation-reason">{aiRecommendation.reason}</p>
@@ -428,9 +432,8 @@ function AIVideoGenerator() {
                 </div>
 
                 {/* 티어 선택 */}
-                <div className="form-group" style={{ marginTop: '2rem' }}>
-                  <label>영상 길이 선택 *</label>
-                  <p className="form-hint">AI가 추천한 티어를 선택하거나 다른 옵션을 선택하세요</p>
+                <div className="form-group" style={{ marginTop: '1.5rem' }}>
+                  <label>영상 길이</label>
                   <div className="tier-options">
                     {tiers.map(tier => (
                       <div
@@ -439,16 +442,14 @@ function AIVideoGenerator() {
                         onClick={() => setSelectedTier(tier.tier)}
                       >
                         {aiRecommendation.recommended_tier === tier.tier && (
-                          <div className="recommended-label">✨ AI 추천</div>
+                          <div className="recommended-label">추천</div>
                         )}
                         <div className="tier-header">
                           <h4>{tier.tier === 'short' ? 'Short' : tier.tier === 'standard' ? 'Standard' : 'Premium'}</h4>
                           <span className="tier-price">${tier.cost}</span>
                         </div>
                         <div className="tier-details">
-                          <p>{tier.duration_seconds}초 영상</p>
-                          <p>{tier.cut_count}개 컷</p>
-                          <p className="tier-description">{tier.description}</p>
+                          <p>{tier.duration_seconds}초 · {tier.cut_count}컷</p>
                         </div>
                       </div>
                     ))}
@@ -456,115 +457,29 @@ function AIVideoGenerator() {
                 </div>
 
                 {/* 액션 버튼들 */}
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                <div className="action-buttons">
                   <button
                     type="button"
                     onClick={handleBackToInput}
                     className="btn-secondary"
-                    style={{ flex: 1 }}
                   >
-                    다시 입력하기
+                    다시 입력
                   </button>
                   <button
                     type="button"
                     onClick={handleGenerateVideo}
                     className="btn-generate"
                     disabled={loading}
-                    style={{ flex: 2 }}
                   >
                     {loading ? (
                       <>
                         <span className="spinner"></span>
-                        비디오 생성 시작 중...
+                        생성 중...
                       </>
                     ) : (
-                      <>
-                        <span>🎬</span>
-                        비디오 생성하기
-                      </>
+                      '비디오 생성하기'
                     )}
                   </button>
-                </div>
-              </div>
-            )}
-
-            {/* 안내 사항 (step이 input일 때만 표시) */}
-            {step === 'input' && (
-              <div className="info-box">
-                <h4>🎥 AI 마케팅 비디오 생성 기능</h4>
-                <ul>
-                  <li>제품 이미지 1장으로 완전한 마케팅 비디오 생성</li>
-                  <li>AI가 자동으로 최적의 영상 길이 추천</li>
-                  <li>스토리보드 자동 구성 및 이미지 생성</li>
-                  <li>전환 최적화로 90% 비용 절감 (Veo 3.1 + FFmpeg)</li>
-                  <li>브랜드 톤앤매너 자동 반영</li>
-                  <li>예상 소요 시간: 2-5분</li>
-                  <li>요금: Short $0.99 | Standard $1.49 | Premium $1.99</li>
-                </ul>
-              </div>
-            )}
-          </div>
-
-          {/* 오른쪽: 미리보기/안내 */}
-          <div className="result-section">
-            {error && (
-              <div className="error-message">
-                <span className="error-icon">⚠️</span>
-                <div>
-                  <strong>오류 발생</strong>
-                  <p>{error}</p>
-                </div>
-              </div>
-            )}
-
-            {!error && step === 'input' && (
-              <div className="placeholder-result">
-                <span className="placeholder-icon">🎬</span>
-                <h3>AI 마케팅 비디오 생성</h3>
-                <p>제품 정보를 입력하고 AI 분석을 시작하세요</p>
-                <div className="feature-list">
-                  <div className="feature-item">
-                    <span>🤖</span>
-                    <p>AI 자동 분석 및 추천</p>
-                  </div>
-                  <div className="feature-item">
-                    <span>🎨</span>
-                    <p>고품질 이미지 생성</p>
-                  </div>
-                  <div className="feature-item">
-                    <span>🎥</span>
-                    <p>시네마틱 전환 효과</p>
-                  </div>
-                  <div className="feature-item">
-                    <span>💰</span>
-                    <p>90% 비용 최적화</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {!error && step === 'recommendation' && (
-              <div className="placeholder-result">
-                <span className="placeholder-icon">✨</span>
-                <h3>티어를 선택하세요</h3>
-                <p>AI가 추천한 티어 또는 원하는 옵션을 선택하고 비디오를 생성하세요</p>
-                <div className="feature-list">
-                  <div className="feature-item">
-                    <span>⚡</span>
-                    <p>빠른 생성</p>
-                  </div>
-                  <div className="feature-item">
-                    <span>🎯</span>
-                    <p>정확한 타겟팅</p>
-                  </div>
-                  <div className="feature-item">
-                    <span>📊</span>
-                    <p>성과 최적화</p>
-                  </div>
-                  <div className="feature-item">
-                    <span>🚀</span>
-                    <p>바로 사용 가능</p>
-                  </div>
                 </div>
               </div>
             )}

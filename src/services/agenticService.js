@@ -372,7 +372,7 @@ JSON 형식:
 // ============================================
 // Main Agentic Workflow (Single API Call - Maximum Speed)
 // ============================================
-export const generateAgenticContent = async ({ textInput, images = [] }, onProgress) => {
+export const generateAgenticContent = async ({ textInput, images = [], styleTone = '' }, onProgress) => {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
@@ -400,12 +400,17 @@ export const generateAgenticContent = async ({ textInput, images = [] }, onProgr
       }
     }
 
+    // 스타일 지시문
+    const styleInstruction = styleTone
+      ? `\n**글쓰기 스타일**: ${styleTone}\n위 스타일을 반드시 적용하여 작성하세요.\n`
+      : '';
+
     // ⚡ 단일 API 호출로 분석 + 생성 동시 처리
     const prompt = `당신은 콘텐츠 전문가입니다. 입력을 분석하고 네이버 블로그와 SNS용 콘텐츠를 생성하세요.
 
 입력: ${textInput || '이미지 기반 콘텐츠'}
 이미지: ${images.length}개
-
+${styleInstruction}
 다음 JSON 형식으로 응답하세요:
 {
   "analysis": {

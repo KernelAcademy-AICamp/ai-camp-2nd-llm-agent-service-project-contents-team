@@ -74,6 +74,11 @@
   gap: var(--space-lg);
 }
 
+/* Single column layout (form only) */
+.content-grid.single-column {
+  grid-template-columns: 1fr;
+}
+
 /* Form Section */
 .form-section {
   background: var(--bg-secondary);

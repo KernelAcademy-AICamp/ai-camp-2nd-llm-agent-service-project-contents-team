@@ -707,6 +707,9 @@ class AIGeneratedContent(Base):
     input_text = Column(Text, nullable=True)  # 사용자 입력 텍스트
     input_image_count = Column(Integer, default=0)  # 업로드된 이미지 개수
 
+    # 생성된 이미지 URL 목록
+    generated_image_urls = Column(JSON, nullable=True)  # ["url1", "url2", ...]
+
     # 블로그 콘텐츠
     blog_title = Column(String, nullable=False)  # 블로그 제목
     blog_content = Column(Text, nullable=False)  # 블로그 본문 (마크다운)
