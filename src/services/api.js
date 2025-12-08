@@ -375,6 +375,53 @@ export const xAPI = {
 };
 
 // ==========================================
+// Threads API
+// ==========================================
+export const threadsAPI = {
+  // 연동 상태 확인
+  getStatus: async () => {
+    const response = await api.get('/api/threads/status');
+    return response.data;
+  },
+
+  // 연동 해제
+  disconnect: async () => {
+    const response = await api.delete('/api/threads/disconnect');
+    return response.data;
+  },
+
+  // 계정 정보 새로고침
+  refresh: async () => {
+    const response = await api.post('/api/threads/refresh');
+    return response.data;
+  },
+
+  // 포스트 목록 조회
+  getPosts: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/threads/posts?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 포스트 동기화
+  syncPosts: async () => {
+    const response = await api.post('/api/threads/posts/sync');
+    return response.data;
+  },
+
+  // 포스트 작성
+  createPost: async (data) => {
+    const response = await api.post('/api/threads/posts/create', data);
+    return response.data;
+  },
+
+  // 계정 분석 데이터
+  getAnalytics: async () => {
+    const response = await api.get('/api/threads/analytics');
+    return response.data;
+  },
+};
+
+// ==========================================
 // AI 콘텐츠 API
 // ==========================================
 export const aiContentAPI = {

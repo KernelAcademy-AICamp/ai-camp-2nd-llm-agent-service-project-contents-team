@@ -22,6 +22,7 @@ function Sidebar() {
     { path: '/facebook', label: 'Facebook' },
     { path: '/instagram', label: 'Instagram' },
     { path: '/x', label: 'X' },
+    { path: '/threads', label: 'Threads' },
   ];
 
   const managementMenuItems = [

@@ -180,7 +180,7 @@
 .preview-stack {
   position: relative;
   width: 340px;
-  height: 500px;
+  height: 620px;
 }
 
 /* 미리보기 카드 */
@@ -212,7 +212,7 @@
 }
 
 .preview-card.preview-instagram {
-  top: 120px;
+  top: 80px;
   left: 0;
   z-index: 2;
   transform: rotate(2deg);
@@ -221,16 +221,17 @@
 }
 
 .preview-card.preview-video {
-  top: 300px;
+  top: 240px;
   left: 15px;
   z-index: 0;
   transform: rotate(-3deg);
   border: 2px solid #D8BFD8;
   background: #F8F8FF;
+  min-height: 360px;
 }
 
 .preview-card.preview-image {
-  top: 200px;
+  top: 160px;
   left: 50px;
   z-index: 1;
   transform: rotate(3deg);
@@ -329,17 +330,18 @@
   color: var(--text-tertiary);
 }
 
-/* 비디오 플레이스홀더 */
+/* 비디오 플레이스홀더 - 숏츠 형태 (9:16) */
 .content-hub .preview-video-placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100px !important;
-  aspect-ratio: unset !important;
+  height: 280px !important;
+  aspect-ratio: 9 / 16 !important;
   background: #D8BFD8;
   border-radius: 8px;
   position: relative;
+  margin: 0 auto;
 }
 
 .video-play-btn {

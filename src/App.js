@@ -25,6 +25,7 @@ import YouTube from './pages/connection_SNS/youtube/YouTube';
 import Facebook from './pages/connection_SNS/facebook/Facebook';
 import Instagram from './pages/connection_SNS/instagram/Instagram';
 import X from './pages/connection_SNS/x/X';
+import Threads from './pages/connection_SNS/threads/Threads';
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import DeleteData from './pages/legal/DeleteData';
 import './App.css';
@@ -227,6 +228,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <X />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/threads"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Threads />
                 </Layout>
               </ProtectedRoute>
             }
