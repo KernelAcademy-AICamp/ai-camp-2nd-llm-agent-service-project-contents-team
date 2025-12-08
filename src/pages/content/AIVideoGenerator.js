@@ -32,6 +32,10 @@ function AIVideoGenerator() {
   const [currentJob, setCurrentJob] = useState(null);
   const [error, setError] = useState(null);
 
+  // AI 분석 상태
+  const [analyzingProduct, setAnalyzingProduct] = useState(false);
+  const [aiRecommendation, setAiRecommendation] = useState(null);
+
   // 히스토리
   const [jobHistory, setJobHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -392,7 +396,7 @@ function AIVideoGenerator() {
 
             {/* Step 2: AI 추천 및 티어 선택 */}
             {step === 'recommendation' && aiRecommendation && (
-              <div>
+              <form onSubmit={handleGenerateVideo}>
                 {/* AI 추천 결과 */}
                 <div className="ai-recommendation">
                   <div className="recommendation-card">
