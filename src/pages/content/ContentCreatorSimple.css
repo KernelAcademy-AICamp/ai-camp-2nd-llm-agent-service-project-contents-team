@@ -426,7 +426,7 @@
 
 .history-layout {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 250px 1fr;
   gap: 1.25rem;
   min-height: 450px;
 }
@@ -436,7 +436,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  max-height: 600px;
+  max-height: 700px;
   overflow-y: auto;
   padding-right: 0.5rem;
 }
@@ -460,8 +460,9 @@
 
 .history-item-header {
   display: flex;
+  flex-direction: row;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.4rem;
 }
@@ -569,7 +570,13 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  position: relative;
+}
+
+.history-detail-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
 }
 
 .history-detail-header h3 {
@@ -577,13 +584,7 @@
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--text-primary);
-  padding-right: 2.5rem;
-}
-
-.history-detail-header .btn-icon-delete {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
+  flex: 1;
 }
 
 .history-detail-meta {
@@ -595,6 +596,45 @@
 
 .history-detail-meta .history-date {
   margin-left: auto;
+}
+
+/* 내역 상세 탭 */
+.history-detail-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.history-tab {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.history-tab:hover {
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+.history-tab.active {
+  background: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+/* 내역 상세 콘텐츠 */
+.history-detail-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.history-detail-content .result-card {
+  margin-bottom: 0;
 }
 
 /* 빈 상태 */

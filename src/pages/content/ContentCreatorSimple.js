@@ -29,6 +29,7 @@ function ContentCreatorSimple() {
   const [history, setHistory] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+  const [historyDetailTab, setHistoryDetailTab] = useState('blog'); // 상세 보기 탭
 
   // 이미지 팝업 상태
   const [popupImage, setPopupImage] = useState(null);
@@ -74,6 +75,10 @@ function ContentCreatorSimple() {
 
   // 내역 아이템 선택 (이미지가 있으면 상세 API 호출)
   const handleSelectHistory = async (item) => {
+    // 첫 번째 사용 가능한 탭 선택
+    const firstTab = item.blog ? 'blog' : item.sns ? 'sns' : item.x ? 'x' : item.threads ? 'threads' : (item.image_count > 0 ? 'images' : 'blog');
+    setHistoryDetailTab(firstTab);
+
     // 이미지가 있는 경우 상세 API로 이미지 데이터 가져오기
     if (item.image_count > 0) {
       try {
@@ -133,16 +138,45 @@ function ContentCreatorSimple() {
     }
   };
 
-  // 날짜 포맷
+  // 날짜 포맷 (목록용: 올해면 월/일 시:분, 지난 년도면 yy/mm/dd 시:분)
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const dateYear = date.getFullYear();
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+
+    if (dateYear === currentYear) {
+      // 올해: MM/DD HH:MM
+      return `${date.getMonth() + 1}/${date.getDate()} ${hh}:${min}`;
+    } else {
+      // 지난 년도: YY/MM/DD HH:MM
+      const yy = String(dateYear).slice(-2);
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yy}/${mm}/${dd} ${hh}:${min}`;
+    }
+  };
+
+  // 날짜 포맷 (상세용: 올해면 M월 D일 오전/오후 H:MM, 지난 년도면 YYYY년 M월 D일 오전/오후 H:MM)
+  const formatDateDetail = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const dateYear = date.getFullYear();
+    const hours = date.getHours();
+    const ampm = hours < 12 ? '오전' : '오후';
+    const h12 = hours % 12 || 12;
+    const min = String(date.getMinutes()).padStart(2, '0');
+
+    if (dateYear === currentYear) {
+      // 올해: M월 D일 오전/오후 H:MM
+      return `${date.getMonth() + 1}월 ${date.getDate()}일 ${ampm} ${h12}:${min}`;
+    } else {
+      // 지난 년도: YYYY년 M월 D일 오전/오후 H:MM
+      return `${dateYear}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${ampm} ${h12}:${min}`;
+    }
   };
 
   // 자동 저장 함수 (v2 API - 플랫폼별 분리 저장)
@@ -749,7 +783,6 @@ function ContentCreatorSimple() {
                       {item.sns && <span className="platform-badge">SNS</span>}
                       {item.x && <span className="platform-badge">X</span>}
                       {item.threads && <span className="platform-badge">Threads</span>}
-                      {item.image_count > 0 && <span className="platform-badge">이미지 {item.image_count}장</span>}
                     </div>
                   </div>
                 ))}
@@ -761,7 +794,12 @@ function ContentCreatorSimple() {
                   <>
                     {/* 세션 정보 헤더 */}
                     <div className="history-detail-header">
-                      <h3>{selectedHistoryItem.topic}</h3>
+                      <div className="history-detail-title-row">
+                        <h3>{selectedHistoryItem.topic}</h3>
+                        <button className="btn-icon btn-icon-delete" onClick={() => handleDeleteHistory(selectedHistoryItem.id)} title="삭제">
+                          <FiTrash2 />
+                        </button>
+                      </div>
                       <div className="history-detail-meta">
                         <span className="info-badge type">
                           {selectedHistoryItem.content_type === 'text' ? '글만' : selectedHistoryItem.content_type === 'image' ? '이미지만' : '글+이미지'}
@@ -769,141 +807,185 @@ function ContentCreatorSimple() {
                         <span className="info-badge style">
                           {styles.find(s => s.id === selectedHistoryItem.style)?.label || selectedHistoryItem.style}
                         </span>
-                        <span className="history-date">{formatDate(selectedHistoryItem.created_at)}</span>
+                        <span className="history-date">{formatDateDetail(selectedHistoryItem.created_at)}</span>
                       </div>
-                      <button className="btn-icon btn-icon-delete" onClick={() => handleDeleteHistory(selectedHistoryItem.id)} title="삭제">
-                        <FiTrash2 />
-                      </button>
                     </div>
 
-                    {/* 블로그 콘텐츠 */}
-                    {selectedHistoryItem.blog && (
-                      <div className="result-card">
-                        <div className="result-card-header">
-                          <h3>네이버 블로그</h3>
-                          <div className="result-card-actions">
-                            <button className="btn-icon" onClick={() => handleCopyHistoryBlog(selectedHistoryItem)} title="복사">
-                              <FiCopy />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="result-card-content">
-                          <div className="blog-title">{selectedHistoryItem.blog.title}</div>
-                          <div className="text-result">
-                            {selectedHistoryItem.blog.content}
-                          </div>
-                          {selectedHistoryItem.blog.tags && (
-                            <div className="result-tags">
-                              {selectedHistoryItem.blog.tags.map((tag, idx) => (
-                                <span key={idx} className="tag-item">{tag}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    {/* 플랫폼 탭 */}
+                    <div className="history-detail-tabs">
+                      {selectedHistoryItem.blog && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'blog' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('blog')}
+                        >
+                          블로그
+                        </button>
+                      )}
+                      {selectedHistoryItem.sns && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'sns' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('sns')}
+                        >
+                          SNS
+                        </button>
+                      )}
+                      {selectedHistoryItem.x && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'x' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('x')}
+                        >
+                          X
+                        </button>
+                      )}
+                      {selectedHistoryItem.threads && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'threads' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('threads')}
+                        >
+                          Threads
+                        </button>
+                      )}
+                      {selectedHistoryItem.images && selectedHistoryItem.images.length > 0 && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'images' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('images')}
+                        >
+                          이미지 ({selectedHistoryItem.images.length})
+                        </button>
+                      )}
+                    </div>
 
-                    {/* SNS 콘텐츠 */}
-                    {selectedHistoryItem.sns && (
-                      <div className="result-card">
-                        <div className="result-card-header">
-                          <h3>SNS (Instagram/Facebook)</h3>
-                          <div className="result-card-actions">
-                            <button className="btn-icon" onClick={() => handleCopyHistorySNS(selectedHistoryItem)} title="복사">
-                              <FiCopy />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="result-card-content">
-                          <div className="text-result sns-content">
-                            {selectedHistoryItem.sns.content}
-                          </div>
-                          {selectedHistoryItem.sns.hashtags && (
-                            <div className="result-tags">
-                              {selectedHistoryItem.sns.hashtags.map((tag, idx) => (
-                                <span key={idx} className="tag-item hashtag">{tag}</span>
-                              ))}
+                    {/* 탭 콘텐츠 */}
+                    <div className="history-detail-content">
+                      {/* 블로그 콘텐츠 */}
+                      {historyDetailTab === 'blog' && selectedHistoryItem.blog && (
+                        <div className="result-card">
+                          <div className="result-card-header">
+                            <h3>네이버 블로그</h3>
+                            <div className="result-card-actions">
+                              <button className="btn-icon" onClick={() => handleCopyHistoryBlog(selectedHistoryItem)} title="복사">
+                                <FiCopy />
+                              </button>
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* X 콘텐츠 */}
-                    {selectedHistoryItem.x && (
-                      <div className="result-card">
-                        <div className="result-card-header">
-                          <h3>X</h3>
-                          <div className="result-card-actions">
-                            <button className="btn-icon" onClick={() => handleCopyHistoryX(selectedHistoryItem)} title="복사">
-                              <FiCopy />
-                            </button>
                           </div>
-                        </div>
-                        <div className="result-card-content">
-                          <div className="text-result sns-content">
-                            {selectedHistoryItem.x.content}
-                          </div>
-                          {selectedHistoryItem.x.hashtags && (
-                            <div className="result-tags">
-                              {selectedHistoryItem.x.hashtags.map((tag, idx) => (
-                                <span key={idx} className="tag-item hashtag">{tag}</span>
-                              ))}
+                          <div className="result-card-content">
+                            <div className="blog-title">{selectedHistoryItem.blog.title}</div>
+                            <div className="text-result">
+                              {selectedHistoryItem.blog.content}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Threads 콘텐츠 */}
-                    {selectedHistoryItem.threads && (
-                      <div className="result-card">
-                        <div className="result-card-header">
-                          <h3>Threads</h3>
-                          <div className="result-card-actions">
-                            <button className="btn-icon" onClick={() => handleCopyHistoryThreads(selectedHistoryItem)} title="복사">
-                              <FiCopy />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="result-card-content">
-                          <div className="text-result sns-content">
-                            {selectedHistoryItem.threads.content}
-                          </div>
-                          {selectedHistoryItem.threads.hashtags && (
-                            <div className="result-tags">
-                              {selectedHistoryItem.threads.hashtags.map((tag, idx) => (
-                                <span key={idx} className="tag-item hashtag">{tag}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 생성된 이미지 */}
-                    {selectedHistoryItem.images && selectedHistoryItem.images.length > 0 && (
-                      <div className="result-card result-card-full">
-                        <div className="result-card-header">
-                          <h3>생성된 이미지 ({selectedHistoryItem.images.length}장)</h3>
-                        </div>
-                        <div className="result-card-content">
-                          <div className="images-grid">
-                            {selectedHistoryItem.images.map((img, idx) => (
-                              <div key={idx} className="image-item" onClick={() => setPopupImage(img.image_url)}>
-                                <img src={img.image_url} alt={`생성된 이미지 ${idx + 1}`} />
-                                <button
-                                  className="btn-download-single"
-                                  onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.image_url, idx); }}
-                                >
-                                  다운로드
-                                </button>
+                            {selectedHistoryItem.blog.tags && (
+                              <div className="result-tags">
+                                {selectedHistoryItem.blog.tags.map((tag, idx) => (
+                                  <span key={idx} className="tag-item">{tag}</span>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+
+                      {/* SNS 콘텐츠 */}
+                      {historyDetailTab === 'sns' && selectedHistoryItem.sns && (
+                        <div className="result-card">
+                          <div className="result-card-header">
+                            <h3>SNS (Instagram/Facebook)</h3>
+                            <div className="result-card-actions">
+                              <button className="btn-icon" onClick={() => handleCopyHistorySNS(selectedHistoryItem)} title="복사">
+                                <FiCopy />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="result-card-content">
+                            <div className="text-result sns-content">
+                              {selectedHistoryItem.sns.content}
+                            </div>
+                            {selectedHistoryItem.sns.hashtags && (
+                              <div className="result-tags">
+                                {selectedHistoryItem.sns.hashtags.map((tag, idx) => (
+                                  <span key={idx} className="tag-item hashtag">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* X 콘텐츠 */}
+                      {historyDetailTab === 'x' && selectedHistoryItem.x && (
+                        <div className="result-card">
+                          <div className="result-card-header">
+                            <h3>X</h3>
+                            <div className="result-card-actions">
+                              <button className="btn-icon" onClick={() => handleCopyHistoryX(selectedHistoryItem)} title="복사">
+                                <FiCopy />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="result-card-content">
+                            <div className="text-result sns-content">
+                              {selectedHistoryItem.x.content}
+                            </div>
+                            {selectedHistoryItem.x.hashtags && (
+                              <div className="result-tags">
+                                {selectedHistoryItem.x.hashtags.map((tag, idx) => (
+                                  <span key={idx} className="tag-item hashtag">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Threads 콘텐츠 */}
+                      {historyDetailTab === 'threads' && selectedHistoryItem.threads && (
+                        <div className="result-card">
+                          <div className="result-card-header">
+                            <h3>Threads</h3>
+                            <div className="result-card-actions">
+                              <button className="btn-icon" onClick={() => handleCopyHistoryThreads(selectedHistoryItem)} title="복사">
+                                <FiCopy />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="result-card-content">
+                            <div className="text-result sns-content">
+                              {selectedHistoryItem.threads.content}
+                            </div>
+                            {selectedHistoryItem.threads.hashtags && (
+                              <div className="result-tags">
+                                {selectedHistoryItem.threads.hashtags.map((tag, idx) => (
+                                  <span key={idx} className="tag-item hashtag">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 생성된 이미지 */}
+                      {historyDetailTab === 'images' && selectedHistoryItem.images && selectedHistoryItem.images.length > 0 && (
+                        <div className="result-card result-card-full">
+                          <div className="result-card-header">
+                            <h3>생성된 이미지 ({selectedHistoryItem.images.length}장)</h3>
+                          </div>
+                          <div className="result-card-content">
+                            <div className="images-grid">
+                              {selectedHistoryItem.images.map((img, idx) => (
+                                <div key={idx} className="image-item" onClick={() => setPopupImage(img.image_url)}>
+                                  <img src={img.image_url} alt={`생성된 이미지 ${idx + 1}`} />
+                                  <button
+                                    className="btn-download-single"
+                                    onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.image_url, idx); }}
+                                  >
+                                    다운로드
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </>
                 ) : (
                   <div className="empty-detail">
