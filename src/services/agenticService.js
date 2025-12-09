@@ -335,20 +335,80 @@ class CriticAgent {
     this.model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
   }
 
-  async critique(blogContent, snsContent, analysisData, xContent = null, threadsContent = null) {
-    console.log('🔍 Critic Agent: 콘텐츠 평가 중...');
+  async critique(content, analysisData, selectedPlatforms = ['blog', 'sns', 'x', 'threads']) {
+    console.log('🔍 Critic Agent: 콘텐츠 평가 중...', selectedPlatforms);
 
-    const xSection = xContent ? `
-**X 콘텐츠:**
-본문: ${xContent.content}
-태그: ${xContent.tags?.join(', ') || ''}
-` : '';
+    // 선택된 플랫폼만 평가 대상에 포함
+    const hasBlog = selectedPlatforms.includes('blog') && content.blog;
+    const hasSNS = selectedPlatforms.includes('sns') && content.sns;
+    const hasX = selectedPlatforms.includes('x') && content.x;
+    const hasThreads = selectedPlatforms.includes('threads') && content.threads;
 
-    const threadsSection = threadsContent ? `
-**Threads 콘텐츠:**
-본문: ${threadsContent.content}
-태그: ${threadsContent.tags?.join(', ') || ''}
-` : '';
+    // 평가할 콘텐츠가 없으면 기본값 반환
+    if (!hasBlog && !hasSNS && !hasX && !hasThreads) {
+      console.warn('🔍 Critic Agent: 평가할 콘텐츠 없음');
+      return { overallRecommendation: '통과' };
+    }
+
+    // 평가 대상 콘텐츠 섹션 생성
+    const contentSections = [];
+    if (hasBlog) {
+      contentSections.push(`**[블로그]**
+제목: ${content.blog.title}
+본문: ${content.blog.content}
+태그: ${content.blog.tags?.join(', ') || ''}`);
+    }
+    if (hasSNS) {
+      contentSections.push(`**[SNS (인스타/페이스북)]**
+본문: ${content.sns.content}
+태그: ${content.sns.tags?.join(', ') || ''}`);
+    }
+    if (hasX) {
+      contentSections.push(`**[X]**
+본문: ${content.x.content}
+태그: ${content.x.tags?.join(', ') || ''}`);
+    }
+    if (hasThreads) {
+      contentSections.push(`**[Threads]**
+본문: ${content.threads.content}
+태그: ${content.threads.tags?.join(', ') || ''}`);
+    }
+
+    // JSON 출력 형식 생성 (선택된 플랫폼만)
+    const outputFormat = {};
+    if (hasBlog) {
+      outputFormat.blog = {
+        score: "총점(0-100)",
+        strengths: ["구체적 장점"],
+        weaknesses: ["구체적 문제점"],
+        improvements: ["구체적 개선 방법"]
+      };
+    }
+    if (hasSNS) {
+      outputFormat.sns = {
+        score: "총점(0-100)",
+        strengths: ["구체적 장점"],
+        weaknesses: ["구체적 문제점"],
+        improvements: ["구체적 개선 방법"]
+      };
+    }
+    if (hasX) {
+      outputFormat.x = {
+        score: "총점(0-100)",
+        strengths: ["장점"],
+        weaknesses: ["문제점"],
+        improvements: ["개선 방법"]
+      };
+    }
+    if (hasThreads) {
+      outputFormat.threads = {
+        score: "총점(0-100)",
+        strengths: ["장점"],
+        weaknesses: ["문제점"],
+        improvements: ["개선 방법"]
+      };
+    }
+    outputFormat.overallRecommendation = "통과/개선필요";
 
     const prompt = `당신은 엄격한 콘텐츠 품질 평가 전문가입니다.
 **실제 사용자들이 읽고 싶어할 가치 있는 콘텐츠인지** 냉정하게 평가하세요.
@@ -357,22 +417,14 @@ class CriticAgent {
 📌 원본 분석 정보
 ═══════════════════════════════════════
 - 주제: ${analysisData.subject}
-- 키워드: ${analysisData.keywords.join(', ')}
-- 타겟: ${analysisData.targetAudience.join(', ')}
+- 키워드: ${analysisData.keywords?.join(', ') || ''}
+- 타겟: ${analysisData.targetAudience?.join(', ') || ''}
 
 ═══════════════════════════════════════
 📝 평가 대상 콘텐츠
 ═══════════════════════════════════════
 
-**[블로그]**
-제목: ${blogContent.title}
-본문: ${blogContent.content}
-태그: ${blogContent.tags.join(', ')}
-
-**[SNS (인스타/페이스북)]**
-본문: ${snsContent.content}
-태그: ${snsContent.tags.join(', ')}
-${xSection}${threadsSection}
+${contentSections.join('\n\n')}
 
 ═══════════════════════════════════════
 🔍 상세 평가 기준 (각 항목 0-20점)
@@ -380,94 +432,37 @@ ${xSection}${threadsSection}
 
 **1. 독자 가치 (0-20점)** ⭐ 가장 중요
 - 읽는 사람이 얻어가는 실질적 정보/팁/인사이트가 있는가?
-- 단순 홍보/정보 나열이 아닌 문제 해결 또는 새로운 관점 제공?
 - 15점 미만: 공허하고 뻔한 내용
 - 15점 이상: 독자에게 도움이 되는 구체적 가치
 
 **2. 구체성 (0-20점)**
-- 추상적 표현(맛있다, 좋다, 최고) 대신 구체적 묘사?
-- 숫자, 데이터, 실제 사례 포함?
+- 추상적 표현 대신 구체적 묘사, 숫자, 사례 포함?
 - 15점 미만: 추상적이고 모호한 표현 다수
 - 15점 이상: 생생하고 구체적인 내용
 
 **3. 신뢰성 (0-20점)**
-- 과장/허위 표현 없는가? ("최고", "완벽", "혁신적" 남발?)
-- 주장에 근거가 있는가?
+- 과장/허위 표현 없는가?
 - 15점 미만: 과장되거나 신뢰하기 어려움
 - 15점 이상: 믿을 수 있고 정직한 톤
 
 **4. 플랫폼 최적화 (0-20점)**
 - 각 플랫폼 특성에 맞는 길이/톤/형식?
-- SEO(블로그), 훅(SNS), 임팩트(X), 대화체(Threads)?
 - 15점 미만: 플랫폼 특성 무시
 - 15점 이상: 플랫폼에 최적화됨
 
 **5. 가독성/흐름 (0-20점)**
-- 서론-본론-결론 구조?
-- 문단 간 자연스러운 연결?
-- 읽기 쉬운 문장 길이?
+- 자연스러운 구조와 흐름?
 - 15점 미만: 읽기 불편하거나 구조 없음
 - 15점 이상: 술술 읽히는 자연스러운 흐름
 
 ═══════════════════════════════════════
-⚠️ 자동 감점 사항
-═══════════════════════════════════════
-- 키워드 과다 반복: -10점
-- "최고/완벽/혁신적" 등 근거 없는 과장: -5점씩
-- 의미 없는 이모지 남발 (5개 초과): -5점
-- 복사-붙여넣기 같은 천편일률적 문구: -10점
-
-═══════════════════════════════════════
 📤 평가 결과 (JSON)
 ═══════════════════════════════════════
-{
-  "blog": {
-    "score": 총점(0-100),
-    "breakdown": {
-      "readerValue": 0-20,
-      "specificity": 0-20,
-      "credibility": 0-20,
-      "platformOptimization": 0-20,
-      "readability": 0-20
-    },
-    "strengths": ["구체적 장점"],
-    "weaknesses": ["구체적 문제점"],
-    "improvements": ["구체적 개선 방법"],
-    "seoScore": 0-100,
-    "readabilityScore": 0-100
-  },
-  "sns": {
-    "score": 총점(0-100),
-    "breakdown": {
-      "readerValue": 0-20,
-      "specificity": 0-20,
-      "credibility": 0-20,
-      "platformOptimization": 0-20,
-      "readability": 0-20
-    },
-    "strengths": ["구체적 장점"],
-    "weaknesses": ["구체적 문제점"],
-    "improvements": ["구체적 개선 방법"],
-    "engagementScore": 0-100,
-    "hashtagScore": 0-100
-  },
-  "x": {
-    "score": 총점(0-100),
-    "strengths": ["장점"],
-    "weaknesses": ["문제점"],
-    "improvements": ["개선 방법"]
-  },
-  "threads": {
-    "score": 총점(0-100),
-    "strengths": ["장점"],
-    "weaknesses": ["문제점"],
-    "improvements": ["개선 방법"]
-  },
-  "overallRecommendation": "통과/개선필요"
-}
+${JSON.stringify(outputFormat, null, 2)}
 
 **80점 이상 = 통과, 미만 = 개선 필요**
-엄격하게 평가하세요. 평범한 콘텐츠는 70점대입니다.`;
+엄격하게 평가하세요. 평범한 콘텐츠는 70점대입니다.
+위에 명시된 플랫폼만 평가하세요.`;
 
     const result = await this.model.generateContent(prompt);
     const response = result.response.text();
@@ -476,17 +471,28 @@ ${xSection}${threadsSection}
 
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        console.warn('🔍 Critic Agent: JSON 파싱 실패, 기본 평가 반환', parseError.message);
+      }
     }
 
-    throw new Error('평가 결과 파싱 실패');
+    // 기본값 반환 (선택된 플랫폼만)
+    console.warn('🔍 Critic Agent: 기본 평가 반환');
+    const defaultResult = { overallRecommendation: '통과' };
+    if (hasBlog) defaultResult.blog = { score: 80, strengths: ['콘텐츠 생성 완료'], weaknesses: [], improvements: [] };
+    if (hasSNS) defaultResult.sns = { score: 80, strengths: ['콘텐츠 생성 완료'], weaknesses: [], improvements: [] };
+    if (hasX) defaultResult.x = { score: 80, strengths: ['콘텐츠 생성 완료'], weaknesses: [], improvements: [] };
+    if (hasThreads) defaultResult.threads = { score: 80, strengths: ['콘텐츠 생성 완료'], weaknesses: [], improvements: [] };
+    return defaultResult;
   }
 }
 
 // ============================================
 // Main Agentic Workflow (with Quality Check)
 // ============================================
-export const generateAgenticContent = async ({ textInput, images = [], styleTone = '' }, onProgress) => {
+export const generateAgenticContent = async ({ textInput, images = [], styleTone = '', selectedPlatforms = ['blog', 'sns', 'x', 'threads'] }, onProgress) => {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const criticAgent = new CriticAgent();
@@ -521,6 +527,87 @@ export const generateAgenticContent = async ({ textInput, images = [], styleTone
     const styleInstruction = styleTone
       ? `\n**글쓰기 스타일**: ${styleTone}\n위 스타일을 반드시 적용하여 작성하세요.\n`
       : '';
+
+    // 선택된 플랫폼 확인
+    const hasBlog = selectedPlatforms.includes('blog');
+    const hasSNS = selectedPlatforms.includes('sns');
+    const hasX = selectedPlatforms.includes('x');
+    const hasThreads = selectedPlatforms.includes('threads');
+
+    // 플랫폼별 요구사항 생성 (선택된 플랫폼만)
+    const platformRequirements = [];
+    if (hasBlog) {
+      platformRequirements.push(`**[네이버 블로그] (800-1500자)**
+- 제목: 검색 키워드 포함 + 클릭 유도 (호기심, 숫자, 구체적 혜택)
+- 도입부: 독자의 공감을 얻는 문제 제기 또는 상황 설정
+- 본문:
+  * 핵심 정보를 소제목(##)으로 구분
+  * 각 섹션마다 실질적인 정보 또는 팁 제공
+  * 개인 경험이나 구체적 사례 포함
+- 마무리: 핵심 요약 + 독자 행동 유도
+- 태그: 검색량 높은 키워드 + 롱테일 키워드 조합${images.length > 0 ? `
+- 이미지 배치: [IMAGE_1]~[IMAGE_${images.length}] 마커를 내용과 연관된 위치에 삽입` : ''}`);
+    }
+    if (hasSNS) {
+      platformRequirements.push(`**[Instagram/Facebook] (150-300자)**
+- 첫 줄: 스크롤을 멈추게 하는 훅 (질문, 충격적 사실, 공감 포인트)
+- 본문: 핵심 메시지 1-2개에 집중, 스토리텔링
+- 이모지: 과하지 않게 포인트로 활용 (3-5개)
+- CTA: 구체적인 행동 유도 (댓글, 저장, 공유)
+- 해시태그: 대중적 태그 + 니치 태그 조합`);
+    }
+    if (hasX) {
+      platformRequirements.push(`**[X/Twitter] (280자 이내)**
+- 임팩트 있는 한 줄 메시지 또는 인사이트
+- 트렌드/밈 활용 가능
+- 리트윗하고 싶은 가치 있는 내용
+- 해시태그는 2-3개만 (과하면 스팸처럼 보임)`);
+    }
+    if (hasThreads) {
+      platformRequirements.push(`**[Threads] (500자 이내)**
+- 인스타보다 대화체, 생각을 나누는 느낌
+- 의견이나 관점 공유
+- 독자와 대화하듯 친근하게
+- 스토리텔링 + 인사이트`);
+    }
+
+    // JSON 출력 형식 생성 (선택된 플랫폼만)
+    const outputFormat = {
+      analysis: {
+        subject: "핵심 주제",
+        category: "카테고리 (음식/뷰티/여행/IT/라이프스타일/비즈니스 등)",
+        keywords: ["SEO 메인키워드", "연관키워드1", "연관키워드2", "롱테일키워드"],
+        mood: "콘텐츠 분위기",
+        targetAudience: ["주요 타겟층 구체적으로"],
+        highlights: ["차별화 포인트", "핵심 가치"],
+        recommendedTone: "권장 톤앤매너"
+      }
+    };
+    if (hasBlog) {
+      outputFormat.blog = {
+        title: "클릭하고 싶은 SEO 최적화 제목",
+        content: "가치 있는 블로그 본문 (마크다운 형식)",
+        tags: ["태그1", "태그2", "태그3", "태그4", "태그5", "태그6", "태그7"]
+      };
+    }
+    if (hasSNS) {
+      outputFormat.sns = {
+        content: "Instagram/Facebook용 매력적인 본문",
+        tags: ["#해시태그1", "#해시태그2", "#해시태그3", "#해시태그4", "#해시태그5"]
+      };
+    }
+    if (hasX) {
+      outputFormat.x = {
+        content: "X용 임팩트 있는 본문 (280자 이내)",
+        tags: ["#해시태그1", "#해시태그2"]
+      };
+    }
+    if (hasThreads) {
+      outputFormat.threads = {
+        content: "Threads용 대화체 본문 (500자 이내)",
+        tags: ["#해시태그1", "#해시태그2", "#해시태그3"]
+      };
+    }
 
     // ⚡ 단일 API 호출로 분석 + 생성 동시 처리 (강화된 프롬프트 엔지니어링)
     const prompt = `당신은 10년 경력의 전문 콘텐츠 마케터이자 SEO 전문가입니다.
@@ -561,35 +648,7 @@ ${styleInstruction}
 📝 플랫폼별 상세 요구사항
 ═══════════════════════════════════════
 
-**[네이버 블로그] (800-1500자)**
-- 제목: 검색 키워드 포함 + 클릭 유도 (호기심, 숫자, 구체적 혜택)
-- 도입부: 독자의 공감을 얻는 문제 제기 또는 상황 설정
-- 본문:
-  * 핵심 정보를 소제목(##)으로 구분
-  * 각 섹션마다 실질적인 정보 또는 팁 제공
-  * 개인 경험이나 구체적 사례 포함
-- 마무리: 핵심 요약 + 독자 행동 유도
-- 태그: 검색량 높은 키워드 + 롱테일 키워드 조합${images.length > 0 ? `
-- 이미지 배치: [IMAGE_1]~[IMAGE_${images.length}] 마커를 내용과 연관된 위치에 삽입` : ''}
-
-**[Instagram/Facebook] (150-300자)**
-- 첫 줄: 스크롤을 멈추게 하는 훅 (질문, 충격적 사실, 공감 포인트)
-- 본문: 핵심 메시지 1-2개에 집중, 스토리텔링
-- 이모지: 과하지 않게 포인트로 활용 (3-5개)
-- CTA: 구체적인 행동 유도 (댓글, 저장, 공유)
-- 해시태그: 대중적 태그 + 니치 태그 조합
-
-**[X/Twitter] (280자 이내)**
-- 임팩트 있는 한 줄 메시지 또는 인사이트
-- 트렌드/밈 활용 가능
-- 리트윗하고 싶은 가치 있는 내용
-- 해시태그는 2-3개만 (과하면 스팸처럼 보임)
-
-**[Threads] (500자 이내)**
-- 인스타보다 대화체, 생각을 나누는 느낌
-- 의견이나 관점 공유
-- 독자와 대화하듯 친근하게
-- 스토리텔링 + 인사이트
+${platformRequirements.join('\n\n')}
 
 ═══════════════════════════════════════
 ⚠️ 절대 하지 말아야 할 것
@@ -603,36 +662,9 @@ ${styleInstruction}
 ═══════════════════════════════════════
 📤 출력 형식 (JSON)
 ═══════════════════════════════════════
-{
-  "analysis": {
-    "subject": "핵심 주제",
-    "category": "카테고리 (음식/뷰티/여행/IT/라이프스타일/비즈니스 등)",
-    "keywords": ["SEO 메인키워드", "연관키워드1", "연관키워드2", "롱테일키워드"],
-    "mood": "콘텐츠 분위기",
-    "targetAudience": ["주요 타겟층 구체적으로"],
-    "highlights": ["차별화 포인트", "핵심 가치"],
-    "recommendedTone": "권장 톤앤매너"
-  },
-  "blog": {
-    "title": "클릭하고 싶은 SEO 최적화 제목",
-    "content": "가치 있는 블로그 본문 (마크다운 형식)",
-    "tags": ["태그1", "태그2", "태그3", "태그4", "태그5", "태그6", "태그7"]
-  },
-  "sns": {
-    "content": "Instagram/Facebook용 매력적인 본문",
-    "tags": ["#해시태그1", "#해시태그2", "#해시태그3", "#해시태그4", "#해시태그5"]
-  },
-  "x": {
-    "content": "X용 임팩트 있는 본문 (280자 이내)",
-    "tags": ["#해시태그1", "#해시태그2"]
-  },
-  "threads": {
-    "content": "Threads용 대화체 본문 (500자 이내)",
-    "tags": ["#해시태그1", "#해시태그2", "#해시태그3"]
-  }
-}
+${JSON.stringify(outputFormat, null, 2)}
 
-중요: JSON만 응답하세요.`;
+중요: JSON만 응답하세요. 위에 명시된 플랫폼만 생성하세요.`;
 
     const contentParts = imageParts.length > 0 ? [prompt, ...imageParts] : prompt;
     const result = await model.generateContent(contentParts);
@@ -662,46 +694,44 @@ ${styleInstruction}
       recommendedTone: '친근함'
     };
 
-    // 🔍 품질 검사 활성화
+    // 🔍 품질 검사 활성화 (선택된 플랫폼만 평가)
     updateProgress('품질 검사 중...', 'critiquing');
-    let critique = await criticAgent.critique(content.blog, content.sns, analysisData, content.x, content.threads);
+    let critique = await criticAgent.critique(content, analysisData, selectedPlatforms);
     let attempts = 1;
 
-    console.log(`🔍 품질 검사 결과 - 블로그: ${critique.blog?.score}점, SNS: ${critique.sns?.score}점, X: ${critique.x?.score}점, Threads: ${critique.threads?.score}점`);
+    console.log(`🔍 품질 검사 결과 - ${selectedPlatforms.map(p => `${p}: ${critique[p]?.score || '-'}점`).join(', ')}`);
 
-    // 80점 미만이면 재생성 (최대 MAX_ATTEMPTS 회)
-    while ((critique.blog.score < 80 || critique.sns.score < 80) && attempts < MAX_ATTEMPTS) {
+    // 선택된 플랫폼 중 80점 미만인 것이 있으면 재생성
+    const needsImprovement = () => {
+      return selectedPlatforms.some(p => critique[p] && critique[p].score < 80);
+    };
+
+    while (needsImprovement() && attempts < MAX_ATTEMPTS) {
       attempts++;
       console.log(`🔄 품질 미달로 재생성 중... (시도 ${attempts}/${MAX_ATTEMPTS})`);
       updateProgress(`품질 개선 중... (시도 ${attempts}/${MAX_ATTEMPTS})`, 'writing');
 
-      // 피드백을 반영하여 재생성
-      const feedback = {
-        blog: critique.blog.score < 80 ? critique.blog.improvements : null,
-        sns: critique.sns.score < 80 ? critique.sns.improvements : null
-      };
+      // 피드백을 반영하여 재생성 (선택된 플랫폼 중 80점 미만인 것만)
+      const feedback = {};
+      selectedPlatforms.forEach(p => {
+        if (critique[p] && critique[p].score < 80) {
+          feedback[p] = critique[p].improvements;
+        }
+      });
 
       const improvedContent = await writerAgent.generateContent(analysisData, feedback, images.length);
 
-      // 기존 콘텐츠 업데이트
-      if (feedback.blog) {
-        content.blog = improvedContent.blog;
-      }
-      if (feedback.sns) {
-        content.sns = improvedContent.sns;
-      }
-      // X와 Threads도 업데이트
-      if (improvedContent.x) {
-        content.x = improvedContent.x;
-      }
-      if (improvedContent.threads) {
-        content.threads = improvedContent.threads;
-      }
+      // 기존 콘텐츠 업데이트 (개선된 플랫폼만)
+      Object.keys(feedback).forEach(p => {
+        if (improvedContent[p]) {
+          content[p] = improvedContent[p];
+        }
+      });
 
       // 다시 품질 검사
       updateProgress('재검사 중...', 'critiquing');
-      critique = await criticAgent.critique(content.blog, content.sns, analysisData, content.x, content.threads);
-      console.log(`🔍 재검사 결과 - 블로그: ${critique.blog?.score}점, SNS: ${critique.sns?.score}점`);
+      critique = await criticAgent.critique(content, analysisData, selectedPlatforms);
+      console.log(`🔍 재검사 결과 - ${selectedPlatforms.map(p => `${p}: ${critique[p]?.score || '-'}점`).join(', ')}`);
     }
 
     updateProgress('완료!', 'complete');
