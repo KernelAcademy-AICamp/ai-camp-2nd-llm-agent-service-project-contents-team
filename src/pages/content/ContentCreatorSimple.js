@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import api, { aiContentAPI } from '../../services/api';
+import { FiCopy, FiTrash2 } from 'react-icons/fi';
+import api, { contentSessionAPI } from '../../services/api';
 import { generateAgenticContent } from '../../services/agenticService';
 import './ContentCommon.css';
 import './ContentCreatorSimple.css';
@@ -14,7 +15,7 @@ function ContentCreatorSimple() {
   // 입력 상태
   const [topic, setTopic] = useState('');
   const [style, setStyle] = useState('casual');
-  const [selectedPlatforms, setSelectedPlatforms] = useState(['instagram']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState(['sns']);
   const [imageCount, setImageCount] = useState(1);  // 이미지 생성 갯수
 
   // 생성 상태
@@ -28,6 +29,10 @@ function ContentCreatorSimple() {
   const [history, setHistory] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+  const [historyDetailTab, setHistoryDetailTab] = useState('blog'); // 상세 보기 탭
+
+  // 이미지 팝업 상태
+  const [popupImage, setPopupImage] = useState(null);
 
   // 스타일 옵션 (글 + 이미지 모두에 적용)
   const styles = [
@@ -42,17 +47,17 @@ function ContentCreatorSimple() {
   ];
 
   const platforms = [
-    { id: 'instagram', label: 'Instagram' },
-    { id: 'facebook', label: 'Facebook' },
+    { id: 'sns', label: 'Instagram/Facebook' },
     { id: 'blog', label: '블로그' },
-    { id: 'x', label: 'X (Twitter)' },
+    { id: 'x', label: 'X' },
+    { id: 'threads', label: 'Threads' },
   ];
 
-  // 생성 내역 불러오기
+  // 생성 내역 불러오기 (v2 API)
   const fetchHistory = async () => {
     setIsLoadingHistory(true);
     try {
-      const data = await aiContentAPI.list(0, 50);
+      const data = await contentSessionAPI.list(0, 50);
       setHistory(data);
     } catch (error) {
       console.error('생성 내역 로드 실패:', error);
@@ -68,31 +73,62 @@ function ContentCreatorSimple() {
     }
   }, [activeTab]);
 
-  // 내역 아이템 선택
-  const handleSelectHistory = (item) => {
-    setSelectedHistoryItem(item);
+  // 내역 아이템 선택 (이미지가 있으면 상세 API 호출)
+  const handleSelectHistory = async (item) => {
+    // 첫 번째 사용 가능한 탭 선택
+    const firstTab = item.blog ? 'blog' : item.sns ? 'sns' : item.x ? 'x' : item.threads ? 'threads' : (item.image_count > 0 ? 'images' : 'blog');
+    setHistoryDetailTab(firstTab);
+
+    // 이미지가 있는 경우 상세 API로 이미지 데이터 가져오기
+    if (item.image_count > 0) {
+      try {
+        const detail = await contentSessionAPI.get(item.id);
+        setSelectedHistoryItem(detail);
+      } catch (error) {
+        console.error('상세 조회 실패:', error);
+        setSelectedHistoryItem(item);
+      }
+    } else {
+      setSelectedHistoryItem(item);
+    }
   };
 
-  // 내역에서 복사
+  // 내역에서 복사 (v2 구조)
   const handleCopyHistoryBlog = (item) => {
-    const blogText = `${item.blog_title}\n\n${item.blog_content}\n\n태그: ${item.blog_tags?.join(', ') || ''}`;
+    if (!item.blog) return;
+    const blogText = `${item.blog.title}\n\n${item.blog.content}\n\n태그: ${item.blog.tags?.join(', ') || ''}`;
     navigator.clipboard.writeText(blogText);
     alert('블로그 콘텐츠가 복사되었습니다.');
   };
 
   const handleCopyHistorySNS = (item) => {
-    const snsText = `${item.sns_content}\n\n${item.sns_hashtags?.join(' ') || ''}`;
+    if (!item.sns) return;
+    const snsText = `${item.sns.content}\n\n${item.sns.hashtags?.join(' ') || ''}`;
     navigator.clipboard.writeText(snsText);
     alert('SNS 콘텐츠가 복사되었습니다.');
   };
 
-  // 내역 삭제
-  const handleDeleteHistory = async (contentId) => {
+  const handleCopyHistoryX = (item) => {
+    if (!item.x) return;
+    const xText = `${item.x.content}\n\n${item.x.hashtags?.join(' ') || ''}`;
+    navigator.clipboard.writeText(xText);
+    alert('X 콘텐츠가 복사되었습니다.');
+  };
+
+  const handleCopyHistoryThreads = (item) => {
+    if (!item.threads) return;
+    const threadsText = `${item.threads.content}\n\n${item.threads.hashtags?.join(' ') || ''}`;
+    navigator.clipboard.writeText(threadsText);
+    alert('Threads 콘텐츠가 복사되었습니다.');
+  };
+
+  // 내역 삭제 (v2 API)
+  const handleDeleteHistory = async (sessionId) => {
     if (!window.confirm('이 콘텐츠를 삭제하시겠습니까?')) return;
     try {
-      await aiContentAPI.delete(contentId);
-      setHistory(history.filter(item => item.id !== contentId));
-      if (selectedHistoryItem?.id === contentId) {
+      await contentSessionAPI.delete(sessionId);
+      setHistory(history.filter(item => item.id !== sessionId));
+      if (selectedHistoryItem?.id === sessionId) {
         setSelectedHistoryItem(null);
       }
       alert('삭제되었습니다.');
@@ -102,41 +138,97 @@ function ContentCreatorSimple() {
     }
   };
 
-  // 날짜 포맷
+  // 날짜 포맷 (목록용: 올해면 월/일 시:분, 지난 년도면 yy/mm/dd 시:분)
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const dateYear = date.getFullYear();
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+
+    if (dateYear === currentYear) {
+      // 올해: MM/DD HH:MM
+      return `${date.getMonth() + 1}/${date.getDate()} ${hh}:${min}`;
+    } else {
+      // 지난 년도: YY/MM/DD HH:MM
+      const yy = String(dateYear).slice(-2);
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yy}/${mm}/${dd} ${hh}:${min}`;
+    }
   };
 
-  // 자동 저장 함수
-  const autoSaveContent = async (content, imageUrls = []) => {
+  // 날짜 포맷 (상세용: 올해면 M월 D일 오전/오후 H:MM, 지난 년도면 YYYY년 M월 D일 오전/오후 H:MM)
+  const formatDateDetail = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const dateYear = date.getFullYear();
+    const hours = date.getHours();
+    const ampm = hours < 12 ? '오전' : '오후';
+    const h12 = hours % 12 || 12;
+    const min = String(date.getMinutes()).padStart(2, '0');
+
+    if (dateYear === currentYear) {
+      // 올해: M월 D일 오전/오후 H:MM
+      return `${date.getMonth() + 1}월 ${date.getDate()}일 ${ampm} ${h12}:${min}`;
+    } else {
+      // 지난 년도: YYYY년 M월 D일 오전/오후 H:MM
+      return `${dateYear}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${ampm} ${h12}:${min}`;
+    }
+  };
+
+  // 자동 저장 함수 (v2 API - 플랫폼별 분리 저장)
+  const autoSaveContent = async (content, imageUrls = [], platforms = [], currentStyle = 'casual', currentContentType = 'both', requestedImageCount = 0) => {
     try {
       const saveData = {
-        input_text: content.analysis?.subject || topic,
-        input_image_count: imageUrls.length,
-        generated_image_urls: imageUrls,
-        blog_title: content.blog?.title || '',
-        blog_content: content.blog?.content || '',
-        blog_tags: content.blog?.tags || [],
-        sns_content: content.sns?.content || '',
-        sns_hashtags: content.sns?.tags || [],
+        // 사용자 입력값
+        topic: topic,
+        content_type: currentContentType,
+        style: currentStyle,
+        selected_platforms: platforms,
+
+        // 플랫폼별 콘텐츠 (선택된 플랫폼만)
+        blog: content.blog ? {
+          title: content.blog.title,
+          content: content.blog.content,
+          tags: content.blog.tags,
+          score: content.critique?.blog?.score || null
+        } : null,
+
+        sns: content.sns ? {
+          content: content.sns.content,
+          hashtags: content.sns.tags,
+          score: content.critique?.sns?.score || null
+        } : null,
+
+        x: content.x ? {
+          content: content.x.content,
+          hashtags: content.x.tags,
+          score: content.critique?.x?.score || null
+        } : null,
+
+        threads: content.threads ? {
+          content: content.threads.content,
+          hashtags: content.threads.tags,
+          score: content.critique?.threads?.score || null
+        } : null,
+
+        // 생성된 이미지
+        images: imageUrls.map(url => ({ image_url: url, prompt: topic })),
+        requested_image_count: requestedImageCount,
+
+        // AI 분석/평가 결과
         analysis_data: content.analysis || null,
-        blog_score: content.critique?.blog?.score || null,
-        sns_score: content.critique?.sns?.score || null,
         critique_data: content.critique || null,
         generation_attempts: content.metadata?.attempts || 1
       };
 
-      await aiContentAPI.save(saveData);
-      console.log('✅ AI 콘텐츠 자동 저장 완료');
+      await contentSessionAPI.save(saveData);
+      console.log('✅ 콘텐츠 세션 저장 완료');
     } catch (error) {
-      console.error('콘텐츠 자동 저장 실패:', error);
+      console.error('콘텐츠 저장 실패:', error);
     }
   };
 
@@ -161,7 +253,9 @@ function ContentCreatorSimple() {
         setProgress('AI가 글을 작성하고 있습니다...');
 
         const hasBlog = selectedPlatforms.includes('blog');
-        const hasSNS = selectedPlatforms.some(p => ['instagram', 'facebook', 'x'].includes(p));
+        const hasSNS = selectedPlatforms.includes('sns');
+        const hasX = selectedPlatforms.includes('x');
+        const hasThreads = selectedPlatforms.includes('threads');
 
         // 선택된 스타일 정보 가져오기
         const selectedStyle = styles.find(s => s.id === style);
@@ -176,9 +270,15 @@ function ContentCreatorSimple() {
           (progress) => setProgress(progress.message)
         );
 
+        // 원본 agenticResult 저장 (저장용)
+        generatedResult.agenticResult = agenticResult;
+
+        // UI 표시용 (플랫폼 선택에 따라 필터링)
         generatedResult.text = {
           blog: hasBlog ? agenticResult.blog : null,
           sns: hasSNS ? agenticResult.sns : null,
+          x: hasX ? agenticResult.x : null,
+          threads: hasThreads ? agenticResult.threads : null,
           analysis: agenticResult.analysis,
           critique: agenticResult.critique,
           platforms: selectedPlatforms,
@@ -224,15 +324,22 @@ function ContentCreatorSimple() {
       }
 
       // 자동 저장 (글 + 이미지 모두 생성 후)
-      if (generatedResult.text) {
+      // 선택된 플랫폼의 콘텐츠만 저장 (원본 agenticResult에서 가져옴)
+      if (generatedResult.agenticResult || generatedResult.text) {
         const imageUrls = generatedResult.images?.map(img => img.url) || [];
+        const platforms = generatedResult.text?.platforms || [];
+        const original = generatedResult.agenticResult || {};
+
         await autoSaveContent({
-          blog: generatedResult.text.blog,
-          sns: generatedResult.text.sns,
-          analysis: generatedResult.text.analysis,
-          critique: generatedResult.text.critique,
-          metadata: { attempts: 1 }
-        }, imageUrls);
+          // 선택된 플랫폼만 저장 (원본 데이터 사용)
+          blog: platforms.includes('blog') ? original.blog : null,
+          sns: platforms.includes('sns') ? original.sns : null,
+          x: platforms.includes('x') ? original.x : null,
+          threads: platforms.includes('threads') ? original.threads : null,
+          analysis: original.analysis || generatedResult.text?.analysis,
+          critique: original.critique || generatedResult.text?.critique,
+          metadata: { attempts: original.metadata?.attempts || 1 }
+        }, imageUrls, platforms, style, contentType, imageCount);
       }
 
       setResult(generatedResult);
@@ -267,6 +374,22 @@ function ContentCreatorSimple() {
       const snsText = `${result.text.sns.content}\n\n${result.text.sns.tags.join(' ')}`;
       navigator.clipboard.writeText(snsText);
       alert('SNS 콘텐츠가 복사되었습니다.');
+    }
+  };
+
+  const handleCopyX = () => {
+    if (result?.text?.x) {
+      const xText = `${result.text.x.content}\n\n${result.text.x.tags.join(' ')}`;
+      navigator.clipboard.writeText(xText);
+      alert('X 콘텐츠가 복사되었습니다.');
+    }
+  };
+
+  const handleCopyThreads = () => {
+    if (result?.text?.threads) {
+      const threadsText = `${result.text.threads.content}\n\n${result.text.threads.tags.join(' ')}`;
+      navigator.clipboard.writeText(threadsText);
+      alert('Threads 콘텐츠가 복사되었습니다.');
     }
   };
 
@@ -452,110 +575,159 @@ function ContentCreatorSimple() {
       {/* 결과 탭 */}
       {activeTab === 'result' && result && (
         <div className="result-content">
-          {/* 품질 점수 표시 */}
-          {result.text?.critique && (
-            <div className="quality-scores">
-              <div className="quality-score-card">
-                <div className="score-circle blog">
-                  <span className="score-number">{result.text.critique.blog?.score || '-'}</span>
+          {/* 생성된 이미지들 (상단) */}
+          {result.images && result.images.length > 0 && (
+            <div className="result-card result-images-top">
+              <div className="result-card-header">
+                <h3>생성된 이미지 ({result.images.length}장)</h3>
+                <div className="result-card-actions">
+                  {result.images.length > 1 && (
+                    <button className="btn-download" onClick={handleDownloadAllImages}>
+                      전체 다운로드
+                    </button>
+                  )}
                 </div>
-                <span className="score-label">블로그 품질</span>
               </div>
-              <div className="quality-score-card">
-                <div className="score-circle sns">
-                  <span className="score-number">{result.text.critique.sns?.score || '-'}</span>
+              <div className="result-card-content">
+                <div className="images-grid">
+                  {result.images.map((img, index) => (
+                    <div key={index} className="image-item" onClick={() => setPopupImage(img.url)}>
+                      <img src={img.url} alt={`Generated ${index + 1}`} />
+                      <button
+                        className="btn-download-single"
+                        onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.url, index); }}
+                      >
+                        다운로드
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <span className="score-label">SNS 품질</span>
               </div>
             </div>
           )}
 
-          <div className="result-grid">
-            {/* 블로그 콘텐츠 */}
-            {result.text?.blog && (
-              <div className="result-card">
-                <div className="result-card-header">
-                  <h3>네이버 블로그</h3>
-                  <div className="result-card-actions">
-                    {result.text.critique?.blog?.score && (
-                      <span className="score-badge blog">{result.text.critique.blog.score}점</span>
-                    )}
-                    <button className="btn-copy" onClick={handleCopyBlog}>
-                      복사
-                    </button>
-                  </div>
-                </div>
-                <div className="result-card-content">
-                  <div className="blog-title">{result.text.blog.title}</div>
-                  <div className="text-result">
-                    {result.text.blog.content}
-                  </div>
-                  <div className="result-tags">
-                    {result.text.blog.tags.map((tag, idx) => (
-                      <span key={idx} className="tag-item">{tag}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* SNS 콘텐츠 */}
-            {result.text?.sns && (
-              <div className="result-card">
-                <div className="result-card-header">
-                  <h3>SNS (Instagram/Facebook)</h3>
-                  <div className="result-card-actions">
-                    {result.text.critique?.sns?.score && (
-                      <span className="score-badge sns">{result.text.critique.sns.score}점</span>
-                    )}
-                    <button className="btn-copy" onClick={handleCopySNS}>
-                      복사
-                    </button>
-                  </div>
-                </div>
-                <div className="result-card-content">
-                  <div className="text-result sns-content">
-                    {result.text.sns.content}
-                  </div>
-                  <div className="result-tags">
-                    {result.text.sns.tags.map((tag, idx) => (
-                      <span key={idx} className="tag-item hashtag">{tag}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 생성된 이미지들 */}
-            {result.images && result.images.length > 0 && (
-              <div className="result-card result-card-full">
-                <div className="result-card-header">
-                  <h3>생성된 이미지 ({result.images.length}장)</h3>
-                  <div className="result-card-actions">
-                    {result.images.length > 1 && (
-                      <button className="btn-download" onClick={handleDownloadAllImages}>
-                        전체 다운로드
+          {/* 2열 레이아웃: 블로그 (좌) | SNS 플랫폼들 (우) */}
+          <div className="result-two-column">
+            {/* 좌측: 블로그 */}
+            <div className="result-column-left">
+              {/* 블로그 콘텐츠 */}
+              {result.text?.blog && (
+                <div className="result-card">
+                  <div className="result-card-header">
+                    <h3>네이버 블로그</h3>
+                    <div className="result-card-actions">
+                      <button className="btn-icon" onClick={handleCopyBlog} title="복사">
+                        <FiCopy />
                       </button>
-                    )}
+                    </div>
+                  </div>
+                  <div className="result-card-content">
+                    <div className="blog-title">{result.text.blog.title}</div>
+                    <div className="text-result">
+                      {result.text.blog.content}
+                    </div>
+                    <div className="result-tags">
+                      {result.text.blog.tags.map((tag, idx) => (
+                        <span key={idx} className="tag-item">{tag}</span>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div className="result-card-content">
-                  <div className="images-grid">
-                    {result.images.map((img, index) => (
-                      <div key={index} className="image-item">
-                        <img src={img.url} alt={`Generated ${index + 1}`} />
-                        <button
-                          className="btn-download-single"
-                          onClick={() => handleDownloadImage(img.url, index)}
-                        >
-                          다운로드
-                        </button>
-                      </div>
-                    ))}
+              )}
+            </div>
+
+            {/* 우측: 품질 점수 + SNS 플랫폼들 (세로 정렬) */}
+            <div className="result-column-right">
+              {/* 품질 점수 (우측 상단) */}
+              {result.text?.critique && (
+                <div className="quality-scores">
+                  <div className="quality-score-card">
+                    <div className="score-circle blog">
+                      <span className="score-number">{result.text.critique.blog?.score || '-'}</span>
+                    </div>
+                    <span className="score-label">블로그 품질</span>
+                  </div>
+                  <div className="quality-score-card">
+                    <div className="score-circle sns">
+                      <span className="score-number">{result.text.critique.sns?.score || '-'}</span>
+                    </div>
+                    <span className="score-label">SNS 품질</span>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* SNS 콘텐츠 (Instagram/Facebook) */}
+              {result.text?.sns && (
+                <div className="result-card">
+                  <div className="result-card-header">
+                    <h3>Instagram / Facebook</h3>
+                    <div className="result-card-actions">
+                      <button className="btn-icon" onClick={handleCopySNS} title="복사">
+                        <FiCopy />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="result-card-content">
+                    <div className="text-result sns-content">
+                      {result.text.sns.content}
+                    </div>
+                    <div className="result-tags">
+                      {result.text.sns.tags.map((tag, idx) => (
+                        <span key={idx} className="tag-item hashtag">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* X 콘텐츠 */}
+              {result.text?.x && (
+                <div className="result-card">
+                  <div className="result-card-header">
+                    <h3>X</h3>
+                    <div className="result-card-actions">
+                      <button className="btn-icon" onClick={handleCopyX} title="복사">
+                        <FiCopy />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="result-card-content">
+                    <div className="text-result sns-content">
+                      {result.text.x.content}
+                    </div>
+                    <div className="result-tags">
+                      {result.text.x.tags.map((tag, idx) => (
+                        <span key={idx} className="tag-item hashtag">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Threads 콘텐츠 */}
+              {result.text?.threads && (
+                <div className="result-card">
+                  <div className="result-card-header">
+                    <h3>Threads</h3>
+                    <div className="result-card-actions">
+                      <button className="btn-icon" onClick={handleCopyThreads} title="복사">
+                        <FiCopy />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="result-card-content">
+                    <div className="text-result sns-content">
+                      {result.text.threads.content}
+                    </div>
+                    <div className="result-tags">
+                      {result.text.threads.tags.map((tag, idx) => (
+                        <span key={idx} className="tag-item hashtag">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 액션 버튼 */}
@@ -595,19 +767,22 @@ function ContentCreatorSimple() {
                     onClick={() => handleSelectHistory(item)}
                   >
                     <div className="history-item-header">
-                      <h4>{item.blog_title || '제목 없음'}</h4>
+                      <h4>{item.topic || '주제 없음'}</h4>
                       <span className="history-date">{formatDate(item.created_at)}</span>
                     </div>
-                    <p className="history-preview">
-                      {item.blog_content?.substring(0, 80)}...
-                    </p>
+                    <div className="history-item-info">
+                      <span className="info-badge type">
+                        {item.content_type === 'text' ? '글만' : item.content_type === 'image' ? '이미지만' : '글+이미지'}
+                      </span>
+                      <span className="info-badge style">
+                        {styles.find(s => s.id === item.style)?.label || item.style}
+                      </span>
+                    </div>
                     <div className="history-item-meta">
-                      {item.blog_score && (
-                        <span className="score-badge blog">블로그 {item.blog_score}점</span>
-                      )}
-                      {item.sns_score && (
-                        <span className="score-badge sns">SNS {item.sns_score}점</span>
-                      )}
+                      {item.blog && <span className="platform-badge">블로그</span>}
+                      {item.sns && <span className="platform-badge">SNS</span>}
+                      {item.x && <span className="platform-badge">X</span>}
+                      {item.threads && <span className="platform-badge">Threads</span>}
                     </div>
                   </div>
                 ))}
@@ -617,83 +792,200 @@ function ContentCreatorSimple() {
               <div className="history-detail">
                 {selectedHistoryItem ? (
                   <>
-                    {/* 블로그 콘텐츠 */}
-                    <div className="result-card">
-                      <div className="result-card-header">
-                        <h3>네이버 블로그</h3>
-                        <div className="result-card-actions">
-                          <button className="btn-copy" onClick={() => handleCopyHistoryBlog(selectedHistoryItem)}>
-                            복사
-                          </button>
-                          <button className="btn-delete" onClick={() => handleDeleteHistory(selectedHistoryItem.id)}>
-                            삭제
-                          </button>
-                        </div>
+                    {/* 세션 정보 헤더 */}
+                    <div className="history-detail-header">
+                      <div className="history-detail-title-row">
+                        <h3>{selectedHistoryItem.topic}</h3>
+                        <button className="btn-icon btn-icon-delete" onClick={() => handleDeleteHistory(selectedHistoryItem.id)} title="삭제">
+                          <FiTrash2 />
+                        </button>
                       </div>
-                      <div className="result-card-content">
-                        <div className="blog-title">{selectedHistoryItem.blog_title}</div>
-                        <div className="text-result">
-                          {selectedHistoryItem.blog_content}
-                        </div>
-                        {selectedHistoryItem.blog_tags && (
-                          <div className="result-tags">
-                            {selectedHistoryItem.blog_tags.map((tag, idx) => (
-                              <span key={idx} className="tag-item">{tag}</span>
-                            ))}
-                          </div>
-                        )}
+                      <div className="history-detail-meta">
+                        <span className="info-badge type">
+                          {selectedHistoryItem.content_type === 'text' ? '글만' : selectedHistoryItem.content_type === 'image' ? '이미지만' : '글+이미지'}
+                        </span>
+                        <span className="info-badge style">
+                          {styles.find(s => s.id === selectedHistoryItem.style)?.label || selectedHistoryItem.style}
+                        </span>
+                        <span className="history-date">{formatDateDetail(selectedHistoryItem.created_at)}</span>
                       </div>
                     </div>
 
-                    {/* SNS 콘텐츠 */}
-                    {selectedHistoryItem.sns_content && (
-                      <div className="result-card">
-                        <div className="result-card-header">
-                          <h3>SNS (Instagram/Facebook)</h3>
-                          <div className="result-card-actions">
-                            <button className="btn-copy" onClick={() => handleCopyHistorySNS(selectedHistoryItem)}>
-                              복사
-                            </button>
+                    {/* 플랫폼 탭 */}
+                    <div className="history-detail-tabs">
+                      {selectedHistoryItem.blog && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'blog' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('blog')}
+                        >
+                          블로그
+                        </button>
+                      )}
+                      {selectedHistoryItem.sns && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'sns' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('sns')}
+                        >
+                          SNS
+                        </button>
+                      )}
+                      {selectedHistoryItem.x && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'x' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('x')}
+                        >
+                          X
+                        </button>
+                      )}
+                      {selectedHistoryItem.threads && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'threads' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('threads')}
+                        >
+                          Threads
+                        </button>
+                      )}
+                      {selectedHistoryItem.images && selectedHistoryItem.images.length > 0 && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'images' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('images')}
+                        >
+                          이미지 ({selectedHistoryItem.images.length})
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 탭 콘텐츠 */}
+                    <div className="history-detail-content">
+                      {/* 블로그 콘텐츠 */}
+                      {historyDetailTab === 'blog' && selectedHistoryItem.blog && (
+                        <div className="result-card">
+                          <div className="result-card-header">
+                            <h3>네이버 블로그</h3>
+                            <div className="result-card-actions">
+                              <button className="btn-icon" onClick={() => handleCopyHistoryBlog(selectedHistoryItem)} title="복사">
+                                <FiCopy />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="result-card-content">
+                            <div className="blog-title">{selectedHistoryItem.blog.title}</div>
+                            <div className="text-result">
+                              {selectedHistoryItem.blog.content}
+                            </div>
+                            {selectedHistoryItem.blog.tags && (
+                              <div className="result-tags">
+                                {selectedHistoryItem.blog.tags.map((tag, idx) => (
+                                  <span key={idx} className="tag-item">{tag}</span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="result-card-content">
-                          <div className="text-result sns-content">
-                            {selectedHistoryItem.sns_content}
+                      )}
+
+                      {/* SNS 콘텐츠 */}
+                      {historyDetailTab === 'sns' && selectedHistoryItem.sns && (
+                        <div className="result-card">
+                          <div className="result-card-header">
+                            <h3>SNS (Instagram/Facebook)</h3>
+                            <div className="result-card-actions">
+                              <button className="btn-icon" onClick={() => handleCopyHistorySNS(selectedHistoryItem)} title="복사">
+                                <FiCopy />
+                              </button>
+                            </div>
                           </div>
-                          {selectedHistoryItem.sns_hashtags && (
-                            <div className="result-tags">
-                              {selectedHistoryItem.sns_hashtags.map((tag, idx) => (
-                                <span key={idx} className="tag-item hashtag">{tag}</span>
+                          <div className="result-card-content">
+                            <div className="text-result sns-content">
+                              {selectedHistoryItem.sns.content}
+                            </div>
+                            {selectedHistoryItem.sns.hashtags && (
+                              <div className="result-tags">
+                                {selectedHistoryItem.sns.hashtags.map((tag, idx) => (
+                                  <span key={idx} className="tag-item hashtag">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* X 콘텐츠 */}
+                      {historyDetailTab === 'x' && selectedHistoryItem.x && (
+                        <div className="result-card">
+                          <div className="result-card-header">
+                            <h3>X</h3>
+                            <div className="result-card-actions">
+                              <button className="btn-icon" onClick={() => handleCopyHistoryX(selectedHistoryItem)} title="복사">
+                                <FiCopy />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="result-card-content">
+                            <div className="text-result sns-content">
+                              {selectedHistoryItem.x.content}
+                            </div>
+                            {selectedHistoryItem.x.hashtags && (
+                              <div className="result-tags">
+                                {selectedHistoryItem.x.hashtags.map((tag, idx) => (
+                                  <span key={idx} className="tag-item hashtag">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Threads 콘텐츠 */}
+                      {historyDetailTab === 'threads' && selectedHistoryItem.threads && (
+                        <div className="result-card">
+                          <div className="result-card-header">
+                            <h3>Threads</h3>
+                            <div className="result-card-actions">
+                              <button className="btn-icon" onClick={() => handleCopyHistoryThreads(selectedHistoryItem)} title="복사">
+                                <FiCopy />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="result-card-content">
+                            <div className="text-result sns-content">
+                              {selectedHistoryItem.threads.content}
+                            </div>
+                            {selectedHistoryItem.threads.hashtags && (
+                              <div className="result-tags">
+                                {selectedHistoryItem.threads.hashtags.map((tag, idx) => (
+                                  <span key={idx} className="tag-item hashtag">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 생성된 이미지 */}
+                      {historyDetailTab === 'images' && selectedHistoryItem.images && selectedHistoryItem.images.length > 0 && (
+                        <div className="result-card result-card-full">
+                          <div className="result-card-header">
+                            <h3>생성된 이미지 ({selectedHistoryItem.images.length}장)</h3>
+                          </div>
+                          <div className="result-card-content">
+                            <div className="images-grid">
+                              {selectedHistoryItem.images.map((img, idx) => (
+                                <div key={idx} className="image-item" onClick={() => setPopupImage(img.image_url)}>
+                                  <img src={img.image_url} alt={`생성된 이미지 ${idx + 1}`} />
+                                  <button
+                                    className="btn-download-single"
+                                    onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.image_url, idx); }}
+                                  >
+                                    다운로드
+                                  </button>
+                                </div>
                               ))}
                             </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 생성된 이미지 */}
-                    {selectedHistoryItem.generated_image_urls && selectedHistoryItem.generated_image_urls.length > 0 && (
-                      <div className="result-card result-card-full">
-                        <div className="result-card-header">
-                          <h3>생성된 이미지 ({selectedHistoryItem.generated_image_urls.length}장)</h3>
-                        </div>
-                        <div className="result-card-content">
-                          <div className="images-grid">
-                            {selectedHistoryItem.generated_image_urls.map((url, idx) => (
-                              <div key={idx} className="image-item">
-                                <img src={url} alt={`생성된 이미지 ${idx + 1}`} />
-                                <button
-                                  className="btn-download-single"
-                                  onClick={() => handleDownloadImage(url, idx)}
-                                >
-                                  다운로드
-                                </button>
-                              </div>
-                            ))}
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </>
                 ) : (
                   <div className="empty-detail">
@@ -704,6 +996,18 @@ function ContentCreatorSimple() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 이미지 팝업 */}
+      {popupImage && (
+        <div className="image-popup-overlay" onClick={() => setPopupImage(null)}>
+          <div className="image-popup-content" onClick={(e) => e.stopPropagation()}>
+            <button className="image-popup-close" onClick={() => setPopupImage(null)}>
+              ✕
+            </button>
+            <img src={popupImage} alt="확대 이미지" />
+          </div>
         </div>
       )}
     </div>

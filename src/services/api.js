@@ -422,7 +422,7 @@ export const threadsAPI = {
 };
 
 // ==========================================
-// AI 콘텐츠 API
+// AI 콘텐츠 API (레거시)
 // ==========================================
 export const aiContentAPI = {
   // AI 콘텐츠 저장
@@ -446,6 +446,35 @@ export const aiContentAPI = {
   // 콘텐츠 삭제
   delete: async (contentId) => {
     const response = await api.delete(`/api/ai-content/${contentId}`);
+    return response.data;
+  },
+};
+
+// ==========================================
+// AI 콘텐츠 API v2 (플랫폼별 분리 저장)
+// ==========================================
+export const contentSessionAPI = {
+  // 콘텐츠 세션 저장
+  save: async (data) => {
+    const response = await api.post('/api/ai-content/v2/save', data);
+    return response.data;
+  },
+
+  // 세션 목록 조회
+  list: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/ai-content/v2/list?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 특정 세션 조회
+  get: async (sessionId) => {
+    const response = await api.get(`/api/ai-content/v2/${sessionId}`);
+    return response.data;
+  },
+
+  // 세션 삭제
+  delete: async (sessionId) => {
+    const response = await api.delete(`/api/ai-content/v2/${sessionId}`);
     return response.data;
   },
 };

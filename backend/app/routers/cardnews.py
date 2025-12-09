@@ -431,16 +431,16 @@ class CardNewsBuilder:
         """로고 배지 추가 (상단 중앙)"""
         import os
 
-        # 로고 파일 경로 (ddukddak_white-Photoroom.png 사용)
-        logo_path = os.path.join(os.path.dirname(__file__), "../../../public/ddukddak_white-Photoroom.png")
+        # 로고 파일 경로 (ddukddak_white.png 사용)
+        logo_path = os.path.join(os.path.dirname(__file__), "../../../public/ddukddak_white.png")
 
         # 프로젝트 루트 기준 경로도 시도
         if not os.path.exists(logo_path):
-            logo_path = os.path.join(os.path.dirname(__file__), "../../../../public/ddukddak_white-Photoroom.png")
+            logo_path = os.path.join(os.path.dirname(__file__), "../../../../public/ddukddak_white.png")
 
         if not os.path.exists(logo_path):
             # 절대 경로로 시도
-            logo_path = "/Users/ohhwayoung/Desktop/ai-content/ai-camp-2nd-llm-agent-service-project-contents-team/public/ddukddak_white-Photoroom.png"
+            logo_path = "/Users/ohhwayoung/Desktop/ai-content/ai-camp-2nd-llm-agent-service-project-contents-team/public/ddukddak_white.png"
 
         try:
             # 로고 이미지 로드

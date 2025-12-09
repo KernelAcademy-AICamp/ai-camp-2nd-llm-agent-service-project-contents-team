@@ -35,7 +35,7 @@ function OAuthCallback() {
           if (!userInfo.onboarding_completed) {
             window.location.href = '/onboarding';
           } else {
-            window.location.href = '/home';
+            window.location.href = '/dashboard';
           }
         }, 1000);
 

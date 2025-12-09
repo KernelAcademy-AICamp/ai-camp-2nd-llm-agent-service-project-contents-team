@@ -665,19 +665,6 @@
   margin-bottom: 20px;
 }
 
-/* .preview-image {
-  width: 100%;
-  aspect-ratio: 1;
-  overflow: hidden;
-  background: #f3f4f6;
-}
-
-.preview-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-} */
-
 .preview-content {
   padding: 16px;
 }

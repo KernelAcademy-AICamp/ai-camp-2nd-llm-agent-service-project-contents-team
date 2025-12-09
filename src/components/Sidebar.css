@@ -1,6 +1,6 @@
 /* ========================================
-   SIDEBAR - BAUHAUS STYLE
-   Clean vertical navigation
+   SIDEBAR - EXPANDABLE ON HOVER
+   Icon-only, expands to show text on hover
    ======================================== */
 
 .sidebar {
@@ -8,11 +8,19 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 200px;
-  background-color: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
-  overflow-y: auto;
+  width: 64px;
+  background-color: #D8BFD8;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
   z-index: 999;
+  transition: width 0.2s ease;
+  overflow: hidden;
+}
+
+/* 호버 시 확장 */
+.sidebar:hover {
+  width: 200px;
 }
 
 /* Logo */
@@ -20,185 +28,298 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-sm);
-  border-bottom: 1px solid var(--border-color);
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 16px;
   cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.sidebar-logo:hover {
-  background-color: var(--accent-color);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .sidebar-logo img {
-  height: 70px;
+  max-height: 44px;
+  max-width: 44px;
   width: auto;
+  height: auto;
+  object-fit: contain;
+  transition: all 0.2s ease;
+}
+
+/* 호버 시 로고 확장 */
+.sidebar:hover .sidebar-logo {
+  width: 180px;
+  height: 60px;
+}
+
+.sidebar:hover .sidebar-logo img {
+  max-height: 60px;
+  max-width: 180px;
 }
 
 .sidebar-nav {
-  padding: var(--space-md) 0;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 4px;
+  width: 100%;
+  padding: 0 10px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
+/* 메뉴 아이템 */
 .sidebar-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md) var(--space-lg);
+  gap: 12px;
+  width: 100%;
+  height: 44px;
+  padding: 0 11px;
   text-decoration: none;
   color: var(--text-secondary);
-  transition: all 0.15s ease;
+  opacity: 0.7;
+  transition: all 0.2s ease;
   font-size: 14px;
-  font-weight: 500;
   border: none;
   background: none;
   cursor: pointer;
-  width: 100%;
-  text-align: left;
+  border-radius: 12px;
+  white-space: nowrap;
 }
 
 .sidebar-item:hover {
-  background-color: var(--accent-color);
-  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.15);
+  opacity: 1;
 }
 
 .sidebar-item.active {
-  background: var(--accent-color);
-  color: var(--primary-color);
-  font-weight: 600;
+  background-color: rgba(255, 255, 255, 0.2);
+  opacity: 1;
 }
 
+.sidebar-item .sidebar-icon {
+  font-size: 22px;
+  min-width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 라벨 - 기본 숨김, 호버 시 표시 */
 .sidebar-label {
-  flex: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  font-weight: 500;
+}
+
+.sidebar:hover .sidebar-label {
+  opacity: 1;
+}
+
+/* 툴팁 제거 (확장 방식으로 대체) */
+.sidebar-item::after {
+  display: none;
 }
 
 /* Dropdown Styles */
 .sidebar-dropdown {
   position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-.sidebar-dropdown-header {
+.sidebar-dropdown-trigger {
   display: flex;
   align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 44px;
+  padding: 0 11px;
 }
 
-.sidebar-dropdown-header .sidebar-dropdown-trigger {
-  flex: 1;
+.sidebar-dropdown-arrow {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.2s ease;
 }
 
-.sidebar-dropdown-toggle {
-  padding: var(--space-md) var(--space-md);
-  background: none;
-  border: none;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  font-size: 10px;
-  transition: all 0.15s ease;
+.sidebar:hover .sidebar-dropdown-arrow {
+  opacity: 0.7;
 }
 
-.sidebar-dropdown-toggle:hover {
-  color: var(--text-primary);
-  background: var(--accent-color);
-}
-
-.sidebar-dropdown-toggle.open {
+.sidebar-dropdown:hover .sidebar-dropdown-arrow,
+.sidebar-dropdown-menu.open + .sidebar-dropdown-arrow {
   transform: rotate(180deg);
 }
 
 .sidebar-dropdown-menu {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  background: var(--bg-tertiary);
+  gap: 2px;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.2s ease, padding 0.2s ease;
+  padding: 0;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  margin: 2px 0 0 0;
+}
+
+.sidebar-dropdown:hover .sidebar-dropdown-menu,
+.sidebar-dropdown-menu.open {
+  max-height: 200px;
+  padding: 4px;
 }
 
 .sidebar-dropdown-item {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-3xl);
+  gap: 12px;
+  width: 100%;
+  height: 40px;
+  padding: 0 11px;
   text-decoration: none;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
+  opacity: 0.7;
   transition: all 0.15s ease;
   font-size: 13px;
-  font-weight: 500;
   border: none;
   background: none;
   cursor: pointer;
-  width: 100%;
-  text-align: left;
+  border-radius: 8px;
+  white-space: nowrap;
 }
 
 .sidebar-dropdown-item:hover {
-  background-color: var(--accent-color);
-  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.1);
+  opacity: 1;
 }
 
 .sidebar-dropdown-item.active {
-  color: var(--primary-color);
-  font-weight: 600;
+  background-color: rgba(255, 255, 255, 0.15);
+  opacity: 1;
+}
+
+.sidebar-dropdown-item .sidebar-icon {
+  font-size: 18px;
+  min-width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-dropdown-item .sidebar-label {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  font-weight: 500;
+}
+
+.sidebar:hover .sidebar-dropdown-item .sidebar-label {
+  opacity: 1;
+}
+
+/* 드롭다운 아이템 툴팁 제거 */
+.sidebar-dropdown-item::after {
+  display: none;
 }
 
 /* Divider */
 .sidebar-divider {
+  width: calc(100% - 20px);
   height: 1px;
-  background-color: var(--border-color);
-  margin: var(--space-md) var(--space-lg);
+  background-color: var(--text-secondary);
+  opacity: 0.15;
+  margin: 8px 10px;
+  flex-shrink: 0;
 }
 
-/* Section Label */
+/* Section Label - Hidden */
 .sidebar-section-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: var(--space-md) var(--space-lg) var(--space-xs);
+  display: none;
+}
+
+/* Bottom section */
+.sidebar-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 10px;
+  margin-top: auto;
+  padding-bottom: 8px;
 }
 
 /* Mobile responsive */
 @media (max-width: 768px) {
   .sidebar {
-    width: 64px;
+    bottom: 0;
+    top: auto;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 64px;
+    flex-direction: row;
+    justify-content: space-around;
+    padding: 0 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .sidebar:hover {
+    width: 100%;
   }
 
   .sidebar-logo {
-    padding: var(--space-md);
-  }
-
-  .sidebar-logo img {
-    height: 28px;
-  }
-
-  .sidebar-label {
     display: none;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    gap: 0;
+    padding: 0;
+    justify-content: space-around;
+    width: 100%;
+    overflow: visible;
   }
 
   .sidebar-item {
+    width: 44px;
+    padding: 0;
     justify-content: center;
-    padding: var(--space-md);
   }
 
-  .sidebar-item.active {
-    border-right: none;
-    border-bottom: none;
+  .sidebar-label {
+    display: none !important;
   }
 
-  .sidebar-dropdown-arrow {
-    display: none;
-  }
-
-  .sidebar-dropdown-menu {
-    display: none;
-  }
-
-  .sidebar-section-label {
+  .sidebar-bottom {
     display: none;
   }
 
   .sidebar-divider {
-    margin: var(--space-sm);
+    display: none;
+  }
+
+  .sidebar-dropdown-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    top: auto;
+    width: auto;
+  }
+
+  .sidebar-dropdown-item {
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .sidebar-dropdown-item .sidebar-label {
+    display: none !important;
   }
 }

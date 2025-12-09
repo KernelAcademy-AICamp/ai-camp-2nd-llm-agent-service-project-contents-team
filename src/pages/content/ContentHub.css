@@ -204,7 +204,7 @@
 /* 카드 위치 및 스타일 */
 .preview-card.preview-blog {
   top: 0;
-  left: 30px;
+  left: 60px;
   z-index: 3;
   transform: rotate(-3deg);
   border: 2px solid #D8BFD8;
@@ -222,9 +222,9 @@
 
 .preview-card.preview-video {
   top: 240px;
-  left: 15px;
+  left: 50px;
   z-index: 0;
-  transform: rotate(-3deg);
+  transform: rotate(-6deg);
   border: 2px solid #D8BFD8;
   background: #F8F8FF;
   min-height: 360px;
@@ -232,7 +232,7 @@
 
 .preview-card.preview-image {
   top: 160px;
-  left: 50px;
+  left: 100px;
   z-index: 1;
   transform: rotate(3deg);
   border: 2px solid #D8BFD8;
