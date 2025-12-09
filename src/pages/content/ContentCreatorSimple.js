@@ -9,13 +9,13 @@ function ContentCreatorSimple() {
   // 탭 상태
   const [activeTab, setActiveTab] = useState('create');
 
-  // 콘텐츠 타입: 'text' | 'image' | 'both'
-  const [contentType, setContentType] = useState('both');
+  // 콘텐츠 타입: 'text' | 'image' | 'both' | null
+  const [contentType, setContentType] = useState(null);
 
   // 입력 상태
   const [topic, setTopic] = useState('');
-  const [style, setStyle] = useState('casual');
-  const [selectedPlatforms, setSelectedPlatforms] = useState(['sns']);
+  const [style, setStyle] = useState(null);
+  const [selectedPlatforms, setSelectedPlatforms] = useState([]);
   const [imageCount, setImageCount] = useState(1);  // 이미지 생성 갯수
 
   // 생성 상태
@@ -73,22 +73,18 @@ function ContentCreatorSimple() {
     }
   }, [activeTab]);
 
-  // 내역 아이템 선택 (이미지가 있으면 상세 API 호출)
+  // 내역 아이템 선택 (상세 API 호출하여 전체 콘텐츠 가져오기)
   const handleSelectHistory = async (item) => {
     // 첫 번째 사용 가능한 탭 선택
     const firstTab = item.blog ? 'blog' : item.sns ? 'sns' : item.x ? 'x' : item.threads ? 'threads' : (item.image_count > 0 ? 'images' : 'blog');
     setHistoryDetailTab(firstTab);
 
-    // 이미지가 있는 경우 상세 API로 이미지 데이터 가져오기
-    if (item.image_count > 0) {
-      try {
-        const detail = await contentSessionAPI.get(item.id);
-        setSelectedHistoryItem(detail);
-      } catch (error) {
-        console.error('상세 조회 실패:', error);
-        setSelectedHistoryItem(item);
-      }
-    } else {
+    // 항상 상세 API 호출 (목록 API는 content를 포함하지 않음)
+    try {
+      const detail = await contentSessionAPI.get(item.id);
+      setSelectedHistoryItem(detail);
+    } catch (error) {
+      console.error('상세 조회 실패:', error);
       setSelectedHistoryItem(item);
     }
   };
@@ -260,12 +256,13 @@ function ContentCreatorSimple() {
         // 선택된 스타일 정보 가져오기
         const selectedStyle = styles.find(s => s.id === style);
 
-        // agenticService로 블로그 + SNS 콘텐츠 생성 (스타일 적용)
+        // agenticService로 콘텐츠 생성 (선택된 플랫폼만, 스타일 적용)
         const agenticResult = await generateAgenticContent(
           {
             textInput: topic,
             images: [],
-            styleTone: selectedStyle?.textTone || '친근하고 편안한 말투로'
+            styleTone: selectedStyle?.textTone || '친근하고 편안한 말투로',
+            selectedPlatforms: selectedPlatforms
           },
           (progress) => setProgress(progress.message)
         );
@@ -340,6 +337,9 @@ function ContentCreatorSimple() {
           critique: original.critique || generatedResult.text?.critique,
           metadata: { attempts: original.metadata?.attempts || 1 }
         }, imageUrls, platforms, style, contentType, imageCount);
+
+        // 저장 후 히스토리 새로고침 (다음에 히스토리 탭 열 때 최신 데이터 표시)
+        fetchHistory();
       }
 
       setResult(generatedResult);
@@ -446,19 +446,7 @@ function ContentCreatorSimple() {
       {activeTab === 'create' && (
         <div className="content-grid single-column">
           <div className="form-section">
-            {/* 주제 입력 */}
-            <div className="form-group">
-              <label>주제 *</label>
-              <textarea
-                className="form-textarea"
-                placeholder="예: 가을 신상 니트 소개, 카페 오픈 이벤트 안내, 새로운 메뉴 출시..."
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                rows={3}
-              />
-            </div>
-
-            {/* 콘텐츠 타입 선택 */}
+            {/* 콘텐츠 타입 선택 (가장 상단) */}
             <div className="form-group">
               <label>생성 타입</label>
               <div className="type-options">
@@ -491,6 +479,18 @@ function ContentCreatorSimple() {
                   <p className="type-desc">완성 콘텐츠</p>
                 </div>
               </div>
+            </div>
+
+            {/* 주제 입력 */}
+            <div className="form-group">
+              <label>주제 *</label>
+              <textarea
+                className="form-textarea"
+                placeholder="예: 가을 신상 니트 소개, 카페 오픈 이벤트 안내, 새로운 메뉴 출시..."
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                rows={3}
+              />
             </div>
 
             {/* 스타일 선택 */}
@@ -540,7 +540,7 @@ function ContentCreatorSimple() {
               <div className="form-group">
                 <label>이미지 갯수</label>
                 <div className="option-cards">
-                  {[1, 2, 3, 4].map((count) => (
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((count) => (
                     <div
                       key={count}
                       className={`option-card ${imageCount === count ? 'selected' : ''}`}
@@ -557,7 +557,7 @@ function ContentCreatorSimple() {
             <button
               className="btn-generate"
               onClick={handleGenerate}
-              disabled={isGenerating || !topic.trim()}
+              disabled={isGenerating || !topic.trim() || !contentType || !style || (contentType !== 'image' && selectedPlatforms.length === 0)}
             >
               {isGenerating ? (
                 <>
