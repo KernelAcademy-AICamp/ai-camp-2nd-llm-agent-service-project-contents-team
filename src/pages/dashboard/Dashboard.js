@@ -22,7 +22,7 @@ function Dashboard() {
   ];
 
   const quickActions = [
-    { label: '콘텐츠 생성', path: '/content', desc: 'AI로 블로그/SNS 콘텐츠 생성' },
+    { label: '콘텐츠 생성', path: '/create', desc: 'AI로 블로그/SNS 콘텐츠 생성' },
     { label: '생성 내역', path: '/history', desc: '이전에 생성한 콘텐츠 보기' },
     { label: 'SNS 연동', path: '/settings', desc: 'Facebook, YouTube 등 연결' },
   ];
