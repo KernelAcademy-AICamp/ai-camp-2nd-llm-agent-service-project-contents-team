@@ -17,6 +17,7 @@ import google.generativeai as genai
 import vertexai
 from vertexai.generative_models import GenerativeModel as VertexGenerativeModel, Part
 from sqlalchemy.orm import Session
+import fal_client
 
 from ..models import VideoGenerationJob, User, BrandAnalysis
 from ..logger import get_logger
@@ -230,24 +231,40 @@ class MasterPlanningAgent:
 6. resolution: "1080p" (hero shot) 또는 "720p" (일반)
 
 **전환 정보 (컷과 컷 사이):**
-1. method: "veo" 또는 "ffmpeg"
-   - **veo**: 역동적 움직임 필요 (줌인/아웃, 회전, 복잡한 카메라 무브)
-   - **ffmpeg**: 심플한 전환 충분 (디졸브, 페이드, 단순 패닝)
-   - **비용 최적화**: 전체 전환의 30-40%만 veo 사용 (가장 임팩트 있는 부분)
-2. effect: 전환 효과명
-   - veo: "dynamic_zoom_in", "dynamic_zoom_out", "dynamic_pan", "complex_transition"
+1. method: "kling" 또는 "ffmpeg"
+   - **kling**: 역동적 움직임 또는 실제 액션이 필요한 경우 - AI 비디오 생성
+     * 카메라 움직임: 줌인/아웃, 회전, 복잡한 패닝
+     * 객체 동작: 휘젓기, 붓기, 들기, 움직이는 손/사람
+     * 역동적 장면 전환: 빠른 모션, 유체 움직임
+   - **ffmpeg**: 정적 장면 간 단순 전환만 필요한 경우 - 기본 효과
+     * 디졸브, 페이드, 크로스페이드
+     * 비슷한 구도의 정적 컷 사이
+   - **사용 전략**: 전체 전환의 50-70%는 kling 사용 (퀄리티 우선)
+   - **kling 비용**: $0.25/video
+2. effect: 전환 효과명 (참고용)
+   - kling: "dynamic_zoom_in", "dynamic_zoom_out", "dynamic_pan", "complex_transition"
    - ffmpeg: "dissolve", "fade", "zoom_in", "zoom_out", "pan_left", "pan_right"
-3. duration: 전환 길이 (veo: 4-6초, ffmpeg: 0.5-2초)
-4. reason: 이 방식을 선택한 이유 (한 줄)
+3. video_prompt: **구체적인 비디오 생성 프롬프트** (kling 사용 시 필수!)
+   - 제품 특징, 브랜드 톤, 장면 설명 포함
+   - 카메라 움직임, 조명, 분위기 상세히 기술
+   - 앞 컷과 뒤 컷의 연결을 자연스럽게 설명
+   - 예: "Camera smoothly zooms out from close-up of luxury bottle's golden cap, gradually revealing the full pristine white bottle against minimalist marble background, maintaining soft professional lighting throughout"
+   - ffmpeg 사용 시에는 간단히 작성 (효과명만 참고)
+4. duration: 전환 길이 (kling: 5초, ffmpeg: 0.5-2초)
+5. reason: 이 방식을 선택한 이유 (한 줄)
 
 **스토리보드 작성 가이드라인:**
 - 첫 번째 컷: 임팩트 있는 오프닝 (hero shot)
 - 중간 컷들: 제품 특징, 사용 시나리오, 혜택
 - 마지막 컷: CTA 또는 브랜드 메시지 (hero shot)
-- 첫 전환과 마지막 전환은 강렬하게 (veo 추천)
-- 중간 전환 중 비슷한 분위기면 ffmpeg 사용
+- **전환 전략 (퀄리티 우선):**
+  * 실제 동작/액션이 있는 장면 → 무조건 kling 사용
+  * 역동적 카메라 움직임 필요 → kling 사용
+  * 정적 컷 간 단순 전환만 → ffmpeg 사용 가능
+  * 전체의 50-70%는 kling으로 구성하여 영상의 퀄리티 확보
 - 전체 흐름의 리듬감 유지
 - image_prompt는 조명, 각도, 분위기, 색감 포함하여 상세하게
+- video_prompt는 앞뒤 컷의 맥락을 고려하여 구체적이고 일관성 있게 작성
 
 **응답 형식 (JSON 배열):**
 [
@@ -261,9 +278,10 @@ class MasterPlanningAgent:
   }},
   {{
     "transition": {{
-      "method": "veo",
+      "method": "kling",
       "effect": "dynamic_zoom_out",
-      "duration": 4.0,
+      "video_prompt": "Camera smoothly zooms out from extreme close-up of product detail, gradually revealing full product in elegant setting with professional lighting",
+      "duration": 5.0,
       "reason": "제품 디테일에서 전체로, 강렬한 전환 필요"
     }}
   }},
@@ -583,6 +601,367 @@ class ImageGenerationAgent:
             raise
 
 
+class KlingVideoGenerationAgent:
+    """
+    Kling v2.1 Standard Video Generation Agent
+    - fal.ai API를 사용하여 이미지 간 트랜지션 비디오 생성
+    - Image-to-Video 방식
+    - Front-Last Frame 지원
+    """
+
+    def __init__(self, model: str = "fal-ai/kling-video/v2.1/standard/image-to-video"):
+        self.model = model
+        self.api_key = os.getenv("FAL_API_KEY")
+        if not self.api_key:
+            raise ValueError("FAL_API_KEY not found in environment variables")
+
+        # API 키 설정
+        os.environ["FAL_KEY"] = self.api_key
+        logger.info(f"KlingVideoGenerationAgent initialized with model: {self.model}")
+
+    def image_to_data_url(self, image_path: str) -> str:
+        """
+        로컬 이미지 파일을 data URL로 변환
+
+        Args:
+            image_path: 이미지 파일 경로
+
+        Returns:
+            data URL 형식의 문자열 (data:image/png;base64,...)
+        """
+        try:
+            # 1. 이미지 읽기
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+
+            # 2. base64 인코딩
+            image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+
+            # 3. MIME type 결정
+            ext = Path(image_path).suffix.lower()
+            mime_map = {
+                ".png": "image/png",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".webp": "image/webp"
+            }
+            mime_type = mime_map.get(ext, "image/png")
+
+            # 4. data URL 생성
+            data_url = f"data:{mime_type};base64,{image_b64}"
+            logger.info(f"Image converted to data URL: {image_path} ({len(data_url)} chars)")
+            return data_url
+
+        except Exception as e:
+            logger.error(f"Failed to convert image to data URL: {str(e)}")
+            raise
+
+    async def download_video(self, video_url: str, save_path: str) -> bool:
+        """
+        fal.ai에서 생성된 비디오 다운로드
+
+        Args:
+            video_url: 비디오 다운로드 URL
+            save_path: 저장할 경로
+
+        Returns:
+            성공 여부
+        """
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                logger.info(f"Downloading video from: {video_url}")
+                response = await client.get(video_url)
+                response.raise_for_status()
+
+                # 디렉토리 생성
+                Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+
+                # 파일 저장
+                with open(save_path, "wb") as f:
+                    f.write(response.content)
+
+                file_size_mb = len(response.content) / (1024 * 1024)
+                logger.info(f"Video downloaded: {save_path} ({file_size_mb:.2f} MB)")
+                return True
+
+        except Exception as e:
+            logger.error(f"Download failed: {str(e)}")
+            return False
+
+    async def generate_transition_video(
+        self,
+        start_image_path: str,
+        end_image_path: str,
+        prompt: str,
+        duration: int = 5,
+        user_id: int = None,
+        job_id: int = None,
+        transition_name: str = "transition"
+    ) -> dict:
+        """
+        두 이미지 사이의 전환 비디오 생성
+
+        Args:
+            start_image_path: 시작 이미지 경로
+            end_image_path: 종료 이미지 경로
+            prompt: 비디오 생성 프롬프트
+            duration: 비디오 길이 (초)
+            user_id: 사용자 ID
+            job_id: 작업 ID
+            transition_name: 전환 이름 (예: "1-2")
+
+        Returns:
+            {
+                "transition": "1-2",
+                "url": "/uploads/...",
+                "method": "kling",
+                "effect": "...",
+                "error": None
+            }
+        """
+        try:
+            logger.info(f"Generating Kling video for {transition_name}: {prompt}")
+
+            # 1. 시작 이미지를 data URL로 변환 (Kling은 시작 이미지만 사용)
+            image_data_url = self.image_to_data_url(start_image_path)
+
+            # 2. fal.ai API 호출
+            logger.info(f"Calling fal.ai API...")
+
+            # asyncio.to_thread를 사용하여 동기 함수를 비동기로 실행
+            result = await asyncio.to_thread(
+                fal_client.subscribe,
+                self.model,
+                arguments={
+                    "image_url": image_data_url,
+                    "prompt": prompt,
+                    "duration": duration,
+                    "aspect_ratio": "16:9"
+                },
+                with_logs=False
+            )
+
+            logger.info(f"Kling API response received")
+
+            # 3. 응답에서 비디오 URL 추출
+            if not result or "video" not in result:
+                raise ValueError(f"Invalid API response: {result}")
+
+            video_url = result["video"]["url"]
+            logger.info(f"Video URL: {video_url}")
+
+            # 4. 비디오 다운로드
+            # 저장 경로: backend/uploads/ai_video_transitions/{user_id}/{job_id}/
+            save_dir = Path("uploads") / "ai_video_transitions" / str(user_id) / str(job_id)
+            save_dir.mkdir(parents=True, exist_ok=True)
+            save_path = save_dir / f"{transition_name}.mp4"
+
+            download_success = await self.download_video(video_url, str(save_path))
+
+            if not download_success:
+                raise Exception("Failed to download video")
+
+            # 5. 상대 경로 URL 생성
+            relative_url = f"/uploads/ai_video_transitions/{user_id}/{job_id}/{transition_name}.mp4"
+
+            logger.info(f"Kling video generated successfully: {relative_url}")
+
+            return {
+                "success": True,
+                "transition": transition_name,
+                "url": relative_url,
+                "method": "kling",
+                "effect": prompt,
+                "error": None,
+                "cost": 0.25  # USD
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to generate Kling video: {str(e)}")
+            return {
+                "success": False,
+                "transition": transition_name,
+                "url": None,
+                "method": "kling",
+                "effect": prompt,
+                "error": str(e),
+                "cost": 0
+            }
+
+    async def generate_transition_videos(
+        self,
+        job: VideoGenerationJob,
+        storyboard: List[Dict[str, Any]],
+        images: List[Dict[str, str]],
+        db: Session
+    ) -> List[Dict[str, str]]:
+        """
+        이미지 간 트랜지션 비디오 생성 (Kling 방식만 선택적으로)
+
+        Args:
+            job: VideoGenerationJob 인스턴스
+            storyboard: 스토리보드 데이터 (전환 정보 포함)
+            images: 생성된 이미지 리스트
+            db: Database session
+
+        Returns:
+            List[Dict]: 생성된 비디오 URL 리스트 (Kling 전환만)
+        """
+        try:
+            # 스토리보드에서 Kling 방식의 전환만 필터링
+            kling_transitions = [
+                item['transition'] for item in storyboard
+                if 'transition' in item and item['transition'].get('method') == 'kling'
+            ]
+
+            # Job 상태 업데이트
+            job.status = "generating_videos"
+            job.current_step = f"Generating {len(kling_transitions)} Kling transition videos"
+            db.commit()
+
+            logger.info(f"Starting Kling video generation for job {job.id}: {len(kling_transitions)} transitions (FFmpeg transitions will be handled in composition)")
+
+            if not kling_transitions:
+                logger.info("No Kling transitions needed - all transitions will use FFmpeg")
+                job.generated_video_urls = []
+                db.commit()
+                return []
+
+            generated_videos = []
+
+            # 유효한 이미지만 필터링
+            valid_images = [img for img in images if img.get('url')]
+
+            if len(valid_images) < 2:
+                raise ValueError("Need at least 2 images to create transition videos")
+
+            # 이미지를 cut 번호로 매핑
+            image_by_cut = {img['cut']: img for img in valid_images}
+
+            # 스토리보드에서 전환과 컷의 매핑 생성
+            cuts = [item for item in storyboard if 'cut' in item]
+
+            # 각 Kling 전환 비디오 생성
+            for idx, transition_data in enumerate(kling_transitions, 1):
+                try:
+                    effect = transition_data.get('effect', 'smooth_transition')
+                    duration = transition_data.get('duration', 5.0)
+                    reason = transition_data.get('reason', '')
+
+                    # Master Agent가 생성한 video_prompt 사용
+                    video_prompt = transition_data.get('video_prompt',
+                        'Smooth, cinematic transition from the first image to the second image.')
+
+                    # 전환이 어느 컷 사이인지 추론 (스토리보드의 순서 기반)
+                    transition_index = None
+                    for i, item in enumerate(storyboard):
+                        if 'transition' in item and item['transition'] == transition_data:
+                            transition_index = i
+                            break
+
+                    if transition_index is None:
+                        logger.warning(f"Could not find transition in storyboard, skipping")
+                        continue
+
+                    # 앞뒤 컷 찾기
+                    from_cut = None
+                    to_cut = None
+                    for i in range(transition_index - 1, -1, -1):
+                        if 'cut' in storyboard[i]:
+                            from_cut = storyboard[i]['cut']
+                            break
+                    for i in range(transition_index + 1, len(storyboard)):
+                        if 'cut' in storyboard[i]:
+                            to_cut = storyboard[i]['cut']
+                            break
+
+                    if not from_cut or not to_cut:
+                        logger.warning(f"Could not determine from/to cuts for transition, skipping")
+                        continue
+
+                    from_image = image_by_cut.get(from_cut)
+                    to_image = image_by_cut.get(to_cut)
+
+                    if not from_image or not to_image:
+                        logger.warning(f"Missing images for transition {from_cut}-{to_cut}, skipping")
+                        continue
+
+                    transition_name = f"{from_cut}-{to_cut}"
+
+                    logger.info(f"Generating Kling transition video {idx}/{len(kling_transitions)}: {transition_name} (prompt: {video_prompt[:80]}...)")
+
+                    # Job 상태 업데이트
+                    job.current_step = f"Generating Kling transition {idx}/{len(kling_transitions)}"
+                    db.commit()
+
+                    # 로컬 파일 시스템에서 이미지 경로 가져오기
+                    from_image_path = from_image['url']  # 예: "/uploads/ai_video_images/1/18/cut_1.png"
+                    to_image_path = to_image['url']
+
+                    # 상대 경로를 절대 경로로 변환
+                    from_image_abs = Path(__file__).parent.parent.parent / from_image_path.lstrip('/')
+                    to_image_abs = Path(__file__).parent.parent.parent / to_image_path.lstrip('/')
+
+                    # Kling API 호출
+                    result = await self.generate_transition_video(
+                        start_image_path=str(from_image_abs),
+                        end_image_path=str(to_image_abs),
+                        prompt=video_prompt,
+                        duration=int(duration),
+                        user_id=job.user_id,
+                        job_id=job.id,
+                        transition_name=transition_name
+                    )
+
+                    if result.get('success'):
+                        generated_videos.append({
+                            "transition": transition_name,
+                            "url": result['url'],
+                            "from_cut": from_cut,
+                            "to_cut": to_cut,
+                            "method": "kling",
+                            "effect": effect,
+                            "duration": duration,
+                            "reason": reason,
+                            "cost": result.get('cost', 0.25)
+                        })
+                        logger.info(f"Kling transition video generated: {transition_name} -> {result['url']}")
+                    else:
+                        logger.error(f"Failed to generate Kling video for {transition_name}: {result.get('error')}")
+                        generated_videos.append({
+                            "transition": transition_name,
+                            "url": None,
+                            "error": result.get('error'),
+                            "method": "kling",
+                            "effect": effect
+                        })
+
+                except Exception as e:
+                    logger.error(f"Error generating Kling transition video: {str(e)}")
+                    if 'transition_name' in locals():
+                        generated_videos.append({
+                            "transition": transition_name,
+                            "url": None,
+                            "error": str(e),
+                            "method": "kling",
+                            "effect": transition_data.get('effect', '')
+                        })
+
+            # 생성된 비디오 저장
+            job.generated_video_urls = generated_videos
+            db.commit()
+
+            logger.info(f"Kling video generation completed for job {job.id}: {len([vid for vid in generated_videos if vid.get('url')])} successful")
+            return generated_videos
+
+        except Exception as e:
+            logger.error(f"Error in video generation for job {job.id}: {str(e)}")
+            job.status = "failed"
+            job.error_message = f"Video generation failed: {str(e)}"
+            db.commit()
+            raise
+
+
 class VideoGenerationAgent:
     """
     Video Generation Agent
@@ -847,8 +1226,8 @@ class VideoCompositionAgent:
     """
     Video Composition Agent
     - moviepy/ffmpeg를 사용하여 이미지와 트랜지션 비디오를 최종 비디오로 합성
-    - FFmpeg 기반 간단한 전환 효과 (dissolve, fade, zoom, pan) 지원
-    - 생성된 최종 비디오를 Cloudinary에 업로드
+    - Kling AI 비디오 + FFmpeg 기반 간단한 전환 효과 혼합 지원
+    - 생성된 최종 비디오를 로컬 파일 시스템에 저장
     """
 
     def __init__(self):
@@ -969,13 +1348,13 @@ class VideoCompositionAgent:
         db: Session
     ) -> str:
         """
-        최종 비디오 합성 (Veo 전환 + FFmpeg 전환 혼합)
+        최종 비디오 합성 (Kling 전환 + FFmpeg 전환 혼합)
 
         Args:
             job: VideoGenerationJob 인스턴스
             storyboard: 스토리보드 데이터 (컷과 전환이 혼합된 배열)
             images: 생성된 이미지 리스트
-            transition_videos: 생성된 Veo 트랜지션 비디오 리스트
+            transition_videos: 생성된 Kling 트랜지션 비디오 리스트
             db: Database session
 
         Returns:
@@ -1020,14 +1399,14 @@ class VideoCompositionAgent:
             if not image_by_cut:
                 raise ValueError("No valid images to compose video")
 
-            # Veo 트랜지션 비디오 매핑
-            veo_videos = {
+            # Kling 트랜지션 비디오 매핑
+            kling_videos = {
                 tv['transition']: tv
                 for tv in transition_videos
                 if tv.get('url')
             }
 
-            logger.info(f"Processing {len(image_by_cut)} images, {len(veo_videos)} Veo transitions")
+            logger.info(f"Processing {len(image_by_cut)} images, {len(kling_videos)} Kling transitions")
 
             clips = []
             image_clips_cache = {}  # 이미지 클립 캐시 (FFmpeg 전환에 재사용)
@@ -1093,11 +1472,11 @@ class VideoCompositionAgent:
                     transition_key = f"{from_cut}-{to_cut}"
 
                     try:
-                        if method == "veo":
-                            # Veo 비디오 사용
-                            if transition_key in veo_videos:
-                                transition_path = os.path.join(temp_dir, f"veo_transition_{transition_key}.mp4")
-                                video_bytes = await self._download_file(veo_videos[transition_key]['url'])
+                        if method == "kling":
+                            # Kling 비디오 사용
+                            if transition_key in kling_videos:
+                                transition_path = os.path.join(temp_dir, f"kling_transition_{transition_key}.mp4")
+                                video_bytes = await self._download_file(kling_videos[transition_key]['url'])
 
                                 with open(transition_path, 'wb') as f:
                                     f.write(video_bytes)
@@ -1105,9 +1484,9 @@ class VideoCompositionAgent:
                                 transition_clip = VideoFileClip(transition_path)
                                 clips.append(transition_clip)
 
-                                logger.info(f"Added Veo transition {transition_key} ({effect})")
+                                logger.info(f"Added Kling transition {transition_key} ({effect})")
                             else:
-                                logger.warning(f"Veo video for {transition_key} not found, falling back to FFmpeg")
+                                logger.warning(f"Kling video for {transition_key} not found, falling back to FFmpeg")
                                 # FFmpeg 폴백
                                 if from_cut in image_clips_cache and to_cut in image_clips_cache:
                                     ffmpeg_transition = self._create_ffmpeg_transition(
@@ -1358,12 +1737,12 @@ async def run_video_generation_pipeline(job_id: int, db: Session):
         image_agent = ImageGenerationAgent()
         images = await image_agent.generate_images(job, storyboard, db)
 
-        # 3. Video Generation (Veo transitions only)
-        logger.info(f"Step 3/4: Generating Veo transition videos")
-        video_agent = VideoGenerationAgent()
+        # 3. Video Generation (Kling transitions only)
+        logger.info(f"Step 3/4: Generating Kling transition videos")
+        video_agent = KlingVideoGenerationAgent()
         videos = await video_agent.generate_transition_videos(job, storyboard, images, db)
 
-        # 4. Video Composition (mixed: Veo + FFmpeg transitions)
+        # 4. Video Composition (mixed: Kling + FFmpeg transitions)
         logger.info(f"Step 4/4: Composing final video with mixed transitions")
         composition_agent = VideoCompositionAgent()
         final_video_url = await composition_agent.compose_final_video(
