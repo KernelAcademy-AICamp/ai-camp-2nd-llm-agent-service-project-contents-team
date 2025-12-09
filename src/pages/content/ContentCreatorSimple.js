@@ -9,7 +9,7 @@ function ContentCreatorSimple() {
   // 탭 상태
   const [activeTab, setActiveTab] = useState('create');
 
-  // 콘텐츠 타입: 'text' | 'image' | 'both' | null
+  // 콘텐츠 타입: 'text' | 'image' | 'both' | 'shortform' | null
   const [contentType, setContentType] = useState(null);
 
   // 입력 상태
@@ -17,6 +17,12 @@ function ContentCreatorSimple() {
   const [style, setStyle] = useState(null);
   const [selectedPlatforms, setSelectedPlatforms] = useState([]);
   const [imageCount, setImageCount] = useState(1);  // 이미지 생성 갯수
+
+  // 이미지 업로드 상태
+  const [uploadedImages, setUploadedImages] = useState([]);
+
+  // 숏폼 영상 옵션
+  const [videoDuration, setVideoDuration] = useState('standard'); // short, standard, premium
 
   // 생성 상태
   const [isGenerating, setIsGenerating] = useState(false);
@@ -51,6 +57,13 @@ function ContentCreatorSimple() {
     { id: 'blog', label: '블로그' },
     { id: 'x', label: 'X' },
     { id: 'threads', label: 'Threads' },
+  ];
+
+  // 숏폼 영상 길이 옵션
+  const videoDurationOptions = [
+    { id: 'short', label: 'Short', duration: '15초', cuts: 3, description: '빠른 임팩트' },
+    { id: 'standard', label: 'Standard', duration: '30초', cuts: 5, description: '균형잡힌 구성' },
+    { id: 'premium', label: 'Premium', duration: '60초', cuts: 8, description: '상세한 스토리' },
   ];
 
   // 생성 내역 불러오기 (v2 API)
@@ -414,7 +427,7 @@ function ContentCreatorSimple() {
     <div className="content-page">
       {/* 헤더 */}
       <div className="page-header">
-        <h2>글 + 이미지 생성</h2>
+        <h2>Contents 생성</h2>
         <p className="page-description">주제만 입력하면 AI가 글과 이미지를 한번에 생성합니다</p>
       </div>
 
@@ -449,7 +462,7 @@ function ContentCreatorSimple() {
             {/* 콘텐츠 타입 선택 (가장 상단) */}
             <div className="form-group">
               <label>생성 타입</label>
-              <div className="type-options">
+              <div className="type-options type-options-4">
                 <div
                   className={`type-card ${contentType === 'text' ? 'selected' : ''}`}
                   onClick={() => setContentType('text')}
@@ -472,11 +485,19 @@ function ContentCreatorSimple() {
                   className={`type-card ${contentType === 'both' ? 'selected' : ''}`}
                   onClick={() => setContentType('both')}
                 >
-                  <span className="recommended-label">추천</span>
                   <div className="type-header">
                     <h4>글 + 이미지</h4>
                   </div>
                   <p className="type-desc">완성 콘텐츠</p>
+                </div>
+                <div
+                  className={`type-card ${contentType === 'shortform' ? 'selected' : ''}`}
+                  onClick={() => setContentType('shortform')}
+                >
+                  <div className="type-header">
+                    <h4>숏폼 영상</h4>
+                  </div>
+                  <p className="type-desc">마케팅 비디오</p>
                 </div>
               </div>
             </div>
@@ -492,6 +513,52 @@ function ContentCreatorSimple() {
                 rows={3}
               />
             </div>
+
+            {/* 이미지 업로드 (숏폼 영상 선택 시) */}
+            {contentType === 'shortform' && (
+              <div className="form-group">
+                <label>이미지 *</label>
+                <div className="image-upload-area">
+                  {uploadedImages.length === 0 ? (
+                    <label className="upload-label">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            if (file.size > 10 * 1024 * 1024) {
+                              alert('이미지 파일 크기는 10MB 이하여야 합니다.');
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setUploadedImages([{ file, preview: reader.result }]);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="file-input"
+                      />
+                      <span className="upload-icon">📸</span>
+                      <span>클릭하여 이미지 업로드</span>
+                      <span className="upload-hint">PNG, JPG, WebP (최대 10MB)</span>
+                    </label>
+                  ) : (
+                    <div className="uploaded-image-preview">
+                      <img src={uploadedImages[0].preview} alt="업로드된 이미지" />
+                      <button
+                        type="button"
+                        className="btn-remove-image"
+                        onClick={() => setUploadedImages([])}
+                      >
+                        ✕ 제거
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 스타일 선택 */}
             <div className="form-group">
@@ -553,11 +620,43 @@ function ContentCreatorSimple() {
               </div>
             )}
 
+            {/* 영상 길이 선택 (숏폼 영상 선택 시에만) */}
+            {contentType === 'shortform' && (
+              <div className="form-group">
+                <label>영상 길이</label>
+                <div className="video-duration-options">
+                  {videoDurationOptions.map((option) => (
+                    <div
+                      key={option.id}
+                      className={`duration-card ${videoDuration === option.id ? 'selected' : ''}`}
+                      onClick={() => setVideoDuration(option.id)}
+                    >
+                      <div className="duration-header">
+                        <h4>{option.label}</h4>
+                        <span className="duration-time">{option.duration}</span>
+                      </div>
+                      <div className="duration-info">
+                        <span className="duration-cuts">{option.cuts}개 컷</span>
+                        <span className="duration-desc">{option.description}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* 생성 버튼 */}
             <button
               className="btn-generate"
               onClick={handleGenerate}
-              disabled={isGenerating || !topic.trim() || !contentType || !style || (contentType !== 'image' && selectedPlatforms.length === 0)}
+              disabled={
+                isGenerating ||
+                !topic.trim() ||
+                !contentType ||
+                (contentType !== 'image' && contentType !== 'shortform' && !style) ||
+                (contentType !== 'image' && contentType !== 'shortform' && selectedPlatforms.length === 0) ||
+                (contentType === 'shortform' && uploadedImages.length === 0)
+              }
             >
               {isGenerating ? (
                 <>

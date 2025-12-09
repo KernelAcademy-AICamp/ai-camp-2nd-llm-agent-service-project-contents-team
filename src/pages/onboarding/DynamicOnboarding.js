@@ -111,7 +111,7 @@ function DynamicOnboarding() {
     try {
       const response = await api.get('/api/onboarding/status');
       if (response.data.onboarding_completed) {
-        navigate('/dashboard');
+        navigate('/content');
       }
     } catch (error) {
       console.error('온보딩 상태 확인 실패:', error);
@@ -591,7 +591,7 @@ function DynamicOnboarding() {
       await api.post('/api/onboarding/complete');
       setShowSuccess(true);
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/content');
       }, 1500);
     } catch (error) {
       console.error('온보딩 완료 실패:', error);

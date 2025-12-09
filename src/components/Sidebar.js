@@ -3,12 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   MdDashboard,
   MdAdd,
-  MdVideoLibrary,
   MdFolder,
   MdStyle,
   MdSettings,
-  MdHome,
-  MdEdit
+  MdHome
 } from 'react-icons/md';
 import {
   FaYoutube,
@@ -23,7 +21,6 @@ import './Sidebar.css';
 function Sidebar({ onHoverChange }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [isContentMenuOpen, setIsContentMenuOpen] = useState(false);
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
 
   // 부모 컴포넌트에 호버 상태 전달
@@ -73,11 +70,6 @@ function Sidebar({ onHoverChange }) {
     { path: '/dashboard', label: '대시보드', icon: MdDashboard },
   ];
 
-  const contentMenuItems = [
-    { path: '/create', label: '글 + 이미지 생성', icon: MdEdit },
-    { path: '/ai-video', label: 'AI 동영상 생성', icon: MdVideoLibrary },
-  ];
-
   const contentManagementItems = [
     { path: '/contents', label: '콘텐츠 관리', icon: MdFolder },
     { path: '/templates', label: '템플릿', icon: MdStyle },
@@ -101,31 +93,6 @@ function Sidebar({ onHoverChange }) {
     { path: '/settings', label: '설정', icon: MdSettings },
   ];
 
-  const isContentMenuActive = location.pathname === '/content' || contentMenuItems.some(item =>
-    location.pathname === item.path
-  );
-
-  // 콘텐츠 생성 관련 페이지에 있을 때 드롭다운 자동으로 열기
-  useEffect(() => {
-    if (isContentMenuActive) {
-      setIsContentMenuOpen(true);
-    }
-  }, [isContentMenuActive]);
-
-  const handleContentMenuEnter = () => {
-    setIsContentMenuOpen(true);
-  };
-
-  const handleContentMenuLeave = () => {
-    if (!isContentMenuActive) {
-      setIsContentMenuOpen(false);
-    }
-  };
-
-  const handleContentItemClick = (path) => {
-    navigate(path);
-  };
-
   const handleLogoClick = () => {
     navigate('/home');
   };
@@ -145,6 +112,15 @@ function Sidebar({ onHoverChange }) {
       </div>
 
       <nav className="sidebar-nav">
+        {/* 콘텐츠 생성 */}
+        <Link
+          to="/content"
+          className={`sidebar-item ${location.pathname === '/content' || location.pathname === '/create' || location.pathname === '/ai-video' ? 'active' : ''}`}
+        >
+          <MdAdd className="sidebar-icon" />
+          <span className="sidebar-label">콘텐츠 생성</span>
+        </Link>
+
         {menuItems.map((item) => (
           <Link
             key={item.path}
@@ -155,34 +131,6 @@ function Sidebar({ onHoverChange }) {
             <span className="sidebar-label">{item.label}</span>
           </Link>
         ))}
-
-        {/* 콘텐츠 생성 드롭다운 */}
-        <div
-          className="sidebar-dropdown"
-          onMouseEnter={handleContentMenuEnter}
-          onMouseLeave={handleContentMenuLeave}
-        >
-          <button
-            className={`sidebar-item sidebar-dropdown-trigger ${isContentMenuActive ? 'active' : ''}`}
-            onClick={() => navigate('/content')}
-          >
-            <MdAdd className="sidebar-icon" />
-            <span className="sidebar-label">콘텐츠 생성</span>
-          </button>
-
-          <div className={`sidebar-dropdown-menu ${isContentMenuOpen ? 'open' : ''}`}>
-            {contentMenuItems.map((item) => (
-              <button
-                key={item.path}
-                onClick={() => handleContentItemClick(item.path)}
-                className={`sidebar-dropdown-item ${location.pathname === item.path ? 'active' : ''}`}
-              >
-                <item.icon className="sidebar-icon" />
-                <span className="sidebar-label">{item.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* 콘텐츠 관리 메뉴 */}
         {contentManagementItems.map((item) => (
