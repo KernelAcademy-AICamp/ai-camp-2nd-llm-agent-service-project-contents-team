@@ -32,10 +32,6 @@ function AIVideoGenerator() {
   const [currentJob, setCurrentJob] = useState(null);
   const [error, setError] = useState(null);
 
-  // AI 분석 상태
-  const [analyzingProduct, setAnalyzingProduct] = useState(false);
-  const [aiRecommendation, setAiRecommendation] = useState(null);
-
   // 히스토리
   const [jobHistory, setJobHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -376,49 +372,10 @@ function AIVideoGenerator() {
                     rows="3"
                   />
                 </div>
-                {/* AI 분석 버튼 */}
-                <button
-                  type="submit"
-                  className="btn-generate"
-                  disabled={analyzingProduct}
-                >
-                  {analyzingProduct ? (
-                    <>
-                      <span className="spinner"></span>
-                      AI가 제품 분석 중...
-                    </>
-                  ) : (
-                    'AI 분석하기'
-                  )}
-                </button>
-              </form>
-            )}
-
-            {/* Step 2: AI 추천 및 티어 선택 */}
-            {step === 'recommendation' && aiRecommendation && (
-              <form onSubmit={handleGenerateVideo}>
-                {/* AI 추천 결과 */}
-                <div className="ai-recommendation">
-                  <div className="recommendation-card">
-                    <div className="recommendation-header">
-                      <span className="recommended-badge">AI 추천</span>
-                      <h4>
-                        {aiRecommendation.recommended_tier === 'short' ? 'Short' :
-                         aiRecommendation.recommended_tier === 'standard' ? 'Standard' :
-                         'Premium'}
-                      </h4>
-                      <span className="confidence-score">
-                        신뢰도 {Math.round(aiRecommendation.confidence * 100)}%
-                      </span>
-                    </div>
-                    <p className="recommendation-reason">{aiRecommendation.reason}</p>
-                  </div>
-                </div>
 
                 {/* 티어 선택 */}
                 <div className="form-group">
                   <label>영상 길이 선택 *</label>
-                  <p className="form-hint">원하는 비디오 길이를 선택하세요</p>
                   <div className="tier-options">
                     {tiers.map(tier => (
                       <div
@@ -426,15 +383,14 @@ function AIVideoGenerator() {
                         className={`tier-card ${selectedTier === tier.tier ? 'selected' : ''}`}
                         onClick={() => setSelectedTier(tier.tier)}
                       >
-                        {aiRecommendation.recommended_tier === tier.tier && (
-                          <div className="recommended-label">추천</div>
-                        )}
                         <div className="tier-header">
-                          <h4>{tier.tier === 'short' ? 'Short' : tier.tier === 'standard' ? 'Standard' : 'Premium'}</h4>
-                          <span className="tier-price">${tier.cost}</span>
+                          <h3>{tier.tier.toUpperCase()}</h3>
+                          <span className="tier-price">${tier.cost.toFixed(2)}</span>
                         </div>
                         <div className="tier-details">
-                          <p>{tier.duration_seconds}초 · {tier.cut_count}컷</p>
+                          <p className="tier-duration">{tier.duration_seconds}초</p>
+                          <p className="tier-cuts">{tier.cut_count}개 컷</p>
+                          <p className="tier-description">{tier.description}</p>
                         </div>
                       </div>
                     ))}
@@ -450,18 +406,14 @@ function AIVideoGenerator() {
                   {loading ? (
                     <>
                       <span className="spinner"></span>
-                      비디오 생성 시작 중...
+                      비디오 생성 중...
                     </>
                   ) : (
-                    <>
-                      <span>🎬</span>
-                      비디오 생성하기
-                    </>
+                    '비디오 생성하기'
                   )}
                 </button>
               </form>
             )}
-
 
             {/* 안내 사항 */}
             {step === 'input' && (
