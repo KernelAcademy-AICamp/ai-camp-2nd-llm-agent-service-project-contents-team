@@ -8,6 +8,10 @@
   margin-top: 0.5rem;
 }
 
+.type-options.type-options-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .type-card {
   border: 1px solid var(--border-color);
   padding: 1.25rem;
@@ -58,6 +62,18 @@
   right: 8px;
   background: var(--accent-color);
   color: var(--text-secondary);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.new-label {
+  position: absolute;
+  top: -8px;
+  right: 8px;
+  background: #4CAF50;
+  color: white;
   padding: 0.15rem 0.5rem;
   font-size: 0.65rem;
   font-weight: 600;
@@ -389,6 +405,146 @@
   padding: 1.25rem 0;
 }
 
+/* 이미지 업로드 영역 */
+.image-upload-area {
+  margin-top: 0.5rem;
+}
+
+.image-upload-area .upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  border: 2px dashed var(--border-color);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  gap: 0.5rem;
+}
+
+.image-upload-area .upload-label:hover {
+  border-color: var(--secondary-color);
+  background: rgba(216, 191, 216, 0.1);
+}
+
+.image-upload-area .file-input {
+  display: none;
+}
+
+.image-upload-area .upload-icon {
+  font-size: 2rem;
+  opacity: 0.6;
+}
+
+.image-upload-area .upload-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.uploaded-image-preview {
+  position: relative;
+  display: inline-block;
+  max-width: 300px;
+}
+
+.uploaded-image-preview img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  border: 1px solid var(--border-color);
+}
+
+.btn-remove-image {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  background: rgba(220, 53, 69, 0.9);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-remove-image:hover {
+  background: #dc3545;
+}
+
+/* 영상 길이 선택 */
+.video-duration-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.duration-card {
+  border: 1px solid var(--border-color);
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--bg-primary);
+  text-align: center;
+}
+
+.duration-card:hover {
+  border-color: var(--secondary-color);
+  background: rgba(216, 191, 216, 0.1);
+}
+
+.duration-card.selected {
+  border-color: var(--secondary-color);
+  background: var(--secondary-color);
+}
+
+.duration-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.duration-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.duration-time {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.duration-card.selected .duration-time {
+  color: var(--text-primary);
+}
+
+.duration-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.duration-cuts {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.duration-desc {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.duration-card.selected .duration-desc {
+  color: var(--text-secondary);
+}
+
 /* 반응형 디자인 */
 @media (max-width: 992px) {
   .result-two-column {
@@ -401,11 +557,19 @@
     grid-template-columns: 1fr;
   }
 
+  .type-options.type-options-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .option-cards {
     grid-template-columns: repeat(2, 1fr);
   }
 
   .result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .video-duration-options {
     grid-template-columns: 1fr;
   }
 }

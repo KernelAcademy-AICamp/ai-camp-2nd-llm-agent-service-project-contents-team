@@ -94,12 +94,6 @@ function ContentHub() {
             </button>
           </div>
 
-          <div className="other-options">
-            <button className="option-btn" onClick={() => navigate('/ai-video')}>
-              <span className="option-icon">🎬</span>
-              AI 동영상 생성
-            </button>
-          </div>
         </div>
 
         {/* 오른쪽: 미리보기 섹션 */}
