@@ -264,6 +264,17 @@
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-score {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .result-card-actions {
@@ -975,6 +986,31 @@
 
 .image-item:hover {
   opacity: 0.9;
+}
+
+/* SNS 발행 버튼 */
+.btn-publish {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  background: var(--accent-color);
+  color: var(--text-secondary);
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-publish:hover {
+  background: var(--bauhaus-blue);
+  color: white;
+}
+
+.btn-publish svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* 반응형 */

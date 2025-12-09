@@ -22,10 +22,9 @@ function Dashboard() {
   ];
 
   const quickActions = [
-    { label: '콘텐츠 생성', path: '/content/ai-generator', desc: 'AI로 콘텐츠 생성' },
-    { label: '템플릿 선택', path: '/content/templates', desc: '다양한 템플릿 활용' },
-    { label: '이미지 생성', path: '/content/image-generator', desc: 'AI 이미지 만들기' },
-    { label: '비디오 제작', path: '/content/video-creator', desc: '영상 콘텐츠 제작' },
+    { label: '콘텐츠 생성', path: '/content', desc: 'AI로 블로그/SNS 콘텐츠 생성' },
+    { label: '생성 내역', path: '/history', desc: '이전에 생성한 콘텐츠 보기' },
+    { label: 'SNS 연동', path: '/settings', desc: 'Facebook, YouTube 등 연결' },
   ];
 
   // SNS 연동 상태 및 데이터 조회

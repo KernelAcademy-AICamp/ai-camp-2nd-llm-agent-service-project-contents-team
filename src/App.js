@@ -18,6 +18,7 @@ import MyPage from './pages/profile/MyPage';
 import AIVideoGenerator from './pages/content/AIVideoGenerator';
 import ContentHub from './pages/content/ContentHub';
 import ContentCreatorSimple from './pages/content/ContentCreatorSimple';
+import ContentHistory from './pages/content/ContentHistory';
 import YouTube from './pages/connection_SNS/youtube/YouTube';
 import Facebook from './pages/connection_SNS/facebook/Facebook';
 import Instagram from './pages/connection_SNS/instagram/Instagram';
@@ -85,6 +86,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ContentCreatorSimple />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/history"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ContentHistory />
                 </Layout>
               </ProtectedRoute>
             }

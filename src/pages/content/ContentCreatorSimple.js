@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FiCopy, FiTrash2 } from 'react-icons/fi';
+import { FiCopy, FiTrash2, FiSend } from 'react-icons/fi';
 import api, { contentSessionAPI } from '../../services/api';
 import { generateAgenticContent } from '../../services/agenticService';
+import SNSPublishModal from '../../components/sns/SNSPublishModal';
 import './ContentCommon.css';
 import './ContentCreatorSimple.css';
 
@@ -18,8 +19,8 @@ const STYLES = [
 ];
 
 const PLATFORMS = [
-  { id: 'sns', label: 'Instagram/Facebook' },
   { id: 'blog', label: '블로그' },
+  { id: 'sns', label: 'Instagram/Facebook' },
   { id: 'x', label: 'X' },
   { id: 'threads', label: 'Threads' },
 ];
@@ -79,11 +80,33 @@ const copyToClipboard = (text, message) => {
 
 const getStyleLabel = (styleId) => STYLES.find(s => s.id === styleId)?.label || styleId;
 
+// 점수에 따른 색상
+const getScoreColor = (score) => {
+  if (score >= 80) return '#10b981';
+  if (score >= 60) return '#f59e0b';
+  return '#ef4444';
+};
+
+// SNS 평균 점수 계산 (instagram/facebook, x, threads)
+const calcSnsAverageScore = (critique) => {
+  if (!critique) return null;
+  const scores = [critique.sns?.score, critique.x?.score, critique.threads?.score].filter(s => s != null);
+  if (scores.length === 0) return null;
+  return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+};
+
 // ========== 서브 컴포넌트 ==========
-const ResultCard = ({ title, children, onCopy }) => (
+const ResultCard = ({ title, children, onCopy, score }) => (
   <div className="result-card">
     <div className="result-card-header">
-      <h3>{title}</h3>
+      <h3>
+        {title}
+        {score != null && (
+          <span className="header-score" style={{ color: getScoreColor(score) }}>
+            {score}점
+          </span>
+        )}
+      </h3>
       {onCopy && (
         <div className="result-card-actions">
           <button className="btn-icon" onClick={onCopy} title="복사">
@@ -104,7 +127,7 @@ const TagList = ({ tags, isHashtag = false }) => (
   </div>
 );
 
-const PlatformContent = ({ platform, data, onCopy }) => {
+const PlatformContent = ({ platform, data, onCopy, score }) => {
   if (!data) return null;
 
   const config = {
@@ -118,7 +141,7 @@ const PlatformContent = ({ platform, data, onCopy }) => {
   const tags = data[tagsKey] || data.tags;
 
   return (
-    <ResultCard title={title} onCopy={onCopy}>
+    <ResultCard title={title} onCopy={onCopy} score={score}>
       {platform === 'blog' && <div className="blog-title">{data.title}</div>}
       <div className={`text-result ${platform !== 'blog' ? 'sns-content' : ''}`}>
         {data.content}
@@ -155,6 +178,10 @@ function ContentCreatorSimple() {
 
   // 팝업 상태
   const [popupImage, setPopupImage] = useState(null);
+
+  // SNS 발행 모달 상태
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [publishContent, setPublishContent] = useState(null);
 
   // ========== 히스토리 관련 함수 ==========
   const fetchHistory = useCallback(async () => {
@@ -579,30 +606,47 @@ function ContentCreatorSimple() {
           {/* 2열 레이아웃 */}
           <div className="result-two-column">
             <div className="result-column-left">
-              <PlatformContent platform="blog" data={result.text?.blog} onCopy={() => handleCopyBlog({ blog: result.text.blog })} />
+              <PlatformContent platform="blog" data={result.text?.blog} onCopy={() => handleCopyBlog({ blog: result.text.blog })} score={result.text?.critique?.blog?.score} />
             </div>
             <div className="result-column-right">
-              {/* 품질 점수 */}
+              {/* 품질 점수 요약 (블로그 + SNS 평균) */}
               {result.text?.critique && (
                 <div className="quality-scores">
                   <div className="quality-score-card">
                     <div className="score-circle blog"><span className="score-number">{result.text.critique.blog?.score || '-'}</span></div>
-                    <span className="score-label">블로그 품질</span>
+                    <span className="score-label">블로그</span>
                   </div>
                   <div className="quality-score-card">
-                    <div className="score-circle sns"><span className="score-number">{result.text.critique.sns?.score || '-'}</span></div>
-                    <span className="score-label">SNS 품질</span>
+                    <div className="score-circle sns"><span className="score-number">{calcSnsAverageScore(result.text.critique) || '-'}</span></div>
+                    <span className="score-label">SNS 평균</span>
                   </div>
                 </div>
               )}
-              <PlatformContent platform="sns" data={result.text?.sns} onCopy={() => handleCopySNS({ sns: result.text.sns })} />
-              <PlatformContent platform="x" data={result.text?.x} onCopy={() => handleCopyX({ x: result.text.x })} />
-              <PlatformContent platform="threads" data={result.text?.threads} onCopy={() => handleCopyThreads({ threads: result.text.threads })} />
+              <PlatformContent platform="sns" data={result.text?.sns} onCopy={() => handleCopySNS({ sns: result.text.sns })} score={result.text?.critique?.sns?.score} />
+              <PlatformContent platform="x" data={result.text?.x} onCopy={() => handleCopyX({ x: result.text.x })} score={result.text?.critique?.x?.score} />
+              <PlatformContent platform="threads" data={result.text?.threads} onCopy={() => handleCopyThreads({ threads: result.text.threads })} score={result.text?.critique?.threads?.score} />
             </div>
           </div>
 
           <div className="result-actions-bar">
             <button className="btn-reset" onClick={handleReset}>새로 만들기</button>
+            {result.text?.sns && (
+              <button
+                className="btn-publish"
+                onClick={() => {
+                  setPublishContent({
+                    type: result.images?.length > 0 ? 'image' : 'text',
+                    instagramCaption: result.text.sns?.content || '',
+                    facebookPost: result.text.sns?.content || '',
+                    hashtags: result.text.sns?.tags || result.text.sns?.hashtags || [],
+                    images: result.images?.map(img => img.url) || []
+                  });
+                  setShowPublishModal(true);
+                }}
+              >
+                <FiSend /> SNS 발행하기
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -644,7 +688,7 @@ function ContentCreatorSimple() {
                     </div>
                     <div className="history-item-meta">
                       {item.blog && <span className="platform-badge">블로그</span>}
-                      {item.sns && <span className="platform-badge">SNS</span>}
+                      {item.sns && <span className="platform-badge">IG/FB</span>}
                       {item.x && <span className="platform-badge">X</span>}
                       {item.threads && <span className="platform-badge">Threads</span>}
                     </div>
@@ -681,7 +725,7 @@ function ContentCreatorSimple() {
                             className={`history-tab ${historyDetailTab === platform ? 'active' : ''}`}
                             onClick={() => setHistoryDetailTab(platform)}
                           >
-                            {platform === 'blog' ? '블로그' : platform === 'sns' ? 'SNS' : platform.toUpperCase()}
+                            {platform === 'blog' ? '블로그' : platform === 'sns' ? 'IG/FB' : platform === 'threads' ? 'Threads' : 'X'}
                           </button>
                         )
                       ))}
@@ -754,6 +798,13 @@ function ContentCreatorSimple() {
           </div>
         </div>
       )}
+
+      {/* SNS 발행 모달 */}
+      <SNSPublishModal
+        isOpen={showPublishModal}
+        onClose={() => setShowPublishModal(false)}
+        content={publishContent}
+      />
     </div>
   );
 }

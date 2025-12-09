@@ -13,7 +13,6 @@
 .hub-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-3xl);
   max-width: 1100px;
   width: 100%;
   align-items: center;
@@ -395,7 +394,6 @@
 @media (max-width: 1024px) {
   .hub-container {
     grid-template-columns: 1fr;
-    gap: var(--space-2xl);
     max-width: 500px;
   }
 

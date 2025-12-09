@@ -285,8 +285,9 @@ ${imageInstructions}
 - 해시태그 2-3개만
 
 **[Threads] (500자 이내)**
-- 대화체로 친근하게
-- 스토리텔링 + 인사이트
+- 반말 모드로 작성 (~해, ~야, ~지, ~거든)
+- 친구한테 얘기하듯 편하게
+- 솔직한 의견 + 개인적인 인사이트
 
 ═══════════════════════════════════════
 📤 출력 형식 (JSON)
@@ -497,7 +498,7 @@ export const generateAgenticContent = async ({ textInput, images = [], styleTone
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const criticAgent = new CriticAgent();
     const writerAgent = new WriterAgent();
-    const MAX_ATTEMPTS = 2;
+    const MAX_ATTEMPTS = 5; // 80점 이상이 될 때까지 최대 5회 시도
 
     const updateProgress = (message, step) => {
       if (onProgress) {
@@ -565,10 +566,12 @@ export const generateAgenticContent = async ({ textInput, images = [], styleTone
     }
     if (hasThreads) {
       platformRequirements.push(`**[Threads] (500자 이내)**
-- 인스타보다 대화체, 생각을 나누는 느낌
-- 의견이나 관점 공유
-- 독자와 대화하듯 친근하게
-- 스토리텔링 + 인사이트`);
+- 반말 모드로 작성 (Threads 특유의 문화)
+- "~해", "~야", "~지", "~거든" 등 친근한 반말체 사용
+- 친구한테 얘기하듯 편하게
+- 의견이나 생각을 솔직하게 공유
+- 스토리텔링 + 개인적인 인사이트
+- 이모지는 자연스럽게 1-3개 정도`);
     }
 
     // JSON 출력 형식 생성 (선택된 플랫폼만)
@@ -708,8 +711,9 @@ ${JSON.stringify(outputFormat, null, 2)}
 
     while (needsImprovement() && attempts < MAX_ATTEMPTS) {
       attempts++;
-      console.log(`🔄 품질 미달로 재생성 중... (시도 ${attempts}/${MAX_ATTEMPTS})`);
-      updateProgress(`품질 개선 중... (시도 ${attempts}/${MAX_ATTEMPTS})`, 'writing');
+      const lowScorePlatforms = selectedPlatforms.filter(p => critique[p] && critique[p].score < 80);
+      console.log(`🔄 품질 미달 플랫폼: ${lowScorePlatforms.join(', ')} - 재생성 중... (시도 ${attempts}/${MAX_ATTEMPTS})`);
+      updateProgress(`품질 개선 중... (${lowScorePlatforms.join(', ')}) - 시도 ${attempts}/${MAX_ATTEMPTS}`, 'writing');
 
       // 피드백을 반영하여 재생성 (선택된 플랫폼 중 80점 미만인 것만)
       const feedback = {};
