@@ -1,42 +1,53 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import {
-  MdDashboard,
-  MdAdd,
-  MdFolder,
-  MdStyle,
-  MdSettings,
-  MdHome
-} from 'react-icons/md';
-import {
-  FaYoutube,
-  FaFacebook,
-  FaInstagram,
-  FaXTwitter
-} from 'react-icons/fa6';
+import { MdDashboard, MdAdd, MdFolder, MdStyle, MdSettings, MdHome } from 'react-icons/md';
+import { FaYoutube, FaFacebook, FaInstagram, FaXTwitter } from 'react-icons/fa6';
 import { SiThreads } from 'react-icons/si';
 import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI } from '../services/api';
 import './Sidebar.css';
+
+// 메뉴 아이템 렌더링 컴포넌트
+const MenuItem = ({ item, isActive }) => (
+  <Link to={item.path} className={`sidebar-item ${isActive ? 'active' : ''}`}>
+    <item.icon className="sidebar-icon" />
+    <span className="sidebar-label">{item.label}</span>
+  </Link>
+);
+
+// 플랫폼 설정
+const PLATFORMS = [
+  { key: 'youtube', path: '/youtube', label: 'YouTube', icon: FaYoutube },
+  { key: 'facebook', path: '/facebook', label: 'Facebook', icon: FaFacebook },
+  { key: 'instagram', path: '/instagram', label: 'Instagram', icon: FaInstagram },
+  { key: 'threads', path: '/threads', label: 'Threads', icon: SiThreads },
+  { key: 'x', path: '/x', label: 'X', icon: FaXTwitter },
+];
+
+// 메뉴 설정
+const MAIN_MENU = [
+  { path: '/dashboard', label: '대시보드', icon: MdDashboard },
+  { path: '/contents', label: '콘텐츠 관리', icon: MdFolder },
+  { path: '/templates', label: '템플릿', icon: MdStyle },
+];
+
+const BOTTOM_MENU = [
+  { path: '/home', label: '뚝딱 도우미', icon: MdHome },
+  { path: '/settings', label: '설정', icon: MdSettings },
+];
+
+// 콘텐츠 생성 관련 경로
+const CONTENT_PATHS = ['/content', '/create', '/ai-video'];
 
 function Sidebar({ onHoverChange }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
+  const [connectedPlatforms, setConnectedPlatforms] = useState({});
 
-  // 부모 컴포넌트에 호버 상태 전달
   const handleSidebarHover = (hovered) => {
     setIsSidebarHovered(hovered);
-    if (onHoverChange) {
-      onHoverChange(hovered);
-    }
+    onHoverChange?.(hovered);
   };
-  const [connectedPlatforms, setConnectedPlatforms] = useState({
-    youtube: false,
-    facebook: false,
-    instagram: false,
-    threads: false,
-    x: false
-  });
 
   // 플랫폼 연동 상태 조회
   useEffect(() => {
@@ -47,16 +58,15 @@ function Sidebar({ onHoverChange }) {
           facebookAPI.getStatus().catch(() => null),
           instagramAPI.getStatus().catch(() => null),
           threadsAPI.getStatus().catch(() => null),
-          twitterAPI.getStatus().catch(() => null)
+          twitterAPI.getStatus().catch(() => null),
         ]);
 
-        // API가 연결 객체를 반환하면 연동됨, null이면 미연동
         setConnectedPlatforms({
           youtube: !!youtube,
-          facebook: !!(facebook && facebook.page_id),  // 페이지 선택까지 완료해야 연동
-          instagram: !!(instagram && instagram.instagram_account_id),  // 계정 선택까지 완료해야 연동
+          facebook: !!(facebook?.page_id),
+          instagram: !!(instagram?.instagram_account_id),
           threads: !!threads,
-          x: !!x
+          x: !!x,
         });
       } catch (error) {
         console.error('Failed to fetch platform status:', error);
@@ -66,36 +76,9 @@ function Sidebar({ onHoverChange }) {
     fetchPlatformStatus();
   }, []);
 
-  const menuItems = [
-    { path: '/dashboard', label: '대시보드', icon: MdDashboard },
-  ];
-
-  const contentManagementItems = [
-    { path: '/contents', label: '콘텐츠 관리', icon: MdFolder },
-    { path: '/templates', label: '템플릿', icon: MdStyle },
-  ];
-
-  const allPlatformMenuItems = [
-    { path: '/youtube', label: 'YouTube', icon: FaYoutube, key: 'youtube' },
-    { path: '/facebook', label: 'Facebook', icon: FaFacebook, key: 'facebook' },
-    { path: '/instagram', label: 'Instagram', icon: FaInstagram, key: 'instagram' },
-    { path: '/threads', label: 'Threads', icon: SiThreads, key: 'threads' },
-    { path: '/x', label: 'X', icon: FaXTwitter, key: 'x' },
-  ];
-
-  // 연동된 플랫폼만 필터링
-  const platformMenuItems = allPlatformMenuItems.filter(
-    item => connectedPlatforms[item.key]
-  );
-
-  const managementMenuItems = [
-    { path: '/home', label: '뚝딱 도우미', icon: MdHome },
-    { path: '/settings', label: '설정', icon: MdSettings },
-  ];
-
-  const handleLogoClick = () => {
-    navigate('/home');
-  };
+  const isActive = (path) => location.pathname === path;
+  const isContentActive = CONTENT_PATHS.includes(location.pathname);
+  const connectedPlatformItems = PLATFORMS.filter(p => connectedPlatforms[p.key]);
 
   return (
     <aside
@@ -103,8 +86,7 @@ function Sidebar({ onHoverChange }) {
       onMouseEnter={() => handleSidebarHover(true)}
       onMouseLeave={() => handleSidebarHover(false)}
     >
-      {/* 로고 */}
-      <div className="sidebar-logo" onClick={handleLogoClick}>
+      <div className="sidebar-logo" onClick={() => navigate('/home')}>
         <img
           src={isSidebarHovered ? "/ddukddak_white.png" : "/ddukddak_white_text.png"}
           alt="콘텐츠 크리에이터"
@@ -113,50 +95,22 @@ function Sidebar({ onHoverChange }) {
 
       <nav className="sidebar-nav">
         {/* 콘텐츠 생성 */}
-        <Link
-          to="/content"
-          className={`sidebar-item ${location.pathname === '/content' || location.pathname === '/create' || location.pathname === '/ai-video' ? 'active' : ''}`}
-        >
+        <Link to="/content" className={`sidebar-item ${isContentActive ? 'active' : ''}`}>
           <MdAdd className="sidebar-icon" />
           <span className="sidebar-label">콘텐츠 생성</span>
         </Link>
 
-        {menuItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
-          >
-            <item.icon className="sidebar-icon" />
-            <span className="sidebar-label">{item.label}</span>
-          </Link>
+        {/* 메인 메뉴 */}
+        {MAIN_MENU.map(item => (
+          <MenuItem key={item.path} item={item} isActive={isActive(item.path)} />
         ))}
 
-        {/* 콘텐츠 관리 메뉴 */}
-        {contentManagementItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
-          >
-            <item.icon className="sidebar-icon" />
-            <span className="sidebar-label">{item.label}</span>
-          </Link>
-        ))}
-
-        {/* 플랫폼 연동 메뉴 (연동된 플랫폼만 표시) */}
-        {platformMenuItems.length > 0 && (
+        {/* 연동된 플랫폼 메뉴 */}
+        {connectedPlatformItems.length > 0 && (
           <>
-            <div className="sidebar-divider"></div>
-            {platformMenuItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
-              >
-                <item.icon className="sidebar-icon" />
-                <span className="sidebar-label">{item.label}</span>
-              </Link>
+            <div className="sidebar-divider" />
+            {connectedPlatformItems.map(item => (
+              <MenuItem key={item.path} item={item} isActive={isActive(item.path)} />
             ))}
           </>
         )}
@@ -164,16 +118,9 @@ function Sidebar({ onHoverChange }) {
 
       {/* 하단 메뉴 */}
       <div className="sidebar-bottom">
-        <div className="sidebar-divider"></div>
-        {managementMenuItems.map((item) => (
-          <Link
-            key={item.path}
-            to={item.path}
-            className={`sidebar-item ${location.pathname === item.path ? 'active' : ''}`}
-          >
-            <item.icon className="sidebar-icon" />
-            <span className="sidebar-label">{item.label}</span>
-          </Link>
+        <div className="sidebar-divider" />
+        {BOTTOM_MENU.map(item => (
+          <MenuItem key={item.path} item={item} isActive={isActive(item.path)} />
         ))}
       </div>
     </aside>
