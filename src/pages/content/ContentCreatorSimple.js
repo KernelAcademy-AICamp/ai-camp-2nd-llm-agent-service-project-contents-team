@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { FiCopy, FiSend } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import { FiCopy, FiSend, FiArrowRight } from 'react-icons/fi';
 import api, { contentSessionAPI } from '../../services/api';
 import { generateAgenticContent } from '../../services/agenticService';
 import SNSPublishModal from '../../components/sns/SNSPublishModal';
-import './ContentCommon.css';
 import './ContentCreatorSimple.css';
 
 // ========== 상수 정의 ==========
@@ -32,13 +32,15 @@ const VIDEO_DURATION_OPTIONS = [
 ];
 
 const CONTENT_TYPES = [
-  { id: 'text', label: '글만', desc: '블로그, SNS 캡션' },
-  { id: 'image', label: '이미지만', desc: '썸네일, 배너' },
-  { id: 'both', label: '글 + 이미지', desc: '완성 콘텐츠' },
-  { id: 'shortform', label: '숏폼 영상', desc: '마케팅 비디오' },
+  { id: 'text', label: '글만', desc: '블로그, SNS 캡션', icon: '📝' },
+  { id: 'image', label: '이미지만', desc: '썸네일, 배너', icon: '🖼️' },
+  { id: 'both', label: '글 + 이미지', desc: '완성 콘텐츠', icon: '✨', recommended: true },
+  { id: 'shortform', label: '숏폼 영상', desc: '마케팅 비디오', icon: '🎬', isNew: true },
 ];
 
 const IMAGE_COUNTS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+const QUICK_TOPICS = ['신제품 출시', '이벤트 안내', '후기 소개', '브랜드 소개'];
 
 // ========== 유틸리티 함수 ==========
 const copyToClipboard = (text, message) => {
@@ -46,14 +48,12 @@ const copyToClipboard = (text, message) => {
   alert(message);
 };
 
-// 점수에 따른 색상
 const getScoreColor = (score) => {
   if (score >= 80) return '#10b981';
   if (score >= 60) return '#f59e0b';
   return '#ef4444';
 };
 
-// SNS 평균 점수 계산 (instagram/facebook, x, threads)
 const calcSnsAverageScore = (critique) => {
   if (!critique) return null;
   const scores = [critique.sns?.score, critique.x?.score, critique.threads?.score].filter(s => s != null);
@@ -63,8 +63,8 @@ const calcSnsAverageScore = (critique) => {
 
 // ========== 서브 컴포넌트 ==========
 const ResultCard = ({ title, children, onCopy, score }) => (
-  <div className="result-card">
-    <div className="result-card-header">
+  <div className="creator-result-card">
+    <div className="creator-result-card-header">
       <h3>
         {title}
         {score != null && (
@@ -74,21 +74,19 @@ const ResultCard = ({ title, children, onCopy, score }) => (
         )}
       </h3>
       {onCopy && (
-        <div className="result-card-actions">
-          <button className="btn-icon" onClick={onCopy} title="복사">
-            <FiCopy />
-          </button>
-        </div>
+        <button className="btn-icon" onClick={onCopy} title="복사">
+          <FiCopy />
+        </button>
       )}
     </div>
-    <div className="result-card-content">{children}</div>
+    <div className="creator-result-card-content">{children}</div>
   </div>
 );
 
 const TagList = ({ tags, isHashtag = false }) => (
-  <div className="result-tags">
+  <div className="creator-result-tags">
     {tags?.map((tag, idx) => (
-      <span key={idx} className={`tag-item ${isHashtag ? 'hashtag' : ''}`}>{tag}</span>
+      <span key={idx} className={`creator-tag-item ${isHashtag ? 'hashtag' : ''}`}>{tag}</span>
     ))}
   </div>
 );
@@ -108,8 +106,8 @@ const PlatformContent = ({ platform, data, onCopy, score }) => {
 
   return (
     <ResultCard title={title} onCopy={onCopy} score={score}>
-      {platform === 'blog' && <div className="blog-title">{data.title}</div>}
-      <div className={`text-result ${platform !== 'blog' ? 'sns-content' : ''}`}>
+      {platform === 'blog' && <div className="creator-blog-title">{data.title}</div>}
+      <div className={`creator-text-result ${platform !== 'blog' ? 'sns-content' : ''}`}>
         {data.content}
       </div>
       <TagList tags={tags} isHashtag={isHashtag} />
@@ -119,8 +117,7 @@ const PlatformContent = ({ platform, data, onCopy, score }) => {
 
 // ========== 메인 컴포넌트 ==========
 function ContentCreatorSimple() {
-  // 탭 상태
-  const [activeTab, setActiveTab] = useState('create');
+  const navigate = useNavigate();
 
   // 입력 상태
   const [contentType, setContentType] = useState(null);
@@ -282,7 +279,6 @@ function ContentCreatorSimple() {
 
       setResult(generatedResult);
       setProgress('');
-      setActiveTab('result');
     } catch (error) {
       console.error('콘텐츠 생성 실패:', error);
       alert('콘텐츠 생성 중 오류가 발생했습니다.');
@@ -296,7 +292,6 @@ function ContentCreatorSimple() {
     setResult(null);
     setTopic('');
     setProgress('');
-    setActiveTab('create');
   };
 
   // ========== 플랫폼 토글 ==========
@@ -331,181 +326,210 @@ function ContentCreatorSimple() {
 
   // ========== 렌더링 ==========
   return (
-    <div className="content-page">
-      {/* 헤더 */}
-      <div className="page-header">
-        <h2>Contents 생성</h2>
-        <p className="page-description">주제만 입력하면 AI가 글과 이미지를 한번에 생성합니다</p>
-      </div>
+    <div className="content-creator">
+      {/* 결과가 없을 때: 생성 폼 */}
+      {!result ? (
+        <div className="creator-container">
+          {/* 페이지 헤더 */}
+          <div className="page-header">
+            <h2>콘텐츠 생성</h2>
+            <p className="page-description">AI로 블로그, SNS용 콘텐츠와 이미지를 생성합니다</p>
+          </div>
 
-      {/* 탭 네비게이션 */}
-      <div className="content-tabs">
-        <button className={`content-tab ${activeTab === 'create' ? 'active' : ''}`} onClick={() => setActiveTab('create')}>
-          콘텐츠 생성
-        </button>
-        {result && (
-          <button className={`content-tab ${activeTab === 'result' ? 'active' : ''}`} onClick={() => setActiveTab('result')}>
-            생성 결과
-          </button>
-        )}
-      </div>
+          <div className="creator-grid">
+            {/* 왼쪽: 기본 입력 */}
+            <div className="creator-left">
+              {/* 콘텐츠 타입 선택 */}
+              <div className="creator-type-section">
+                <label className="creator-label">생성 타입</label>
+                <div className="creator-type-grid">
+                  {CONTENT_TYPES.map(type => (
+                    <div
+                      key={type.id}
+                      className={`creator-type-card ${contentType === type.id ? 'selected' : ''}`}
+                      onClick={() => setContentType(type.id)}
+                    >
+                      {type.recommended && <span className="recommended-badge">추천</span>}
+                      {type.isNew && <span className="new-badge">NEW</span>}
+                      <span className="type-icon">{type.icon}</span>
+                      <span className="type-label">{type.label}</span>
+                      <span className="type-desc">{type.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-      {/* 콘텐츠 생성 탭 */}
-      {activeTab === 'create' && (
-        <div className="content-grid single-column">
-          <div className="form-section">
-            {/* 콘텐츠 타입 선택 */}
-            <div className="form-group">
-              <label>생성 타입</label>
-              <div className="type-options type-options-4">
-                {CONTENT_TYPES.map(type => (
-                  <div
-                    key={type.id}
-                    className={`type-card ${contentType === type.id ? 'selected' : ''}`}
-                    onClick={() => setContentType(type.id)}
-                  >
-                    <div className="type-header"><h4>{type.label}</h4></div>
-                    <p className="type-desc">{type.desc}</p>
-                  </div>
+              {/* 주제 입력 */}
+              <div className="creator-input-box">
+                <textarea
+                  className="creator-textarea"
+                  placeholder="무엇에 대한 콘텐츠를 만들까요? 예: 가을 신상 니트 소개"
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  rows={3}
+                />
+                <button
+                  className="creator-generate-btn"
+                  onClick={handleGenerate}
+                  disabled={isGenerateDisabled}
+                >
+                  {isGenerating ? (
+                    <><span className="spinner"></span>{progress}</>
+                  ) : (
+                    <>생성하기 <FiArrowRight className="btn-arrow" /></>
+                  )}
+                </button>
+              </div>
+
+              {/* 빠른 시작 */}
+              <div className="creator-quick-options">
+                <span className="quick-label">빠른 시작:</span>
+                {QUICK_TOPICS.map(t => (
+                  <button key={t} className="quick-chip" onClick={() => setTopic(t)}>{t}</button>
                 ))}
+              </div>
+
+              {/* 기타 옵션 */}
+              <div className="creator-other-options">
+                <button className="option-btn" onClick={() => navigate('/history')}>
+                  <span className="option-icon">📋</span>
+                  생성 내역 보기
+                </button>
               </div>
             </div>
 
-            {/* 주제 입력 */}
-            <div className="form-group">
-              <label>주제 *</label>
-              <textarea
-                className="form-textarea"
-                placeholder="예: 가을 신상 니트 소개, 카페 오픈 이벤트 안내, 새로운 메뉴 출시..."
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                rows={3}
-              />
-            </div>
+            {/* 오른쪽: 타입별 옵션 */}
+            <div className="creator-right">
+              {!contentType ? (
+                <div className="creator-options-placeholder">
+                  <span className="placeholder-icon">⚙️</span>
+                  <p>생성 타입을 선택하면<br />추가 옵션이 표시됩니다</p>
+                </div>
+              ) : (
+                <div className="creator-options-panel">
+                  <h3 className="options-title">옵션 설정</h3>
 
-            {/* 이미지 업로드 (숏폼 영상) */}
-            {contentType === 'shortform' && (
-              <div className="form-group">
-                <label>이미지 *</label>
-                <div className="image-upload-area">
-                  {uploadedImages.length === 0 ? (
-                    <label className="upload-label">
-                      <input type="file" accept="image/*" onChange={handleImageUpload} className="file-input" />
-                      <span className="upload-icon">📸</span>
-                      <span>클릭하여 이미지 업로드</span>
-                      <span className="upload-hint">PNG, JPG, WebP (최대 10MB)</span>
-                    </label>
-                  ) : (
-                    <div className="uploaded-image-preview">
-                      <img src={uploadedImages[0].preview} alt="업로드된 이미지" />
-                      <button type="button" className="btn-remove-image" onClick={() => setUploadedImages([])}>✕ 제거</button>
+                  {/* 스타일 선택 */}
+                  <div className="creator-option-section">
+                    <label className="creator-label">스타일</label>
+                    <div className="creator-chips">
+                      {STYLES.map(s => (
+                        <button
+                          key={s.id}
+                          className={`creator-chip ${style === s.id ? 'selected' : ''}`}
+                          onClick={() => setStyle(s.id)}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 플랫폼 선택 */}
+                  {(contentType === 'text' || contentType === 'both') && (
+                    <div className="creator-option-section">
+                      <label className="creator-label">플랫폼</label>
+                      <div className="creator-chips">
+                        {PLATFORMS.map(p => (
+                          <button
+                            key={p.id}
+                            className={`creator-chip ${selectedPlatforms.includes(p.id) ? 'selected' : ''}`}
+                            onClick={() => togglePlatform(p.id)}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 이미지 갯수 선택 */}
+                  {(contentType === 'image' || contentType === 'both') && (
+                    <div className="creator-option-section">
+                      <label className="creator-label">이미지 갯수</label>
+                      <div className="creator-chips">
+                        {IMAGE_COUNTS.map(count => (
+                          <button
+                            key={count}
+                            className={`creator-chip ${imageCount === count ? 'selected' : ''}`}
+                            onClick={() => setImageCount(count)}
+                          >
+                            {count}장
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 이미지 업로드 (숏폼 영상) */}
+                  {contentType === 'shortform' && (
+                    <div className="creator-option-section">
+                      <label className="creator-label">이미지 업로드 *</label>
+                      <div className="creator-upload-area">
+                        {uploadedImages.length === 0 ? (
+                          <label className="upload-label">
+                            <input type="file" accept="image/*" onChange={handleImageUpload} className="file-input" />
+                            <span className="upload-icon">📸</span>
+                            <span>클릭하여 이미지 업로드</span>
+                            <span className="upload-hint">PNG, JPG, WebP (최대 10MB)</span>
+                          </label>
+                        ) : (
+                          <div className="uploaded-preview">
+                            <img src={uploadedImages[0].preview} alt="업로드된 이미지" />
+                            <button type="button" className="btn-remove" onClick={() => setUploadedImages([])}>✕</button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 영상 길이 선택 */}
+                  {contentType === 'shortform' && (
+                    <div className="creator-option-section">
+                      <label className="creator-label">영상 길이</label>
+                      <div className="creator-duration-grid">
+                        {VIDEO_DURATION_OPTIONS.map(option => (
+                          <div
+                            key={option.id}
+                            className={`creator-duration-card ${videoDuration === option.id ? 'selected' : ''}`}
+                            onClick={() => setVideoDuration(option.id)}
+                          >
+                            <span className="duration-label">{option.label}</span>
+                            <span className="duration-time">{option.duration}</span>
+                            <span className="duration-info">{option.cuts}컷 · {option.description}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-
-            {/* 스타일 선택 */}
-            <div className="form-group">
-              <label>스타일</label>
-              <div className="option-cards">
-                {STYLES.map(s => (
-                  <div key={s.id} className={`option-card ${style === s.id ? 'selected' : ''}`} onClick={() => setStyle(s.id)}>
-                    {s.label}
-                  </div>
-                ))}
-              </div>
+              )}
             </div>
-
-            {/* 플랫폼 선택 */}
-            {(contentType === 'text' || contentType === 'both') && (
-              <div className="form-group">
-                <label>플랫폼</label>
-                <div className="option-cards">
-                  {PLATFORMS.map(p => (
-                    <div
-                      key={p.id}
-                      className={`option-card ${selectedPlatforms.includes(p.id) ? 'selected' : ''}`}
-                      onClick={() => togglePlatform(p.id)}
-                    >
-                      {p.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 이미지 갯수 선택 */}
-            {(contentType === 'image' || contentType === 'both') && (
-              <div className="form-group">
-                <label>이미지 갯수</label>
-                <div className="option-cards">
-                  {IMAGE_COUNTS.map(count => (
-                    <div
-                      key={count}
-                      className={`option-card ${imageCount === count ? 'selected' : ''}`}
-                      onClick={() => setImageCount(count)}
-                    >
-                      {count}장
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 영상 길이 선택 */}
-            {contentType === 'shortform' && (
-              <div className="form-group">
-                <label>영상 길이</label>
-                <div className="video-duration-options">
-                  {VIDEO_DURATION_OPTIONS.map(option => (
-                    <div
-                      key={option.id}
-                      className={`duration-card ${videoDuration === option.id ? 'selected' : ''}`}
-                      onClick={() => setVideoDuration(option.id)}
-                    >
-                      <div className="duration-header">
-                        <h4>{option.label}</h4>
-                        <span className="duration-time">{option.duration}</span>
-                      </div>
-                      <div className="duration-info">
-                        <span className="duration-cuts">{option.cuts}개 컷</span>
-                        <span className="duration-desc">{option.description}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 생성 버튼 */}
-            <button className="btn-generate" onClick={handleGenerate} disabled={isGenerateDisabled}>
-              {isGenerating ? <><span className="spinner"></span>{progress}</> : '생성하기'}
-            </button>
           </div>
         </div>
-      )}
+      ) : (
+        /* 결과 화면 */
+        <div className="creator-result">
+          <div className="result-header">
+            <h2 className="result-title">생성 완료!</h2>
+            <p className="result-subtitle">"{topic}" 주제로 콘텐츠가 생성되었습니다</p>
+          </div>
 
-      {/* 결과 탭 */}
-      {activeTab === 'result' && result && (
-        <div className="result-content">
           {/* 생성된 이미지 */}
           {result.images?.length > 0 && (
-            <div className="result-card result-images-top">
-              <div className="result-card-header">
+            <div className="creator-result-card result-images-section">
+              <div className="creator-result-card-header">
                 <h3>생성된 이미지 ({result.images.length}장)</h3>
                 {result.images.length > 1 && (
-                  <div className="result-card-actions">
-                    <button className="btn-download" onClick={handleDownloadAllImages}>전체 다운로드</button>
-                  </div>
+                  <button className="btn-download" onClick={handleDownloadAllImages}>전체 다운로드</button>
                 )}
               </div>
-              <div className="result-card-content">
-                <div className="images-grid">
+              <div className="creator-result-card-content">
+                <div className="creator-images-grid">
                   {result.images.map((img, index) => (
-                    <div key={index} className="image-item" onClick={() => setPopupImage(img.url)}>
+                    <div key={index} className="creator-image-item" onClick={() => setPopupImage(img.url)}>
                       <img src={img.url} alt={`Generated ${index + 1}`} />
-                      <button className="btn-download-single" onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.url, index); }}>
+                      <button className="btn-download-overlay" onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.url, index); }}>
                         다운로드
                       </button>
                     </div>
@@ -515,32 +539,38 @@ function ContentCreatorSimple() {
             </div>
           )}
 
-          {/* 2열 레이아웃 */}
-          <div className="result-two-column">
-            <div className="result-column-left">
+          {/* 품질 점수 */}
+          {result.text?.critique && (
+            <div className="creator-quality-scores">
+              <div className="quality-score-item">
+                <div className="score-circle blog">
+                  <span className="score-number">{result.text.critique.blog?.score || '-'}</span>
+                </div>
+                <span className="score-label">블로그</span>
+              </div>
+              <div className="quality-score-item">
+                <div className="score-circle sns">
+                  <span className="score-number">{calcSnsAverageScore(result.text.critique) || '-'}</span>
+                </div>
+                <span className="score-label">SNS 평균</span>
+              </div>
+            </div>
+          )}
+
+          {/* 텍스트 결과 */}
+          <div className="creator-result-grid">
+            <div className="result-column">
               <PlatformContent platform="blog" data={result.text?.blog} onCopy={() => handleCopyBlog({ blog: result.text.blog })} score={result.text?.critique?.blog?.score} />
             </div>
-            <div className="result-column-right">
-              {/* 품질 점수 요약 (블로그 + SNS 평균) */}
-              {result.text?.critique && (
-                <div className="quality-scores">
-                  <div className="quality-score-card">
-                    <div className="score-circle blog"><span className="score-number">{result.text.critique.blog?.score || '-'}</span></div>
-                    <span className="score-label">블로그</span>
-                  </div>
-                  <div className="quality-score-card">
-                    <div className="score-circle sns"><span className="score-number">{calcSnsAverageScore(result.text.critique) || '-'}</span></div>
-                    <span className="score-label">SNS 평균</span>
-                  </div>
-                </div>
-              )}
+            <div className="result-column">
               <PlatformContent platform="sns" data={result.text?.sns} onCopy={() => handleCopySNS({ sns: result.text.sns })} score={result.text?.critique?.sns?.score} />
               <PlatformContent platform="x" data={result.text?.x} onCopy={() => handleCopyX({ x: result.text.x })} score={result.text?.critique?.x?.score} />
               <PlatformContent platform="threads" data={result.text?.threads} onCopy={() => handleCopyThreads({ threads: result.text.threads })} score={result.text?.critique?.threads?.score} />
             </div>
           </div>
 
-          <div className="result-actions-bar">
+          {/* 액션 버튼 */}
+          <div className="creator-result-actions">
             <button className="btn-reset" onClick={handleReset}>새로 만들기</button>
             {result.text?.sns && (
               <button
