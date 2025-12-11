@@ -72,3 +72,16 @@ async def update_user_me(
     db.refresh(current_user)
 
     return current_user
+
+
+@router.post("/refresh-token")
+async def refresh_token(current_user: models.User = Depends(auth.get_current_active_user)):
+    """
+    현재 토큰이 유효한 경우 새로운 액세스 토큰을 발급합니다.
+    사용자 활동 감지 시 세션 연장에 사용됩니다.
+    """
+    new_token = auth.refresh_access_token(current_user)
+    return {
+        "access_token": new_token,
+        "token_type": "bearer"
+    }

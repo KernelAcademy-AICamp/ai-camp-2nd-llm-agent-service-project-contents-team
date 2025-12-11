@@ -20,6 +20,15 @@ class XTokenExpiredError(Exception):
     pass
 
 
+class XAPIError(Exception):
+    """X API 호출 중 발생하는 에러"""
+    def __init__(self, message: str, status_code: int = None, response_text: str = None):
+        self.message = message
+        self.status_code = status_code
+        self.response_text = response_text
+        super().__init__(self.message)
+
+
 # X API v2 기본 URL
 X_API_URL = "https://api.twitter.com/2"
 X_TOKEN_URL = "https://api.twitter.com/2/oauth2/token"
@@ -98,7 +107,11 @@ class XService:
             if response.status_code >= 400:
                 logger.error(f"X API error: {response.status_code} - URL: {url}")
                 logger.error(f"X API response: {response.text}")
-                return None
+                raise XAPIError(
+                    f"X API 오류 (HTTP {response.status_code})",
+                    status_code=response.status_code,
+                    response_text=response.text
+                )
 
             # DELETE 요청은 빈 응답일 수 있음
             if response.status_code == 204:

@@ -1,108 +1,31 @@
 /* ========================================
-   FACEBOOK PAGE - CLEAN STYLE
+   FACEBOOK PAGE - PLATFORM SPECIFIC STYLES
    ======================================== */
 
-.facebook-page {
-  padding: var(--space-lg);
-  max-width: 1200px;
-  margin: 0 auto;
+/* Facebook 브랜드 컬러 */
+.facebook-page .tab-btn:hover,
+.facebook-page .tab-btn.active {
+  color: #1877f2;
 }
 
-.facebook-header {
-  margin-bottom: var(--space-xl);
+.facebook-page .tab-btn.active::after {
+  background: #1877f2;
 }
 
-.facebook-header h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--space-sm);
+.facebook-page .post-card:hover {
+  border-color: #1877f2;
 }
 
-.facebook-header p {
-  font-size: 14px;
-  color: var(--text-tertiary);
+.facebook-page .page-item:hover {
+  border-color: #1877f2;
 }
 
-/* Error Message */
-.error-message {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-md);
-  background: var(--error-light);
-  border: 1px solid var(--error-color);
-  margin-bottom: var(--space-lg);
-  color: var(--error-dark);
-  font-weight: 500;
+.facebook-page .form-group input:focus,
+.facebook-page .form-group textarea:focus {
+  border-color: #1877f2;
 }
 
-.error-message button {
-  background: transparent;
-  border: none;
-  color: var(--error-dark);
-  cursor: pointer;
-  font-weight: 600;
-}
-
-/* Loading */
-.loading-spinner {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 400px;
-  font-size: 14px;
-  color: var(--text-tertiary);
-}
-
-/* Connect Section */
-.connect-section {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 500px;
-}
-
-.connect-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  padding: var(--space-2xl);
-  text-align: center;
-  max-width: 500px;
-}
-
-.connect-icon {
-  font-size: 64px;
-  margin-bottom: var(--space-lg);
-}
-
-.connect-card h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--space-md);
-}
-
-.connect-card p {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-lg);
-  line-height: 1.6;
-}
-
-.feature-list {
-  text-align: left;
-  margin-bottom: var(--space-xl);
-  padding-left: var(--space-lg);
-}
-
-.feature-list li {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-sm);
-  line-height: 1.5;
-}
-
+/* Facebook 연결 버튼 */
 .btn-connect-facebook {
   display: inline-flex;
   align-items: center;
@@ -128,56 +51,7 @@
   height: 20px;
 }
 
-/* Page Selector Section */
-.page-selector-section {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 500px;
-}
-
-.page-selector-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  padding: var(--space-2xl);
-  text-align: center;
-  max-width: 600px;
-  width: 100%;
-}
-
-.page-selector-card h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--space-sm);
-}
-
-.page-selector-card > p {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-xl);
-}
-
-.no-pages {
-  padding: var(--space-xl);
-  background: var(--bg-secondary);
-  margin-bottom: var(--space-lg);
-}
-
-.no-pages p {
-  color: var(--text-tertiary);
-  margin-bottom: var(--space-sm);
-  font-size: 13px;
-}
-
-.page-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-lg);
-  text-align: left;
-}
-
+/* 페이지 선택 */
 .page-item {
   display: flex;
   align-items: center;
@@ -190,7 +64,6 @@
 }
 
 .page-item:hover {
-  border-color: #1877f2;
   background: var(--bg-primary);
 }
 
@@ -225,39 +98,7 @@
   color: var(--text-secondary);
 }
 
-/* Account Info Card */
-.account-info-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  padding: var(--space-lg);
-  margin-bottom: var(--space-lg);
-}
-
-.account-header {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-lg);
-  margin-bottom: var(--space-lg);
-}
-
-.account-thumbnail {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.account-details {
-  flex: 1;
-}
-
-.account-details h3 {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--space-xs);
-}
-
+/* 카테고리 뱃지 */
 .account-category {
   font-size: 12px;
   color: var(--text-tertiary);
@@ -266,155 +107,13 @@
   display: inline-block;
 }
 
-.account-actions {
-  display: flex;
-  gap: var(--space-sm);
-  flex-wrap: wrap;
-}
-
-.btn-secondary {
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--bg-secondary);
-}
-
-.btn-secondary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-danger {
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-primary);
-  border: 1px solid var(--error-color);
-  color: var(--error-color);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-danger:hover {
-  background: var(--error-color);
-  color: white;
-}
-
-.account-stats-bar {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-2xl);
-  padding-top: var(--space-lg);
-  border-top: 1px solid var(--border-color);
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-value {
-  display: block;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--space-xs);
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-/* Tab Navigation */
-.facebook-tabs {
-  display: flex;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-lg);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.tab-btn {
-  padding: var(--space-sm) var(--space-md);
-  background: none;
-  border: none;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  position: relative;
-  transition: color 0.15s ease;
-}
-
-.tab-btn:hover {
-  color: #1877f2;
-}
-
-.tab-btn.active {
-  color: #1877f2;
-}
-
-.tab-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #1877f2;
-}
-
-/* Tab Content */
-.tab-content {
-}
-
-/* Posts Section */
-.posts-section .section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-lg);
-}
-
-.section-header h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.empty-state {
-  text-align: center;
-  padding: var(--space-2xl);
-  color: var(--text-tertiary);
-}
-
-.post-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.post-card {
+/* 게시물 카드 */
+.facebook-page .post-card {
   display: flex;
   gap: var(--space-md);
-  padding: var(--space-md);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  transition: all 0.15s ease;
 }
 
-.post-card:hover {
-  border-color: #1877f2;
-}
-
-.post-image {
+.facebook-page .post-image {
   flex-shrink: 0;
   width: 120px;
   height: 90px;
@@ -422,18 +121,13 @@
   background: var(--bg-tertiary);
 }
 
-.post-image img {
+.facebook-page .post-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.post-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.post-message {
+.facebook-page .post-message {
   font-size: 14px;
   color: var(--text-primary);
   line-height: 1.5;
@@ -444,20 +138,7 @@
   overflow: hidden;
 }
 
-.post-stats {
-  display: flex;
-  gap: var(--space-md);
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-sm);
-}
-
-.post-date {
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-.post-link {
+.facebook-page .post-link {
   flex-shrink: 0;
   padding: var(--space-sm) var(--space-md);
   background: #1877f2;
@@ -469,53 +150,11 @@
   transition: background 0.15s ease;
 }
 
-.post-link:hover {
+.facebook-page .post-link:hover {
   background: #166fe5;
 }
 
-/* Insights Section */
-.insights-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: var(--space-lg);
-}
-
-.insights-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--space-md);
-}
-
-.insight-card {
-  background: var(--bg-secondary);
-  padding: var(--space-md);
-  text-align: center;
-}
-
-.insight-label {
-  display: block;
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin-bottom: var(--space-sm);
-}
-
-.insight-value {
-  display: block;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-/* Create Post Section */
-.create-post-section h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: var(--space-lg);
-}
-
-/* Permission Notice */
+/* 게시물 작성 권한 알림 */
 .permission-notice {
   background: var(--bg-secondary);
   padding: var(--space-lg);
@@ -542,110 +181,27 @@
   margin-bottom: var(--space-sm);
 }
 
-.create-post-form {
-  max-width: 600px;
-}
-
-.form-group {
-  margin-bottom: var(--space-lg);
-}
-
-.form-group label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: var(--space-sm);
-}
-
-.form-group input[type="text"],
-.form-group input[type="url"],
-.form-group textarea {
-  width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  font-size: 14px;
-  color: var(--text-primary);
-  transition: border-color 0.15s ease;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #1877f2;
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 100px;
-}
-
-.form-group input:disabled,
-.form-group textarea:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-post {
-  padding: var(--space-sm) var(--space-xl);
+/* 게시 버튼 */
+.facebook-page .btn-post {
   background: #1877f2;
-  color: white;
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease;
 }
 
-.btn-post:hover:not(:disabled) {
+.facebook-page .btn-post:hover:not(:disabled) {
   background: #166fe5;
-}
-
-.btn-post:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .facebook-page {
-    padding: var(--space-md);
-  }
-
-  .connect-card,
-  .page-selector-card {
-    padding: var(--space-lg);
-  }
-
-  .account-header {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .account-actions {
-    justify-content: center;
-  }
-
-  .account-stats-bar {
-    gap: var(--space-lg);
-  }
-
-  .post-card {
+  .facebook-page .post-card {
     flex-direction: column;
   }
 
-  .post-image {
+  .facebook-page .post-image {
     width: 100%;
     height: 180px;
   }
 
-  .post-link {
+  .facebook-page .post-link {
     align-self: flex-start;
-  }
-
-  .insights-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 }

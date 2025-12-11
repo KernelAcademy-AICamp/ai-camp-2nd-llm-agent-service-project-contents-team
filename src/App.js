@@ -18,11 +18,14 @@ import MyPage from './pages/profile/MyPage';
 import AIVideoGenerator from './pages/content/AIVideoGenerator';
 import ContentHub from './pages/content/ContentHub';
 import ContentCreatorSimple from './pages/content/ContentCreatorSimple';
+import ContentHistory from './pages/content/ContentHistory';
+import ContentEditor from './pages/content/ContentEditor';
 import YouTube from './pages/connection_SNS/youtube/YouTube';
 import Facebook from './pages/connection_SNS/facebook/Facebook';
 import Instagram from './pages/connection_SNS/instagram/Instagram';
 import X from './pages/connection_SNS/x/X';
 import Threads from './pages/connection_SNS/threads/Threads';
+import SNSConnections from './pages/sns/SNSConnections';
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import DeleteData from './pages/legal/DeleteData';
 import './App.css';
@@ -85,6 +88,26 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ContentCreatorSimple />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/history"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ContentHistory />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/editor"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ContentEditor />
                 </Layout>
               </ProtectedRoute>
             }
@@ -205,6 +228,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Threads />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/sns-connections"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <SNSConnections />
                 </Layout>
               </ProtectedRoute>
             }
