@@ -19,6 +19,7 @@ import AIVideoGenerator from './pages/content/AIVideoGenerator';
 import ContentHub from './pages/content/ContentHub';
 import ContentCreatorSimple from './pages/content/ContentCreatorSimple';
 import ContentHistory from './pages/content/ContentHistory';
+import ContentEditor from './pages/content/ContentEditor';
 import YouTube from './pages/connection_SNS/youtube/YouTube';
 import Facebook from './pages/connection_SNS/facebook/Facebook';
 import Instagram from './pages/connection_SNS/instagram/Instagram';
@@ -96,6 +97,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ContentHistory />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/editor"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ContentEditor />
                 </Layout>
               </ProtectedRoute>
             }

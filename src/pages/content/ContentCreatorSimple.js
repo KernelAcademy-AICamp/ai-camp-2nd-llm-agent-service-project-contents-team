@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiCopy, FiSend, FiArrowRight } from 'react-icons/fi';
+import { FiCopy, FiArrowRight, FiEdit3 } from 'react-icons/fi';
+import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
 import api, { contentSessionAPI } from '../../services/api';
 import { generateAgenticContent } from '../../services/agenticService';
-import SNSPublishModal from '../../components/sns/SNSPublishModal';
 import './ContentCreatorSimple.css';
 
 // ========== 상수 정의 ==========
@@ -83,36 +84,59 @@ const ResultCard = ({ title, children, onCopy, score }) => (
   </div>
 );
 
-const TagList = ({ tags, isHashtag = false }) => (
-  <div className="creator-result-tags">
-    {tags?.map((tag, idx) => (
-      <span key={idx} className={`creator-tag-item ${isHashtag ? 'hashtag' : ''}`}>{tag}</span>
-    ))}
-  </div>
-);
-
 const PlatformContent = ({ platform, data, onCopy, score }) => {
   if (!data) return null;
 
   const config = {
-    blog: { title: '네이버 블로그', tagsKey: 'tags', isHashtag: false },
-    sns: { title: 'Instagram / Facebook', tagsKey: 'hashtags', isHashtag: true },
-    x: { title: 'X', tagsKey: 'hashtags', isHashtag: true },
-    threads: { title: 'Threads', tagsKey: 'hashtags', isHashtag: true },
+    blog: { title: '네이버 블로그' },
+    sns: { title: 'Instagram / Facebook' },
+    x: { title: 'X' },
+    threads: { title: 'Threads' },
   };
 
-  const { title, tagsKey, isHashtag } = config[platform];
-  const tags = data[tagsKey] || data.tags;
+  const { title } = config[platform];
 
   return (
     <ResultCard title={title} onCopy={onCopy} score={score}>
       {platform === 'blog' && <div className="creator-blog-title">{data.title}</div>}
-      <div className={`creator-text-result ${platform !== 'blog' ? 'sns-content' : ''}`}>
-        {data.content}
-      </div>
-      <TagList tags={tags} isHashtag={isHashtag} />
+      {platform === 'blog' ? (
+        <div className="creator-text-result markdown-content">
+          <ReactMarkdown remarkPlugins={[remarkBreaks]}>{data.content}</ReactMarkdown>
+        </div>
+      ) : (
+        <div className="creator-text-result sns-content">
+          {data.content}
+        </div>
+      )}
     </ResultCard>
   );
+};
+
+// 모든 플랫폼에서 태그를 모아서 중복 제거 (통합)
+const collectAllTags = (textResult) => {
+  if (!textResult) return [];
+
+  const allTags = new Set();
+
+  // 블로그 태그 (# 붙여서 통합)
+  if (textResult.blog?.tags) {
+    textResult.blog.tags.forEach(tag => {
+      const normalizedTag = tag.startsWith('#') ? tag : `#${tag}`;
+      allTags.add(normalizedTag);
+    });
+  }
+
+  // SNS 해시태그
+  const snsData = [textResult.sns, textResult.x, textResult.threads];
+  snsData.forEach(data => {
+    const tags = data?.hashtags || data?.tags || [];
+    tags.forEach(tag => {
+      const normalizedTag = tag.startsWith('#') ? tag : `#${tag}`;
+      allTags.add(normalizedTag);
+    });
+  });
+
+  return Array.from(allTags);
 };
 
 // ========== 메인 컴포넌트 ==========
@@ -136,9 +160,23 @@ function ContentCreatorSimple() {
   // 팝업 상태
   const [popupImage, setPopupImage] = useState(null);
 
-  // SNS 발행 모달 상태
-  const [showPublishModal, setShowPublishModal] = useState(false);
-  const [publishContent, setPublishContent] = useState(null);
+  // 결과 컬럼 높이 동기화 ref
+  const snsColumnRef = useRef(null);
+  const blogCardRef = useRef(null);
+
+  // SNS 컬럼 높이에 맞춰 블로그 카드 높이 설정
+  useEffect(() => {
+    if (result && snsColumnRef.current && blogCardRef.current) {
+      const updateHeight = () => {
+        const snsHeight = snsColumnRef.current.offsetHeight;
+        blogCardRef.current.style.height = `${snsHeight}px`;
+      };
+      // 초기 설정 + 리사이즈 대응
+      updateHeight();
+      window.addEventListener('resize', updateHeight);
+      return () => window.removeEventListener('resize', updateHeight);
+    }
+  }, [result]);
 
   // ========== 복사 함수 ==========
   const createCopyHandler = (getData, message) => (item) => {
@@ -389,13 +427,6 @@ function ContentCreatorSimple() {
                 ))}
               </div>
 
-              {/* 기타 옵션 */}
-              <div className="creator-other-options">
-                <button className="option-btn" onClick={() => navigate('/history')}>
-                  <span className="option-icon">📋</span>
-                  생성 내역 보기
-                </button>
-              </div>
             </div>
 
             {/* 오른쪽: 타입별 옵션 */}
@@ -557,12 +588,59 @@ function ContentCreatorSimple() {
             </div>
           )}
 
+          {/* 통합 태그 섹션 */}
+          {result.text && (() => {
+            const allTags = collectAllTags(result.text);
+            if (allTags.length === 0) return null;
+            return (
+              <div className="creator-all-tags">
+                <div className="tags-header">
+                  <span className="tags-label">태그</span>
+                  <button
+                    className="btn-icon btn-copy-tags"
+                    onClick={() => copyToClipboard(allTags.join(' '), '태그가 복사되었습니다!')}
+                    title="전체 태그 복사"
+                  >
+                    <FiCopy />
+                  </button>
+                </div>
+                <div className="tags-list">
+                  {allTags.map((tag, idx) => (
+                    <span key={idx} className="creator-tag-item hashtag">{tag}</span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* 텍스트 결과 */}
           <div className="creator-result-grid">
-            <div className="result-column">
-              <PlatformContent platform="blog" data={result.text?.blog} onCopy={() => handleCopyBlog({ blog: result.text.blog })} score={result.text?.critique?.blog?.score} />
+            <div className="result-column blog-column">
+              {result.text?.blog && (
+                <div className="creator-result-card" ref={blogCardRef}>
+                  <div className="creator-result-card-header">
+                    <h3>
+                      네이버 블로그
+                      {result.text?.critique?.blog?.score != null && (
+                        <span className="header-score" style={{ color: getScoreColor(result.text.critique.blog.score) }}>
+                          {result.text.critique.blog.score}점
+                        </span>
+                      )}
+                    </h3>
+                    <button className="btn-icon" onClick={() => handleCopyBlog({ blog: result.text.blog })} title="복사">
+                      <FiCopy />
+                    </button>
+                  </div>
+                  <div className="creator-result-card-content">
+                    <div className="creator-blog-title">{result.text.blog.title}</div>
+                    <div className="creator-text-result markdown-content">
+                      <ReactMarkdown remarkPlugins={[remarkBreaks]}>{result.text.blog.content}</ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="result-column">
+            <div className="result-column sns-column" ref={snsColumnRef}>
               <PlatformContent platform="sns" data={result.text?.sns} onCopy={() => handleCopySNS({ sns: result.text.sns })} score={result.text?.critique?.sns?.score} />
               <PlatformContent platform="x" data={result.text?.x} onCopy={() => handleCopyX({ x: result.text.x })} score={result.text?.critique?.x?.score} />
               <PlatformContent platform="threads" data={result.text?.threads} onCopy={() => handleCopyThreads({ threads: result.text.threads })} score={result.text?.critique?.threads?.score} />
@@ -572,21 +650,12 @@ function ContentCreatorSimple() {
           {/* 액션 버튼 */}
           <div className="creator-result-actions">
             <button className="btn-reset" onClick={handleReset}>새로 만들기</button>
-            {result.text?.sns && (
+            {result.text && (
               <button
-                className="btn-publish"
-                onClick={() => {
-                  setPublishContent({
-                    type: result.images?.length > 0 ? 'image' : 'text',
-                    instagramCaption: result.text.sns?.content || '',
-                    facebookPost: result.text.sns?.content || '',
-                    hashtags: result.text.sns?.tags || result.text.sns?.hashtags || [],
-                    images: result.images?.map(img => img.url) || []
-                  });
-                  setShowPublishModal(true);
-                }}
+                className="btn-edit-publish"
+                onClick={() => navigate('/editor', { state: { result, topic } })}
               >
-                <FiSend /> SNS 발행하기
+                <FiEdit3 /> 편집 & 발행
               </button>
             )}
           </div>
@@ -603,12 +672,6 @@ function ContentCreatorSimple() {
         </div>
       )}
 
-      {/* SNS 발행 모달 */}
-      <SNSPublishModal
-        isOpen={showPublishModal}
-        onClose={() => setShowPublishModal(false)}
-        content={publishContent}
-      />
     </div>
   );
 }

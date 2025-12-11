@@ -44,8 +44,10 @@
 
 /* Header */
 .history-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   margin-bottom: var(--space-xl);
-  text-align: left;
 }
 
 .history-header h2 {
@@ -200,6 +202,11 @@
   gap: 0.5rem;
 }
 
+.history-detail-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .history-detail-header h3 {
   margin: 0;
   font-size: 1.1rem;
@@ -315,6 +322,47 @@
 .text-result.sns-content {
   font-size: 0.875rem;
   line-height: 1.6;
+}
+
+/* 마크다운 콘텐츠 스타일 */
+.text-result.markdown-content {
+  white-space: normal;
+}
+
+.text-result.markdown-content p {
+  margin: 0 0 0.75rem 0;
+}
+
+.text-result.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.text-result.markdown-content strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.text-result.markdown-content em {
+  font-style: italic;
+}
+
+.text-result.markdown-content h1,
+.text-result.markdown-content h2,
+.text-result.markdown-content h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.text-result.markdown-content ul,
+.text-result.markdown-content ol {
+  margin: 0 0 0.75rem 0;
+  padding-left: 1.25rem;
+}
+
+.text-result.markdown-content li {
+  margin-bottom: 0.25rem;
 }
 
 .result-tags {
@@ -449,6 +497,16 @@
 .btn-icon svg {
   width: 16px;
   height: 16px;
+}
+
+.btn-icon-edit {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.btn-icon-edit:hover {
+  background: var(--primary-color);
+  color: white;
 }
 
 .btn-icon-delete {

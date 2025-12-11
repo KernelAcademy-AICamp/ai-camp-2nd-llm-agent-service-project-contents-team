@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiCopy, FiTrash2, FiArrowLeft } from 'react-icons/fi';
+import { FiCopy, FiTrash2, FiArrowLeft, FiEdit3 } from 'react-icons/fi';
+import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
 import { contentSessionAPI } from '../../services/api';
 import './ContentHistory.css';
 
@@ -91,9 +93,15 @@ const PlatformContent = ({ platform, data, onCopy }) => {
   return (
     <ResultCard title={title} onCopy={onCopy}>
       {platform === 'blog' && <div className="blog-title">{data.title}</div>}
-      <div className={`text-result ${platform !== 'blog' ? 'sns-content' : ''}`}>
-        {data.content}
-      </div>
+      {platform === 'blog' ? (
+        <div className="text-result markdown-content">
+          <ReactMarkdown remarkPlugins={[remarkBreaks]}>{data.content}</ReactMarkdown>
+        </div>
+      ) : (
+        <div className="text-result sns-content">
+          {data.content}
+        </div>
+      )}
       <TagList tags={tags} isHashtag={isHashtag} />
     </ResultCard>
   );
@@ -196,6 +204,28 @@ function ContentHistory() {
     }
   };
 
+  // 편집 페이지로 이동
+  const handleGoToEditor = (item) => {
+    // ContentEditor가 기대하는 형식으로 데이터 변환
+    const result = {
+      text: {
+        blog: item.blog,
+        sns: item.sns,
+        x: item.x,
+        threads: item.threads,
+      },
+      images: item.images?.map(img => ({ url: img.image_url })) || [],
+    };
+
+    navigate('/editor', {
+      state: {
+        result,
+        topic: item.topic,
+        sessionId: item.id,
+      },
+    });
+  };
+
   return (
     <div className="content-history">
       <button className="btn-back" onClick={() => navigate('/content')}>
@@ -256,9 +286,14 @@ function ContentHistory() {
                   <div className="history-detail-header">
                     <div className="history-detail-title-row">
                       <h3>{selectedHistoryItem.topic}</h3>
-                      <button className="btn-icon btn-icon-delete" onClick={() => handleDeleteHistory(selectedHistoryItem.id)} title="삭제">
-                        <FiTrash2 />
-                      </button>
+                      <div className="history-detail-actions">
+                        <button className="btn-icon btn-icon-edit" onClick={() => handleGoToEditor(selectedHistoryItem)} title="편집">
+                          <FiEdit3 />
+                        </button>
+                        <button className="btn-icon btn-icon-delete" onClick={() => handleDeleteHistory(selectedHistoryItem.id)} title="삭제">
+                          <FiTrash2 />
+                        </button>
+                      </div>
                     </div>
                     <div className="history-detail-meta">
                       <span className="info-badge type">

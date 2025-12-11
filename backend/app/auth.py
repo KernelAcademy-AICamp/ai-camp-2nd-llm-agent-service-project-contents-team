@@ -72,3 +72,15 @@ async def get_current_active_user(
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+
+def refresh_access_token(current_user: models.User) -> str:
+    """
+    현재 사용자의 새로운 액세스 토큰을 생성합니다.
+    """
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": current_user.username},
+        expires_delta=access_token_expires
+    )
+    return access_token

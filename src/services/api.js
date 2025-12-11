@@ -57,6 +57,12 @@ export const authAPI = {
     return response.data;
   },
 
+  // 토큰 갱신 (세션 연장)
+  refreshToken: async () => {
+    const response = await api.post('/api/auth/refresh-token');
+    return response.data;
+  },
+
   // 회원가입 (현재 사용 안 함 - OAuth로 대체)
   register: async (userData) => {
     const response = await api.post('/api/auth/register', userData);
