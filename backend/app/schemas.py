@@ -252,3 +252,74 @@ class InstagramPublishRequest(BaseModel):
     caption: str
     image_url: str
     scheduled_time: Optional[datetime] = None
+
+
+# ============================================
+# 발행 콘텐츠 스키마 (PublishedContent)
+# ============================================
+
+class PublishedContentBase(BaseModel):
+    """발행 콘텐츠 기본 스키마"""
+    platform: str  # 'blog', 'sns', 'x', 'threads'
+    title: Optional[str] = None  # 블로그용 제목
+    content: str  # 본문
+    tags: Optional[List[str]] = None  # 태그/해시태그
+
+
+class PublishedContentCreate(PublishedContentBase):
+    """발행 콘텐츠 생성 스키마 (임시저장)"""
+    session_id: Optional[int] = None  # 원본 세션 ID
+    image_ids: Optional[List[int]] = None  # 이미지 ID 목록
+    uploaded_image_url: Optional[str] = None  # 직접 업로드한 이미지 URL
+
+
+class PublishedContentSchedule(PublishedContentCreate):
+    """발행 콘텐츠 예약 스키마"""
+    scheduled_at: datetime  # 예약 발행 시간
+
+
+class PublishedContentUpdate(BaseModel):
+    """발행 콘텐츠 수정 스키마"""
+    title: Optional[str] = None
+    content: Optional[str] = None
+    tags: Optional[List[str]] = None
+    image_ids: Optional[List[int]] = None
+    uploaded_image_url: Optional[str] = None  # 직접 업로드한 이미지 URL
+    scheduled_at: Optional[datetime] = None
+
+
+class PublishedContentResponse(PublishedContentBase):
+    """발행 콘텐츠 응답 스키마"""
+    id: int
+    user_id: int
+    session_id: Optional[int] = None
+    image_ids: Optional[List[int]] = None
+    uploaded_image_url: Optional[str] = None  # 직접 업로드한 이미지 URL
+    status: str  # 'draft', 'scheduled', 'published', 'failed'
+    scheduled_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None
+    publish_url: Optional[str] = None
+    platform_post_id: Optional[str] = None  # 플랫폼별 게시물 ID
+    publish_error: Optional[str] = None
+    views: int = 0
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PublishedContentListResponse(BaseModel):
+    """발행 콘텐츠 목록 응답 스키마 (콘텐츠 관리 페이지용)"""
+    id: int
+    platform: str
+    title: Optional[str] = None
+    content: str  # 본문 미리보기용
+    status: str
+    scheduled_at: Optional[datetime] = None
+    published_at: Optional[datetime] = None
+    views: int = 0
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

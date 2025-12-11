@@ -1,0 +1,506 @@
+/* ========================================
+   SNS 연동 관리 - Dashboard 스타일 매칭
+   ======================================== */
+
+.sns-page {
+  min-height: calc(100vh - 60px);
+  padding: var(--space-xl);
+  max-width: 1200px;
+  margin: 0 auto;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================
+   헤더 - Dashboard와 동일
+   ========================================== */
+
+.sns-page-header {
+  text-align: left;
+  margin-bottom: var(--space-2xl);
+}
+
+.sns-page-header h2 {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-sm) 0;
+  line-height: 1.3;
+}
+
+.sns-page-subtitle {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ==========================================
+   통계 그리드 - Dashboard stats-grid와 동일
+   ========================================== */
+
+.sns-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-2xl);
+}
+
+.sns-stat-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: var(--space-lg);
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.sns-stat-card:hover {
+  border-color: #D8BFD8;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.sns-stat-card:nth-child(1) {
+  background: #F8F8FF;
+  border-color: #E6E6FA;
+}
+
+.sns-stat-card:nth-child(2) {
+  background: #FFF8F8;
+  border-color: #FFE4E1;
+}
+
+.sns-stat-card:nth-child(3) {
+  background: #F8FFF8;
+  border-color: #E0F0E0;
+}
+
+.sns-stat-card:nth-child(4) {
+  background: #FFFDF8;
+  border-color: #F0E8D8;
+}
+
+.sns-stat-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.sns-stat-label {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.sns-stat-value {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.sns-stat-loading {
+  display: inline-block;
+  width: 60px;
+  height: 36px;
+  background: linear-gradient(90deg, var(--border-color) 25%, var(--bg-tertiary) 50%, var(--border-color) 75%);
+  background-size: 200% 100%;
+  border-radius: 8px;
+  animation: shimmer 1.5s infinite;
+  margin: 0 auto;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ==========================================
+   메인 컨텐츠 그리드 - Dashboard와 동일
+   ========================================== */
+
+.sns-content {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: var(--space-xl);
+}
+
+/* ==========================================
+   섹션 - Dashboard content-section과 동일
+   ========================================== */
+
+.sns-section {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: var(--space-xl);
+}
+
+.sns-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+}
+
+.sns-section-title h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.sns-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.sns-refresh-btn:hover:not(:disabled) {
+  background: #E6E6FA;
+  color: var(--text-primary);
+}
+
+.sns-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ==========================================
+   플랫폼 리스트 - Dashboard content-list와 동일
+   ========================================== */
+
+.sns-platform-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.sns-platform-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  transition: all 0.15s ease;
+}
+
+.sns-platform-item:hover {
+  border-color: #D8BFD8;
+  background: #F8F8FF;
+  transform: translateX(4px);
+}
+
+.sns-platform-item.connected {
+  border-color: #E0F0E0;
+  background: #F8FFF8;
+}
+
+.sns-platform-item.connected:hover {
+  border-color: #C0E0C0;
+}
+
+.sns-platform-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.sns-platform-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.sns-platform-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sns-platform-info h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 2px 0;
+}
+
+.sns-platform-status {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.sns-platform-status.connected {
+  color: #2E7D32;
+  font-weight: 500;
+}
+
+.sns-platform-status.loading {
+  color: var(--text-tertiary);
+}
+
+/* 플랫폼 통계 */
+.sns-platform-stats {
+  display: flex;
+  gap: var(--space-md);
+  margin-right: var(--space-md);
+}
+
+.sns-mini-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  min-width: 60px;
+}
+
+.sns-mini-stat-value {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sns-mini-stat-label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+/* 플랫폼 액션 버튼 */
+.sns-platform-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.sns-icon-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: all 0.15s ease;
+}
+
+.sns-icon-btn:hover:not(:disabled) {
+  background: #E6E6FA;
+  border-color: #D8BFD8;
+  color: var(--text-primary);
+}
+
+.sns-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sns-action-btn {
+  padding: var(--space-xs) var(--space-md);
+  background: var(--secondary-color);
+  border: 1px solid var(--secondary-color);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.sns-action-btn:hover {
+  background: var(--secondary-hover);
+  border-color: var(--secondary-hover);
+}
+
+/* ==========================================
+   안내 섹션 - Dashboard quick-actions 스타일
+   ========================================== */
+
+.sns-info-section {
+  height: fit-content;
+}
+
+.sns-info-section h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-lg) 0;
+}
+
+.sns-info-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.sns-info-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  transition: all 0.15s ease;
+}
+
+.sns-info-item:hover {
+  background: #E6E6FA;
+  border-color: #D8BFD8;
+}
+
+.sns-info-number {
+  width: 24px;
+  height: 24px;
+  background: var(--secondary-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.sns-info-item strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.sns-info-item p {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ==========================================
+   반응형 - Dashboard와 동일
+   ========================================== */
+
+@media (max-width: 1024px) {
+  .sns-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sns-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .sns-page {
+    padding: var(--space-lg);
+  }
+
+  .sns-page-header h2 {
+    font-size: 28px;
+  }
+
+  .sns-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+  }
+
+  .sns-stat-card {
+    padding: var(--space-md);
+  }
+
+  .sns-stat-value {
+    font-size: 28px;
+  }
+
+  .sns-platform-main {
+    flex-wrap: wrap;
+  }
+
+  .sns-platform-stats {
+    width: 100%;
+    margin: var(--space-sm) 0 0 0;
+    order: 3;
+  }
+
+  .sns-platform-actions {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .sns-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sns-platform-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+
+  .sns-platform-main {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sns-platform-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .sns-platform-stats {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

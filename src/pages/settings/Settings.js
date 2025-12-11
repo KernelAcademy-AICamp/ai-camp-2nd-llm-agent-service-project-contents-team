@@ -410,76 +410,27 @@ function Settings() {
       <div className="settings-section">
         <div className="section-header">
           <h3>소셜 미디어 플랫폼</h3>
-          <span className="section-count">5개 플랫폼</span>
         </div>
-        <p className="section-description">소셜 미디어 플랫폼을 연동하여 콘텐츠를 관리하세요.</p>
-        <div className="platform-list">
-          <Link to="/youtube" className={`platform-item ${youtubeConnection ? 'connected' : ''}`}>
-            <div className="platform-info">
-              <div className="platform-name">YouTube</div>
-              <div className="platform-status">
-                {youtubeConnection
-                  ? `연동됨 - ${youtubeConnection.channel_title}`
-                  : '연동 가능'}
-              </div>
+        <Link to="/sns-connections" className="account-link-card">
+          <div className="account-link-content">
+            <div className="account-link-title">SNS 연동 관리</div>
+            <div className="account-link-description">
+              {(() => {
+                const connectedCount = [
+                  youtubeConnection,
+                  facebookConnection?.page_id,
+                  instagramConnection?.instagram_account_id,
+                  twitterConnection?.twitter_user_id,
+                  threadsConnection?.threads_user_id,
+                ].filter(Boolean).length;
+                return connectedCount > 0
+                  ? `${connectedCount}개 플랫폼 연동됨 - YouTube, Facebook, Instagram, X, Threads`
+                  : '소셜 미디어 플랫폼을 연동하여 콘텐츠를 발행하세요';
+              })()}
             </div>
-            <span className="btn-connect">
-              {youtubeConnection ? '관리하기' : '연동하기'}
-            </span>
-          </Link>
-          <Link to="/facebook" className={`platform-item ${facebookConnection ? 'connected' : ''}`}>
-            <div className="platform-info">
-              <div className="platform-name">Facebook</div>
-              <div className="platform-status">
-                {facebookConnection
-                  ? `연동됨 - ${facebookConnection.page_name || facebookConnection.facebook_user_name}`
-                  : '연동 가능'}
-              </div>
-            </div>
-            <span className="btn-connect">
-              {facebookConnection ? '관리하기' : '연동하기'}
-            </span>
-          </Link>
-          <Link to="/instagram" className={`platform-item ${instagramConnection ? 'connected' : ''}`}>
-            <div className="platform-info">
-              <div className="platform-name">Instagram</div>
-              <div className="platform-status">
-                {instagramConnection
-                  ? `연동됨 - @${instagramConnection.instagram_username}`
-                  : '연동 가능'}
-              </div>
-            </div>
-            <span className="btn-connect">
-              {instagramConnection ? '관리하기' : '연동하기'}
-            </span>
-          </Link>
-          <Link to="/x" className={`platform-item ${twitterConnection ? 'connected' : ''}`}>
-            <div className="platform-info">
-              <div className="platform-name">X</div>
-              <div className="platform-status">
-                {twitterConnection
-                  ? `연동됨 - @${twitterConnection.username}`
-                  : '연동 가능'}
-              </div>
-            </div>
-            <span className="btn-connect">
-              {twitterConnection ? '관리하기' : '연동하기'}
-            </span>
-          </Link>
-          <Link to="/threads" className={`platform-item ${threadsConnection ? 'connected' : ''}`}>
-            <div className="platform-info">
-              <div className="platform-name">Threads</div>
-              <div className="platform-status">
-                {threadsConnection
-                  ? `연동됨 - @${threadsConnection.username}`
-                  : '연동 가능'}
-              </div>
-            </div>
-            <span className="btn-connect">
-              {threadsConnection ? '관리하기' : '연동하기'}
-            </span>
-          </Link>
-        </div>
+          </div>
+          <span className="account-link-arrow">→</span>
+        </Link>
       </div>
 
       {/* AI API 설정 */}

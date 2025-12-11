@@ -516,6 +516,86 @@ export const snsContentAPI = {
   },
 };
 
+// ==========================================
+// 발행 콘텐츠 API (임시저장, 예약발행, 발행)
+// ==========================================
+export const publishedContentAPI = {
+  // 임시저장
+  saveDraft: async (data) => {
+    const response = await api.post('/api/published-contents/draft', data);
+    return response.data;
+  },
+
+  // 예약발행
+  schedule: async (data) => {
+    const response = await api.post('/api/published-contents/schedule', data);
+    return response.data;
+  },
+
+  // 즉시 발행
+  publish: async (contentId) => {
+    const response = await api.post(`/api/published-contents/publish/${contentId}`);
+    return response.data;
+  },
+
+  // 목록 조회 (상태/플랫폼 필터 가능)
+  list: async (status = null, platform = null, skip = 0, limit = 20) => {
+    let url = `/api/published-contents?skip=${skip}&limit=${limit}`;
+    if (status) url += `&status=${status}`;
+    if (platform) url += `&platform=${platform}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  // 상태별 통계
+  getStats: async () => {
+    const response = await api.get('/api/published-contents/stats');
+    return response.data;
+  },
+
+  // 상세 조회
+  get: async (contentId) => {
+    const response = await api.get(`/api/published-contents/${contentId}`);
+    return response.data;
+  },
+
+  // 수정
+  update: async (contentId, data) => {
+    const response = await api.put(`/api/published-contents/${contentId}`, data);
+    return response.data;
+  },
+
+  // 삭제
+  delete: async (contentId) => {
+    const response = await api.delete(`/api/published-contents/${contentId}`);
+    return response.data;
+  },
+
+  // 예약 취소
+  cancelSchedule: async (contentId) => {
+    const response = await api.post(`/api/published-contents/${contentId}/cancel-schedule`);
+    return response.data;
+  },
+
+  // 세션에서 발행 콘텐츠 생성 (편집하기)
+  createFromSession: async (sessionId, platform) => {
+    const response = await api.post(`/api/published-contents/from-session/${sessionId}?platform=${platform}`);
+    return response.data;
+  },
+
+  // 이미지 업로드 (Instagram/SNS 발행용)
+  uploadImage: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/api/published-contents/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+};
+
 // 호환성을 위한 별칭 (기존 코드에서 twitterAPI 사용하는 경우)
 export const twitterAPI = xAPI;
 

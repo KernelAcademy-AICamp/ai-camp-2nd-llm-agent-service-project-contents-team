@@ -931,3 +931,52 @@ class ThreadsPost(Base):
 
     # Relationships
     connection = relationship("ThreadsConnection", back_populates="posts")
+
+
+class PublishedContent(Base):
+    """
+    발행/임시저장 콘텐츠 모델
+    - 생성된 콘텐츠를 편집하여 저장 (임시저장, 예약발행, 발행완료)
+    - ContentGenerationSession의 원본을 보존하고 편집본을 별도 관리
+    """
+    __tablename__ = "published_contents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    session_id = Column(Integer, ForeignKey("content_generation_sessions.id"), nullable=True, index=True)
+
+    # 플랫폼 정보
+    platform = Column(String(20), nullable=False)  # 'blog', 'sns', 'x', 'threads'
+
+    # 편집된 콘텐츠
+    title = Column(String(500), nullable=True)  # 블로그용 제목
+    content = Column(Text, nullable=False)  # 본문
+    tags = Column(JSON, nullable=True)  # 태그/해시태그 배열
+
+    # 이미지 참조
+    image_ids = Column(JSON, nullable=True)  # generated_images ID 목록
+    uploaded_image_url = Column(String(500), nullable=True)  # 직접 업로드한 이미지 URL
+
+    # 상태 관리
+    status = Column(String(20), nullable=False, default="draft")
+    # 'draft' (임시저장/작성 중)
+    # 'scheduled' (예약됨)
+    # 'published' (발행됨)
+    # 'failed' (발행 실패)
+
+    # 예약/발행 정보
+    scheduled_at = Column(DateTime(timezone=True), nullable=True)  # 예약 발행 시간
+    published_at = Column(DateTime(timezone=True), nullable=True)  # 실제 발행 시간
+    publish_url = Column(String(500), nullable=True)  # 발행된 게시물 URL
+    platform_post_id = Column(String(100), nullable=True)  # 플랫폼별 게시물 ID (X post_id 등)
+    publish_error = Column(Text, nullable=True)  # 발행 실패 에러 메시지
+
+    # 통계 (발행 후 업데이트)
+    views = Column(Integer, default=0)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User")
+    session = relationship("ContentGenerationSession")

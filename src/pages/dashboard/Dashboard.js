@@ -24,7 +24,8 @@ function Dashboard() {
   const quickActions = [
     { label: '콘텐츠 생성', path: '/create', desc: 'AI로 블로그/SNS 콘텐츠 생성' },
     { label: '생성 내역', path: '/history', desc: '이전에 생성한 콘텐츠 보기' },
-    { label: 'SNS 연동', path: '/settings', desc: 'Facebook, YouTube 등 연결' },
+    { label: '콘텐츠 관리', path: '/contents', desc: '임시저장/발행 콘텐츠 관리' },
+    { label: 'SNS 연동', path: '/sns-connections', desc: 'Facebook, YouTube 등 연결' },
   ];
 
   // SNS 연동 상태 및 데이터 조회
