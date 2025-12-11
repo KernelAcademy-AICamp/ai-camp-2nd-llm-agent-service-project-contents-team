@@ -21,12 +21,28 @@ load_dotenv()
 def setup_google_credentials():
     """
     Google Cloud 인증 설정
-    - GOOGLE_APPLICATION_CREDENTIALS가 이미 설정되어 있으면 스킵
+    - GOOGLE_APPLICATION_CREDENTIALS가 이미 설정되어 있으면 절대 경로로 변환
     - GOOGLE_CREDENTIALS_BASE64가 있으면 디코딩해서 임시 파일로 저장
     """
-    # 이미 GOOGLE_APPLICATION_CREDENTIALS가 설정되어 있으면 스킵
-    if os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
-        print(f"✅ Vertex AI credentials already set: {os.getenv('GOOGLE_APPLICATION_CREDENTIALS')}")
+    # GOOGLE_APPLICATION_CREDENTIALS가 설정되어 있으면 절대 경로로 변환
+    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if credentials_path:
+        # 상대 경로인 경우 절대 경로로 변환
+        if not os.path.isabs(credentials_path):
+            # 프로젝트 루트 디렉토리 기준으로 절대 경로 생성
+            # Path(__file__) = backend/app/main.py
+            # .parent.parent.parent = 프로젝트 루트
+            project_root = Path(__file__).parent.parent.parent
+            credentials_path = str(project_root / credentials_path)
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
+
+        # 파일 존재 여부 확인
+        if os.path.exists(credentials_path):
+            print(f"✅ Vertex AI credentials set: {credentials_path}")
+            print(f"   Project: {os.getenv('GOOGLE_CLOUD_PROJECT')}")
+            print(f"   Location: {os.getenv('GOOGLE_CLOUD_LOCATION')}")
+        else:
+            print(f"⚠️  Credentials file not found: {credentials_path}")
         return
 
     # Base64 환경 변수가 있으면 디코딩해서 임시 파일로 저장

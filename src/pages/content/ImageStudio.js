@@ -10,7 +10,7 @@ function ImageStudio() {
   const [activeTab, setActiveTab] = useState('image');
 
   // ========== 이미지 생성 관련 상태 ==========
-  const [aiModel, setAiModel] = useState('whisk');
+  const [aiModel, setAiModel] = useState('nanobanana');
   const [imagePrompt, setImagePrompt] = useState('');
   const [generatedImage, setGeneratedImage] = useState(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -28,9 +28,7 @@ function ImageStudio() {
   const [customTexts, setCustomTexts] = useState([]);
 
   const aiModels = [
-    { id: 'whisk', label: 'Whisk AI (무료)', provider: 'Pollinations' },
-    { id: 'nanovana', label: '나노바나나 (Nanovana)', provider: 'Anthropic' },
-    { id: 'gemini', label: '제미나이 (Gemini)', provider: 'Google' },
+    { id: 'nanobanana', label: '나노바나나 (Nanobanana)', provider: 'Google Gemini' },
   ];
 
   // ========== 이미지 생성 핸들러 ==========

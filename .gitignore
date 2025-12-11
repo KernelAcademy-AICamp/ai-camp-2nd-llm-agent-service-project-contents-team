@@ -71,3 +71,12 @@ Thumbs.db
 
 # AI Video uploads
 /backend/uploads/
+
+# ==============================================
+# Google Cloud Credentials
+# ==============================================
+/backend/secrets/
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
