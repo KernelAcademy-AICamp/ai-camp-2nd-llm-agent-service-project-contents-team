@@ -5,7 +5,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user, blog, chat, brand_analysis, youtube, facebook, instagram, x, threads, ai_video_generation, sns_publish, ai_content
+from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user, blog, chat, brand_analysis, youtube, facebook, instagram, x, threads, ai_video_generation, sns_publish, ai_content, published_content
 from .database import engine, Base
 
 
@@ -117,6 +117,7 @@ app.include_router(threads.router)
 app.include_router(ai_video_generation.router)
 app.include_router(sns_publish.router)
 app.include_router(ai_content.router)
+app.include_router(published_content.router)
 
 # Static files 설정 (업로드된 파일 서빙)
 uploads_dir = Path(__file__).parent.parent / "uploads"

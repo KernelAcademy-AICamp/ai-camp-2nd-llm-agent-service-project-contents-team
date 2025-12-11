@@ -1,108 +1,28 @@
 /* ========================================
-   YOUTUBE PAGE - CLEAN STYLE
+   YOUTUBE PAGE - PLATFORM SPECIFIC STYLES
    ======================================== */
 
-.youtube-page {
-  padding: var(--space-lg);
-  max-width: 1200px;
-  margin: 0 auto;
+/* YouTube 브랜드 컬러 */
+.youtube-page .tab-btn:hover,
+.youtube-page .tab-btn.active {
+  color: #ff0000;
 }
 
-.youtube-header {
-  margin-bottom: var(--space-xl);
+.youtube-page .tab-btn.active::after {
+  background: #ff0000;
 }
 
-.youtube-header h2 {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--space-sm);
+.youtube-page .video-card:hover {
+  border-color: #ff0000;
 }
 
-.youtube-header p {
-  font-size: 14px;
-  color: var(--text-tertiary);
+.youtube-page .form-group input:focus,
+.youtube-page .form-group textarea:focus,
+.youtube-page .form-group select:focus {
+  border-color: #ff0000;
 }
 
-/* Error Message */
-.error-message {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-md);
-  background: var(--error-light);
-  border: 1px solid var(--error-color);
-  margin-bottom: var(--space-lg);
-  color: var(--error-dark);
-  font-weight: 500;
-}
-
-.error-message button {
-  background: transparent;
-  border: none;
-  color: var(--error-dark);
-  cursor: pointer;
-  font-weight: 600;
-}
-
-/* Loading */
-.loading-spinner {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 400px;
-  font-size: 14px;
-  color: var(--text-tertiary);
-}
-
-/* Connect Section */
-.connect-section {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 500px;
-}
-
-.connect-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  padding: var(--space-2xl);
-  text-align: center;
-  max-width: 500px;
-}
-
-.connect-icon {
-  font-size: 64px;
-  margin-bottom: var(--space-lg);
-}
-
-.connect-card h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--space-md);
-}
-
-.connect-card p {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-lg);
-  line-height: 1.6;
-}
-
-.feature-list {
-  text-align: left;
-  margin-bottom: var(--space-xl);
-  padding-left: var(--space-lg);
-}
-
-.feature-list li {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-sm);
-  line-height: 1.5;
-}
-
+/* YouTube 연결 버튼 */
 .btn-connect-youtube {
   display: inline-flex;
   align-items: center;
@@ -128,177 +48,7 @@
   height: 20px;
 }
 
-/* Account Info Card */
-.account-info-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  padding: var(--space-lg);
-  margin-bottom: var(--space-lg);
-}
-
-.account-header {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-lg);
-  margin-bottom: var(--space-lg);
-}
-
-.account-thumbnail {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.account-details {
-  flex: 1;
-}
-
-.account-details h3 {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--space-xs);
-}
-
-.account-url {
-  font-size: 13px;
-  color: var(--bauhaus-blue);
-  text-decoration: none;
-}
-
-.account-url:hover {
-  text-decoration: underline;
-}
-
-.account-actions {
-  display: flex;
-  gap: var(--space-sm);
-  flex-wrap: wrap;
-}
-
-.btn-secondary {
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--bg-secondary);
-}
-
-.btn-secondary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-danger {
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-primary);
-  border: 1px solid var(--error-color);
-  color: var(--error-color);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.btn-danger:hover {
-  background: var(--error-color);
-  color: white;
-}
-
-.account-stats-bar {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-2xl);
-  padding-top: var(--space-lg);
-  border-top: 1px solid var(--border-color);
-}
-
-.stat-item {
-  text-align: center;
-}
-
-.stat-value {
-  display: block;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: var(--space-xs);
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--text-tertiary);
-}
-
-/* Tab Navigation */
-.youtube-tabs {
-  display: flex;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-lg);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.tab-btn {
-  padding: var(--space-sm) var(--space-md);
-  background: none;
-  border: none;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  position: relative;
-  transition: color 0.15s ease;
-}
-
-.tab-btn:hover {
-  color: #ff0000;
-}
-
-.tab-btn.active {
-  color: #ff0000;
-}
-
-.tab-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #ff0000;
-}
-
-/* Videos Section */
-.videos-section {
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-lg);
-}
-
-.section-header h3 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.empty-state {
-  text-align: center;
-  padding: var(--space-2xl);
-  color: var(--text-tertiary);
-}
-
+/* YouTube 비디오 그리드 */
 .video-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -310,10 +60,6 @@
   overflow: hidden;
   transition: all 0.15s ease;
   border: 1px solid var(--border-color);
-}
-
-.video-card:hover {
-  border-color: #ff0000;
 }
 
 .video-thumbnail {
@@ -387,10 +133,7 @@
   color: var(--text-tertiary);
 }
 
-/* Analytics Section */
-.analytics-section {
-}
-
+/* YouTube 분석 섹션 */
 .analytics-header {
   margin-bottom: var(--space-lg);
 }
@@ -450,7 +193,7 @@
   color: var(--error-dark);
 }
 
-/* Top Videos Section */
+/* 인기 동영상 섹션 */
 .top-videos-section {
   margin-top: var(--space-xl);
   padding-top: var(--space-lg);
@@ -504,10 +247,7 @@
   color: var(--text-tertiary);
 }
 
-/* Upload Section */
-.upload-section {
-}
-
+/* 업로드 섹션 */
 .upload-section h3 {
   font-size: 16px;
   font-weight: 600;
@@ -517,43 +257,6 @@
 
 .upload-form {
   max-width: 600px;
-}
-
-.form-group {
-  margin-bottom: var(--space-lg);
-}
-
-.form-group label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: var(--space-sm);
-}
-
-.form-group input[type="text"],
-.form-group input[type="file"],
-.form-group textarea,
-.form-group select {
-  width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  font-size: 14px;
-  color: var(--text-primary);
-  transition: border-color 0.15s ease;
-}
-
-.form-group input:focus,
-.form-group textarea:focus,
-.form-group select:focus {
-  outline: none;
-  border-color: #ff0000;
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 100px;
 }
 
 .file-name {
@@ -604,28 +307,6 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-  .youtube-page {
-    padding: var(--space-md);
-  }
-
-  .connect-card {
-    padding: var(--space-lg);
-  }
-
-  .account-header {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .account-actions {
-    justify-content: center;
-  }
-
-  .account-stats-bar {
-    gap: var(--space-lg);
-  }
-
   .video-grid {
     grid-template-columns: 1fr;
   }

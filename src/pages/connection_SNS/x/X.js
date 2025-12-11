@@ -1,9 +1,47 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { xAPI } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import {
+  LoadingSpinner,
+  ErrorMessage,
+  PageHeader,
+  ConnectCard,
+  AccountInfoCard,
+  TabNavigation,
+  EmptyState,
+  SectionHeader,
+  SyncButton,
+  DisconnectButton,
+  CharCounter,
+  MediaPreview
+} from '../common/SNSComponents';
+import { formatNumber, formatDate, API_URL } from '../common/utils';
+import '../common/SNSCommon.css';
 import './X.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// X 아이콘 SVG path
+const X_ICON_PATH = "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z";
+
+// X 탭 설정
+const X_TABS = [
+  { id: 'posts', label: '포스트' },
+  { id: 'compose', label: '새 포스트' }
+];
+
+// X 연동 기능 목록
+const X_FEATURES = [
+  '포스트 목록 조회 및 관리',
+  '새 포스트 작성 및 게시',
+  '이미지/미디어 포스트 게시',
+  '팔로워 및 참여도 통계 확인'
+];
+
+// X 아이콘 컴포넌트
+const XIcon = ({ size = 64 }) => (
+  <svg viewBox="0 0 24 24" width={size} height={size}>
+    <path fill="currentColor" d={X_ICON_PATH} />
+  </svg>
+);
 
 function X() {
   const { user } = useAuth();
@@ -42,7 +80,6 @@ function X() {
   // 초기 로드 및 URL 파라미터 확인
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-
     if (params.get('connected') === 'true') {
       setError(null);
       window.history.replaceState({}, '', '/x');
@@ -51,12 +88,10 @@ function X() {
       setError('X 연동에 실패했습니다. 다시 시도해주세요.');
       window.history.replaceState({}, '', '/x');
     }
-
-    // 상태 가져오기
     fetchStatus();
   }, [fetchStatus]);
 
-  // Twitter 연동 시작
+  // X 연동 시작
   const handleConnect = () => {
     if (!user?.id) {
       setError('로그인이 필요합니다.');
@@ -68,7 +103,6 @@ function X() {
   // 연동 해제
   const handleDisconnect = async () => {
     if (!window.confirm('X 연동을 해제하시겠습니까?')) return;
-
     try {
       await xAPI.disconnect();
       setConnection(null);
@@ -87,7 +121,6 @@ function X() {
       fetchPosts();
       fetchStatus();
     } catch (err) {
-      // 401 에러 시 토큰 만료로 자동 연동 해제됨
       if (err.response?.status === 401) {
         setError('X 토큰이 만료되어 연동이 해제되었습니다. 다시 연동해주세요.');
         setConnection(null);
@@ -100,176 +133,74 @@ function X() {
     }
   };
 
-  // 숫자 포맷팅
-  const formatNumber = (num) => {
-    if (!num) return '0';
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return num.toLocaleString();
-  };
-
-  // 날짜 포맷팅
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   if (loading) {
-    return (
-      <div className="x-page">
-        <div className="loading-spinner">로딩 중...</div>
-      </div>
-    );
+    return <LoadingSpinner className="x" />;
   }
+
+  // 계정 통계 데이터
+  const accountStats = connection ? [
+    { value: connection.followers_count, label: '팔로워' },
+    { value: connection.following_count, label: '팔로잉' },
+    { value: connection.post_count, label: '포스트' }
+  ] : [];
 
   return (
     <div className="x-page">
-      <div className="x-header">
-        <h2>X 관리</h2>
-        <p>X 계정을 연동하고 포스트를 관리하세요</p>
-      </div>
+      <PageHeader
+        title="X 관리"
+        description="X 계정을 연동하고 포스트를 관리하세요"
+      />
 
-      {error && (
-        <div className="error-message">
-          {error}
-          <button onClick={() => setError(null)}>닫기</button>
-        </div>
-      )}
+      <ErrorMessage error={error} onClose={() => setError(null)} />
 
       {!connection ? (
-        // 연동 안됨 상태
-        <div className="connect-section">
-          <div className="connect-card">
-            <div className="connect-icon">
-              <svg viewBox="0 0 24 24" width="64" height="64">
-                <path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-              </svg>
-            </div>
-            <h3>X 계정 연동</h3>
-            <p>X 계정을 연동하여 포스트를 관리하고 콘텐츠를 게시하세요.</p>
-            <ul className="feature-list">
-              <li>포스트 목록 조회 및 관리</li>
-              <li>새 포스트 작성 및 게시</li>
-              <li>이미지/미디어 포스트 게시</li>
-              <li>팔로워 및 참여도 통계 확인</li>
-            </ul>
+        <ConnectCard
+          icon={<XIcon />}
+          title="X 계정 연동"
+          description="X 계정을 연동하여 포스트를 관리하고 콘텐츠를 게시하세요."
+          features={X_FEATURES}
+          button={
             <button className="btn-connect-x" onClick={handleConnect}>
-              <svg viewBox="0 0 24 24" width="20" height="20">
-                <path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-              </svg>
+              <XIcon size={20} />
               X 계정 연동하기
             </button>
-          </div>
-        </div>
+          }
+        />
       ) : (
-        // 연동됨 상태
         <>
-          {/* 계정 정보 */}
-          <div className="account-info-card">
-            <div className="account-header">
-              <img
-                src={connection.profile_image_url || '/default-avatar.png'}
-                alt={connection.name}
-                className="account-thumbnail"
-              />
-              <div className="account-details">
-                <h3>{connection.name}</h3>
-                <a
-                  href={`https://twitter.com/${connection.username}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="account-url"
-                >
-                  @{connection.username}
-                </a>
-                {connection.description && (
-                  <p className="account-bio">{connection.description}</p>
-                )}
-              </div>
-              <div className="account-actions">
-                <button className="btn-secondary" onClick={handleSync} disabled={syncing}>
-                  {syncing ? '동기화 중...' : '포스트 동기화'}
-                </button>
-                <button className="btn-danger" onClick={handleDisconnect}>
-                  연동 해제
-                </button>
-              </div>
-            </div>
-            <div className="account-stats-bar">
-              <div className="stat-item">
-                <span className="stat-value">{formatNumber(connection.followers_count)}</span>
-                <span className="stat-label">팔로워</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-value">{formatNumber(connection.following_count)}</span>
-                <span className="stat-label">팔로잉</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-value">{formatNumber(connection.post_count)}</span>
-                <span className="stat-label">포스트</span>
-              </div>
-            </div>
-          </div>
+          <AccountInfoCard
+            thumbnailUrl={connection.profile_image_url}
+            name={connection.name}
+            subInfo={
+              <a
+                href={`https://twitter.com/${connection.username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="account-url"
+              >
+                @{connection.username}
+              </a>
+            }
+            bio={connection.description}
+            stats={accountStats}
+            actions={
+              <>
+                <SyncButton syncing={syncing} onClick={handleSync} label="포스트 동기화" />
+                <DisconnectButton onClick={handleDisconnect} />
+              </>
+            }
+          />
 
-          {/* 탭 네비게이션 */}
-          <div className="x-tabs">
-            <button
-              className={`tab-btn ${activeTab === 'posts' ? 'active' : ''}`}
-              onClick={() => setActiveTab('posts')}
-            >
-              포스트
-            </button>
-            <button
-              className={`tab-btn ${activeTab === 'compose' ? 'active' : ''}`}
-              onClick={() => setActiveTab('compose')}
-            >
-              새 포스트
-            </button>
-          </div>
+          <TabNavigation
+            tabs={X_TABS}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            className="x"
+          />
 
-          {/* 탭 콘텐츠 */}
           <div className="tab-content">
             {activeTab === 'posts' && (
-              <div className="posts-section">
-                <div className="section-header">
-                  <h3>내 포스트 ({posts.length}개)</h3>
-                </div>
-                {posts.length === 0 ? (
-                  <div className="empty-state">
-                    <p>포스트가 없습니다. 동기화 버튼을 클릭하여 X에서 포스트를 가져오세요.</p>
-                  </div>
-                ) : (
-                  <div className="post-list">
-                    {posts.map((post) => (
-                      <div key={post.id} className="post-card">
-                        <div className="post-content">
-                          <p className="post-text">{post.text}</p>
-                          {post.media_url && (
-                            <div className="post-media">
-                              <img src={post.media_url} alt="Post media" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="post-stats">
-                          <span>❤️ {formatNumber(post.like_count)}</span>
-                          <span>🔁 {formatNumber(post.repost_count)}</span>
-                          <span>💬 {formatNumber(post.reply_count)}</span>
-                          <span>👁️ {formatNumber(post.impression_count)}</span>
-                        </div>
-                        <div className="post-date">
-                          {formatDate(post.created_at)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <PostsTab posts={posts} />
             )}
 
             {activeTab === 'compose' && (
@@ -285,6 +216,47 @@ function X() {
   );
 }
 
+// 포스트 탭 컴포넌트
+function PostsTab({ posts }) {
+  return (
+    <div className="posts-section">
+      <SectionHeader title="내 포스트" count={posts.length} />
+      {posts.length === 0 ? (
+        <EmptyState message="포스트가 없습니다. 동기화 버튼을 클릭하여 X에서 포스트를 가져오세요." />
+      ) : (
+        <div className="post-list">
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 포스트 카드 컴포넌트
+function PostCard({ post }) {
+  return (
+    <div className="post-card">
+      <div className="post-content">
+        <p className="post-text">{post.text}</p>
+        {post.media_url && (
+          <div className="post-media">
+            <img src={post.media_url} alt="Post media" />
+          </div>
+        )}
+      </div>
+      <div className="post-stats">
+        <span>❤️ {formatNumber(post.like_count)}</span>
+        <span>🔁 {formatNumber(post.repost_count)}</span>
+        <span>💬 {formatNumber(post.reply_count)}</span>
+        <span>👁️ {formatNumber(post.impression_count)}</span>
+      </div>
+      <div className="post-date">{formatDate(post.created_at)}</div>
+    </div>
+  );
+}
+
 // 포스트 작성 폼 컴포넌트
 function PostComposeForm({ onSuccess }) {
   const [text, setText] = useState('');
@@ -292,14 +264,15 @@ function PostComposeForm({ onSuccess }) {
   const [mediaPreview, setMediaPreview] = useState(null);
   const [posting, setPosting] = useState(false);
 
+  const MAX_LENGTH = 280;
+  const WARNING_THRESHOLD = 260;
+
   const handleMediaChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setMediaFile(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setMediaPreview(reader.result);
-      };
+      reader.onloadend = () => setMediaPreview(reader.result);
       reader.readAsDataURL(file);
     }
   };
@@ -317,8 +290,8 @@ function PostComposeForm({ onSuccess }) {
       return;
     }
 
-    if (text.length > 280) {
-      alert('포스트는 280자를 초과할 수 없습니다.');
+    if (text.length > MAX_LENGTH) {
+      alert(`포스트는 ${MAX_LENGTH}자를 초과할 수 없습니다.`);
       return;
     }
 
@@ -336,8 +309,7 @@ function PostComposeForm({ onSuccess }) {
 
       alert('포스트가 게시되었습니다!');
       setText('');
-      setMediaFile(null);
-      setMediaPreview(null);
+      removeMedia();
       onSuccess();
     } catch (err) {
       console.error('Post failed:', err);
@@ -357,23 +329,18 @@ function PostComposeForm({ onSuccess }) {
             onChange={(e) => setText(e.target.value)}
             placeholder="무슨 일이 일어나고 있나요?"
             rows={4}
-            maxLength={280}
+            maxLength={MAX_LENGTH}
             disabled={posting}
           />
-          <div className="char-count">
-            <span className={text.length > 260 ? 'warning' : ''}>
-              {text.length}/280
-            </span>
-          </div>
+          <CharCounter
+            current={text.length}
+            max={MAX_LENGTH}
+            warningThreshold={WARNING_THRESHOLD}
+          />
         </div>
 
         {mediaPreview && (
-          <div className="media-preview">
-            <img src={mediaPreview} alt="Preview" />
-            <button type="button" className="remove-media" onClick={removeMedia}>
-              ✕
-            </button>
-          </div>
+          <MediaPreview src={mediaPreview} onRemove={removeMedia} />
         )}
 
         <div className="compose-actions">
@@ -388,7 +355,11 @@ function PostComposeForm({ onSuccess }) {
             📷 미디어 추가
           </label>
 
-          <button type="submit" className="btn-post" disabled={posting || (!text.trim() && !mediaFile)}>
+          <button
+            type="submit"
+            className="btn-post"
+            disabled={posting || (!text.trim() && !mediaFile)}
+          >
             {posting ? '게시 중...' : '포스트하기'}
           </button>
         </div>

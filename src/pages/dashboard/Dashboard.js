@@ -22,10 +22,10 @@ function Dashboard() {
   ];
 
   const quickActions = [
-    { label: '콘텐츠 생성', path: '/content/ai-generator', desc: 'AI로 콘텐츠 생성' },
-    { label: '템플릿 선택', path: '/content/templates', desc: '다양한 템플릿 활용' },
-    { label: '이미지 생성', path: '/content/image-generator', desc: 'AI 이미지 만들기' },
-    { label: '비디오 제작', path: '/content/video-creator', desc: '영상 콘텐츠 제작' },
+    { label: '콘텐츠 생성', path: '/create', desc: 'AI로 블로그/SNS 콘텐츠 생성' },
+    { label: '생성 내역', path: '/history', desc: '이전에 생성한 콘텐츠 보기' },
+    { label: '콘텐츠 관리', path: '/contents', desc: '임시저장/발행 콘텐츠 관리' },
+    { label: 'SNS 연동', path: '/sns-connections', desc: 'Facebook, YouTube 등 연결' },
   ];
 
   // SNS 연동 상태 및 데이터 조회
@@ -232,8 +232,10 @@ function Dashboard() {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h2>Dashboard</h2>
-        <p className="dashboard-greeting">{getGreeting()}, {user?.username || 'User'}님!</p>
+        <div className="header-left">
+          <h2>대시보드</h2>
+          <p className="header-subtitle">{getGreeting()}, {user?.username || 'User'}님! 오늘의 콘텐츠 현황을 확인하세요.</p>
+        </div>
       </div>
 
       <div className="stats-grid">

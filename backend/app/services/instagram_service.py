@@ -55,8 +55,15 @@ class InstagramService:
             if response.status_code == 200:
                 return response.json()
             else:
-                logger.error(f"Instagram API error: {response.status_code} - {response.text}")
-                return None
+                error_detail = response.text
+                try:
+                    error_json = response.json()
+                    error_detail = error_json.get('error', {}).get('message', response.text)
+                except Exception:
+                    pass
+                logger.error(f"Instagram API error: {response.status_code} - {error_detail}")
+                logger.error(f"Request URL: {url}, Params: {params}")
+                raise Exception(f"Instagram API error: {error_detail}")
 
         except Exception as e:
             logger.error(f"Instagram API request failed: {e}")

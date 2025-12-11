@@ -1,6 +1,6 @@
 /* ========================================
-   SIDEBAR - EXPANDABLE ON HOVER
-   Icon-only, expands to show text on hover
+   SIDEBAR - MODERN EXPANDABLE DESIGN
+   Glassmorphism effect with smooth animations
    ======================================== */
 
 .sidebar {
@@ -8,19 +8,20 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 64px;
-  background-color: #D8BFD8;
+  width: 72px;
+  background: linear-gradient(180deg, #D8BFD8 0%, #C9A9C9 100%);
   display: flex;
   flex-direction: column;
-  padding: 12px 0;
+  padding: var(--space-md) 0;
   z-index: 999;
-  transition: width 0.2s ease;
+  transition: width var(--transition-normal);
   overflow: hidden;
+  box-shadow: var(--shadow-lg);
 }
 
-/* 호버 시 확장 */
+/* Hover expansion */
 .sidebar:hover {
-  width: 200px;
+  width: 220px;
 }
 
 /* Logo */
@@ -28,98 +29,116 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  margin: 0 auto 16px;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto var(--space-lg);
   cursor: pointer;
-  border-radius: 12px;
-  transition: all 0.2s ease;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-normal);
   flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+}
+
+.sidebar-logo:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
 }
 
 .sidebar-logo img {
-  max-height: 44px;
-  max-width: 44px;
+  max-height: 40px;
+  max-width: 40px;
   width: auto;
   height: auto;
   object-fit: contain;
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal);
 }
 
-/* 호버 시 로고 확장 */
+/* Logo expansion on hover */
 .sidebar:hover .sidebar-logo {
   width: 180px;
-  height: 60px;
+  height: 56px;
+  border-radius: var(--radius-lg);
 }
 
 .sidebar:hover .sidebar-logo img {
-  max-height: 60px;
-  max-width: 180px;
+  max-height: 48px;
+  max-width: 160px;
 }
 
+/* Navigation */
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
   width: 100%;
-  padding: 0 10px;
+  padding: 0 var(--space-sm);
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-/* 메뉴 아이템 */
+/* Menu item */
 .sidebar-item {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   width: 100%;
-  height: 44px;
-  padding: 0 11px;
+  height: 48px;
+  padding: 0 var(--space-md);
   text-decoration: none;
-  color: var(--text-secondary);
-  opacity: 0.7;
-  transition: all 0.2s ease;
-  font-size: 14px;
+  color: var(--text-primary);
+  opacity: 0.75;
+  transition: all var(--transition-fast);
+  font-size: var(--text-sm);
   border: none;
-  background: none;
+  background: transparent;
   cursor: pointer;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .sidebar-item:hover {
-  background-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
   opacity: 1;
+  transform: translateX(2px);
 }
 
 .sidebar-item.active {
-  background-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.3);
   opacity: 1;
+  box-shadow: var(--shadow-sm);
 }
 
 .sidebar-item .sidebar-icon {
-  font-size: 22px;
-  min-width: 22px;
+  font-size: 20px;
+  min-width: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: transform var(--transition-fast);
 }
 
-/* 라벨 - 기본 숨김, 호버 시 표시 */
+.sidebar-item:hover .sidebar-icon {
+  transform: scale(1.1);
+}
+
+/* Label - hidden by default, visible on hover */
 .sidebar-label {
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--transition-fast);
   font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .sidebar:hover .sidebar-label {
   opacity: 1;
 }
 
-/* 툴팁 제거 (확장 방식으로 대체) */
+/* Remove tooltip (replaced with expansion) */
 .sidebar-item::after {
   display: none;
 }
@@ -135,26 +154,27 @@
 .sidebar-dropdown-trigger {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   width: 100%;
-  height: 44px;
-  padding: 0 11px;
+  height: 48px;
+  padding: 0 var(--space-md);
 }
 
 .sidebar-dropdown-arrow {
   margin-left: auto;
-  font-size: 12px;
+  font-size: 10px;
   opacity: 0;
-  transition: opacity 0.15s ease, transform 0.2s ease;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
 .sidebar:hover .sidebar-dropdown-arrow {
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .sidebar-dropdown:hover .sidebar-dropdown-arrow,
 .sidebar-dropdown-menu.open + .sidebar-dropdown-arrow {
   transform: rotate(180deg);
+  opacity: 1;
 }
 
 .sidebar-dropdown-menu {
@@ -163,51 +183,51 @@
   gap: 2px;
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.2s ease, padding 0.2s ease;
+  transition: max-height var(--transition-normal), padding var(--transition-fast);
   padding: 0;
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  margin: 2px 0 0 0;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-sm);
+  margin: var(--space-xs) var(--space-xs) 0;
 }
 
 .sidebar-dropdown:hover .sidebar-dropdown-menu,
 .sidebar-dropdown-menu.open {
   max-height: 200px;
-  padding: 4px;
+  padding: var(--space-xs);
 }
 
 .sidebar-dropdown-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-md);
   width: 100%;
   height: 40px;
-  padding: 0 11px;
+  padding: 0 var(--space-md);
   text-decoration: none;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   opacity: 0.7;
-  transition: all 0.15s ease;
-  font-size: 13px;
+  transition: all var(--transition-fast);
+  font-size: var(--text-xs);
   border: none;
-  background: none;
+  background: transparent;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   white-space: nowrap;
 }
 
 .sidebar-dropdown-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   opacity: 1;
 }
 
 .sidebar-dropdown-item.active {
-  background-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.2);
   opacity: 1;
 }
 
 .sidebar-dropdown-item .sidebar-icon {
-  font-size: 18px;
-  min-width: 22px;
+  font-size: 16px;
+  min-width: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -216,7 +236,7 @@
 
 .sidebar-dropdown-item .sidebar-label {
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--transition-fast);
   font-weight: 500;
 }
 
@@ -224,18 +244,17 @@
   opacity: 1;
 }
 
-/* 드롭다운 아이템 툴팁 제거 */
+/* Remove dropdown item tooltip */
 .sidebar-dropdown-item::after {
   display: none;
 }
 
 /* Divider */
 .sidebar-divider {
-  width: calc(100% - 20px);
+  width: calc(100% - var(--space-lg));
   height: 1px;
-  background-color: var(--text-secondary);
-  opacity: 0.15;
-  margin: 8px 10px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  margin: var(--space-sm) var(--space-sm);
   flex-shrink: 0;
 }
 
@@ -248,10 +267,12 @@
 .sidebar-bottom {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 0 10px;
+  gap: var(--space-xs);
+  padding: 0 var(--space-sm);
   margin-top: auto;
-  padding-bottom: 8px;
+  padding-bottom: var(--space-sm);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: var(--space-sm);
 }
 
 /* Mobile responsive */
@@ -262,11 +283,12 @@
     left: 0;
     right: 0;
     width: 100%;
-    height: 64px;
+    height: 72px;
     flex-direction: row;
     justify-content: space-around;
-    padding: 0 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0 var(--space-md);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
   }
 
   .sidebar:hover {
@@ -287,9 +309,15 @@
   }
 
   .sidebar-item {
-    width: 44px;
+    width: 56px;
+    height: 56px;
     padding: 0;
     justify-content: center;
+    border-radius: var(--radius-md);
+  }
+
+  .sidebar-item:hover {
+    transform: translateY(-2px);
   }
 
   .sidebar-label {
@@ -306,15 +334,19 @@
 
   .sidebar-dropdown-menu {
     position: absolute;
-    bottom: calc(100% + 8px);
+    bottom: calc(100% + var(--space-sm));
     left: 50%;
     transform: translateX(-50%);
     top: auto;
     width: auto;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    background: var(--secondary-color);
   }
 
   .sidebar-dropdown-item {
-    width: 44px;
+    width: 48px;
+    height: 48px;
     padding: 0;
     justify-content: center;
   }
