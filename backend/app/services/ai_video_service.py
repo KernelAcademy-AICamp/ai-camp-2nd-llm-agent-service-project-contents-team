@@ -1,15 +1,16 @@
 """
 AI 비디오 생성 서비스
-- Master Planning Agent: 제품 분석 + 스토리보드 생성
-- Image Generation: Vertex AI Gemini 2.5 Flash로 각 컷 이미지 생성
-- Video Generation: Veo 3.1로 컷 사이 트랜지션 비디오 생성
-- Video Composition: moviepy/ffmpeg로 최종 비디오 합성
+- Master Planning Agent: 제품 분석 + 스토리보드 생성 (Gemini 2.5 Flash)
+- Image Generation: Gemini 2.5 Flash Image (일반) / Gemini 3 Pro Image (텍스트 특화)
+- Video Generation: MiniMax Hailuo-02 (First-Last Frame) 컷 사이 트랜지션 비디오 생성
+- Video Composition: moviepy로 최종 비디오 합성 (빠른 컷 전환)
 """
 import os
 import json
 import base64
 import httpx
 import asyncio
+import random
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import anthropic
@@ -27,9 +28,27 @@ logger = get_logger(__name__)
 # Google Gemini 설정 (기존 코드와의 호환성 유지)
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
+# Vertex AI 지역 설정 (멀티 리전 로테이션으로 쿼터 분산)
+AVAILABLE_REGIONS = [
+    "asia-southeast1",   # 싱가포르
+    "europe-west4",      # 네덜란드
+    "us-west1",          # 오레곤
+    "us-east4"           # 버지니아
+]
+
+# 선택된 지역을 저장할 전역 변수
+SELECTED_LOCATION = None
+
 # Vertex AI 초기화 (GOOGLE_APPLICATION_CREDENTIALS 사용)
 try:
-    location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+    # 환경변수가 설정되어 있고 사용 가능한 지역이면 사용, 아니면 랜덤 선택
+    location = os.getenv("GOOGLE_CLOUD_LOCATION")
+    if not location or location not in AVAILABLE_REGIONS:
+        location = random.choice(AVAILABLE_REGIONS)
+        logger.info(f"🌍 Random region selected for quota distribution: {location}")
+
+    SELECTED_LOCATION = location  # 전역 변수에 저장
+
     vertexai.init(
         project=os.getenv("GOOGLE_CLOUD_PROJECT"),
         location=location
@@ -81,7 +100,7 @@ class MasterPlanningAgent:
         try:
             # Job 상태 업데이트
             job.status = "planning"
-            job.current_step = "Analyzing product and generating storyboard"
+            job.current_step = "Analyzing product image for visual features"
             db.commit()
 
             logger.info(f"Starting Master Planning Agent for job {job.id}")
@@ -89,8 +108,16 @@ class MasterPlanningAgent:
             # 제품 이미지 다운로드 및 base64 인코딩
             image_data = await self._download_and_encode_image(job.uploaded_image_url)
 
-            # 브랜드 정보 준비
-            brand_context = self._prepare_brand_context(user, brand_analysis)
+            # 제품 이미지 비주얼 특징 분석
+            logger.info(f"Analyzing product image for visual consistency...")
+            visual_features = await self.analyze_uploaded_image(image_data)
+
+            # Job 상태 업데이트
+            job.current_step = "Generating storyboard with visual consistency"
+            db.commit()
+
+            # 브랜드 정보 + 비주얼 특징 준비
+            brand_context = self._prepare_brand_context(user, brand_analysis, visual_features)
 
             # Claude에게 스토리보드 생성 요청
             storyboard = await self._generate_storyboard(
@@ -101,6 +128,9 @@ class MasterPlanningAgent:
                 image_data=image_data,
                 brand_context=brand_context
             )
+
+            # 비주얼 일관성 검증
+            self._validate_visual_consistency(storyboard, visual_features)
 
             # 스토리보드 저장
             job.storyboard = storyboard
@@ -115,6 +145,99 @@ class MasterPlanningAgent:
             job.error_message = f"Planning failed: {str(e)}"
             db.commit()
             raise
+
+    async def analyze_uploaded_image(self, image_data: Dict[str, str]) -> Dict[str, Any]:
+        """
+        업로드된 제품 이미지의 비주얼 특징 분석
+
+        Args:
+            image_data: base64 인코딩된 이미지 데이터
+
+        Returns:
+            Dict: 제품의 비주얼 특징
+            {
+                "colors": ["white", "gold", "minimalist"],
+                "style": "luxury premium aesthetic",
+                "lighting": "soft natural lighting",
+                "composition": "centered, minimalist",
+                "key_elements": "golden cap, white bottle, marble background",
+                "mood": "elegant, sophisticated"
+            }
+        """
+        try:
+            logger.info("Analyzing uploaded product image for visual features...")
+
+            # Vertex AI Gemini 모델 초기화
+            gemini_model = VertexGenerativeModel("gemini-2.5-flash")
+
+            # image_data를 PIL Image로 변환 후 Vertex AI Part 객체로 변환
+            from PIL import Image
+            import io
+
+            image_bytes = base64.b64decode(image_data["data"])
+            pil_image = Image.open(io.BytesIO(image_bytes))
+
+            # PIL Image → Vertex AI Part 객체 변환
+            img_byte_arr = io.BytesIO()
+            pil_image.save(img_byte_arr, format='JPEG')
+            img_bytes = img_byte_arr.getvalue()
+
+            image_part = Part.from_data(
+                data=img_bytes,
+                mime_type="image/jpeg"
+            )
+
+            # 이미지 분석 프롬프트
+            analysis_prompt = """이 제품 이미지를 분석하여 비주얼 특징을 추출해주세요.
+
+다음 형식의 JSON으로 반환하세요:
+{
+  "colors": ["주요 색상 1", "주요 색상 2", "주요 색상 3"],
+  "style": "전체적인 스타일 (예: luxury premium, casual modern, minimalist, vintage 등)",
+  "lighting": "조명 스타일 (예: soft natural lighting, dramatic studio lighting, bright daylight 등)",
+  "composition": "구도 및 레이아웃 (예: centered, off-center, close-up, full view 등)",
+  "key_elements": "주요 시각적 요소들 (예: golden cap, white bottle, marble background)",
+  "mood": "전체적인 분위기 (예: elegant sophisticated, playful fun, professional clean 등)",
+  "background": "배경 스타일 (예: marble texture, plain white, wooden surface 등)"
+}
+
+제품의 핵심 비주얼 정체성을 유지하기 위한 정보를 추출하는 것이 목적입니다.
+다른 설명 없이 JSON만 반환해주세요."""
+
+            # Vertex AI Gemini API 호출
+            response = gemini_model.generate_content([analysis_prompt, image_part])
+
+            # 응답 파싱
+            response_text = response.text
+            logger.info(f"Image analysis response: {response_text[:200]}...")
+
+            # JSON 파싱
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+
+            visual_features = json.loads(response_text)
+
+            logger.info(f"✅ Image analysis completed: {visual_features}")
+            return visual_features
+
+        except Exception as e:
+            logger.error(f"Failed to analyze uploaded image: {str(e)}")
+            # 분석 실패 시 기본값 반환
+            return {
+                "colors": ["natural"],
+                "style": "professional",
+                "lighting": "natural lighting",
+                "composition": "centered",
+                "key_elements": "product",
+                "mood": "clean professional",
+                "background": "neutral"
+            }
 
     async def _download_and_encode_image(self, image_url: str) -> Dict[str, str]:
         """이미지 다운로드 (HTTP/HTTPS) 또는 로컬 파일 읽기 및 base64 인코딩"""
@@ -164,12 +287,91 @@ class MasterPlanningAgent:
             "data": image_base64
         }
 
+    def _validate_visual_consistency(
+        self,
+        storyboard: List[Dict[str, Any]],
+        visual_features: Dict[str, Any]
+    ) -> None:
+        """
+        생성된 스토리보드의 비주얼 일관성 검증
+
+        Args:
+            storyboard: 생성된 스토리보드
+            visual_features: 추출된 비주얼 특징
+
+        Raises:
+            경고 로그만 출력 (실패하지 않음)
+        """
+        try:
+            logger.info("Validating visual consistency of generated storyboard...")
+
+            # 컷만 필터링
+            cuts = [item for item in storyboard if 'cut' in item]
+
+            # AI가 생성할 컷들만 검증 (use_uploaded_image가 False인 것들)
+            ai_generated_cuts = [cut for cut in cuts if not cut.get('use_uploaded_image', False)]
+
+            if not ai_generated_cuts:
+                logger.info("No AI-generated cuts to validate (all cuts use uploaded image)")
+                return
+
+            # 비주얼 특징의 주요 키워드 추출
+            keywords_to_check = []
+
+            # 색상
+            if visual_features.get("colors"):
+                colors = visual_features["colors"] if isinstance(visual_features["colors"], list) else [visual_features["colors"]]
+                keywords_to_check.extend([c.lower() for c in colors])
+
+            # 스타일 키워드
+            if visual_features.get("style"):
+                style_keywords = visual_features["style"].lower().split()
+                keywords_to_check.extend(style_keywords)
+
+            # 조명 키워드
+            if visual_features.get("lighting"):
+                lighting_keywords = visual_features["lighting"].lower().split()
+                keywords_to_check.extend(lighting_keywords)
+
+            logger.info(f"Checking for visual consistency keywords: {keywords_to_check[:10]}...")
+
+            # 각 AI 생성 컷 검증
+            inconsistent_cuts = []
+            for cut in ai_generated_cuts:
+                cut_number = cut.get('cut', 'unknown')
+                image_prompt = cut.get('image_prompt', '').lower()
+
+                # 주요 키워드 중 일부라도 포함되어 있는지 확인
+                found_keywords = [kw for kw in keywords_to_check if kw in image_prompt]
+
+                if len(found_keywords) < max(1, len(keywords_to_check) // 3):
+                    # 주요 키워드의 1/3 미만만 포함되어 있으면 경고
+                    inconsistent_cuts.append({
+                        'cut': cut_number,
+                        'prompt': cut.get('image_prompt', '')[:100] + '...',
+                        'found_keywords': found_keywords
+                    })
+
+            # 검증 결과 로그
+            if inconsistent_cuts:
+                logger.warning(f"⚠️  {len(inconsistent_cuts)}/{len(ai_generated_cuts)} cuts may lack visual consistency:")
+                for item in inconsistent_cuts[:3]:  # 처음 3개만 출력
+                    logger.warning(f"  - Cut {item['cut']}: found only {item['found_keywords']}")
+                logger.warning(f"  Visual features may not be fully reflected in image prompts")
+            else:
+                logger.info(f"✅ Visual consistency validated: {len(ai_generated_cuts)} AI-generated cuts checked")
+
+        except Exception as e:
+            logger.warning(f"Failed to validate visual consistency: {str(e)}")
+            # 검증 실패해도 계속 진행
+
     def _prepare_brand_context(
         self,
         user: User,
-        brand_analysis: Optional[BrandAnalysis]
+        brand_analysis: Optional[BrandAnalysis],
+        visual_features: Optional[Dict[str, Any]] = None
     ) -> str:
-        """브랜드 분석 데이터를 컨텍스트로 준비"""
+        """브랜드 분석 데이터 및 제품 비주얼 특징을 컨텍스트로 준비"""
         context_parts = []
 
         # 사용자 기본 정보
@@ -192,6 +394,32 @@ class MasterPlanningAgent:
                 values = ", ".join(brand_analysis.brand_values) if isinstance(brand_analysis.brand_values, list) else brand_analysis.brand_values
                 context_parts.append(f"브랜드 가치: {values}")
 
+        # 제품 비주얼 특징 (이미지 분석 결과)
+        if visual_features:
+            context_parts.append("\n[제품 비주얼 특징 - 모든 컷에서 일관되게 유지해야 함]")
+
+            if visual_features.get("colors"):
+                colors = ", ".join(visual_features["colors"]) if isinstance(visual_features["colors"], list) else visual_features["colors"]
+                context_parts.append(f"주요 색상: {colors}")
+
+            if visual_features.get("style"):
+                context_parts.append(f"비주얼 스타일: {visual_features['style']}")
+
+            if visual_features.get("lighting"):
+                context_parts.append(f"조명 스타일: {visual_features['lighting']}")
+
+            if visual_features.get("composition"):
+                context_parts.append(f"구도: {visual_features['composition']}")
+
+            if visual_features.get("key_elements"):
+                context_parts.append(f"핵심 시각적 요소: {visual_features['key_elements']}")
+
+            if visual_features.get("mood"):
+                context_parts.append(f"분위기: {visual_features['mood']}")
+
+            if visual_features.get("background"):
+                context_parts.append(f"배경 스타일: {visual_features['background']}")
+
         if not context_parts:
             return "브랜드 정보가 제공되지 않았습니다. 제품 이미지와 설명만을 기반으로 스토리보드를 생성해주세요."
 
@@ -208,13 +436,83 @@ class MasterPlanningAgent:
     ) -> List[Dict[str, Any]]:
         """Claude를 사용하여 스토리보드 생성"""
 
-        # 각 컷의 평균 길이 계산
-        avg_duration_per_cut = duration_seconds / cut_count
+        # 트랜지션 평균 길이 계산 (컷 수 - 1 = 트랜지션 수)
+        num_transitions = cut_count - 1
+        avg_transition_duration = duration_seconds / num_transitions if num_transitions > 0 else 5.0
+        cut_duration = 0.3  # 컷 이미지는 짧게 고정
 
         # 프롬프트 구성
         system_prompt = f"""당신은 제품 마케팅 비디오의 스토리보드를 생성하는 전문가입니다.
 
 주어진 제품 이미지와 정보를 분석하여, {cut_count}개의 컷으로 구성된 약 {duration_seconds}초 길이의 마케팅 비디오 스토리보드를 생성해주세요.
+
+**⏱️ 타이밍 구조:**
+- 각 컷 이미지: {cut_duration}초 (고정) - 키 프레임을 짧게 표시
+- 트랜지션: 평균 {avg_transition_duration:.1f}초 - 실제 움직임과 전환이 일어나는 부분
+- 총 길이: 약 {duration_seconds}초
+
+**📖 스토리텔링 프레임워크 (필수 선택):**
+
+제품과 브랜드 특성을 분석하여 다음 중 **가장 적합한 스토리 구조 1가지**를 선택하고 따르세요:
+
+**1. Problem-Solution (문제-해결)**
+- 적합한 제품: 기능성 제품, 생활용품, 건강식품, 에너지 드링크
+- 구조: 문제 상황 제시 → 제품 등장 → 해결 과정 → 긍정적 결과
+- 예시: 피곤한 아침 → 에너지 드링크 → 활기찬 하루
+
+**2. Before-After (변화)**
+- 적합한 제품: 화장품, 피트니스, 청소용품, 에너지 드링크
+- 구조: 사용 전 상태 → 제품 사용 → 변화 과정 → 사용 후 결과
+- 예시: 지친 피부 → 스킨케어 → 촉촉한 피부
+
+**3. Process/Creation (제작 과정)**
+- 적합한 제품: 수제 음식, 카페 음료, 디저트, 수제품, 아티즌 제품
+- 구조: 재료/준비 → 제작 과정 (역동적 순간) → 완성품
+- 특징: ASMR 요소, 시각적 만족감 (층 나뉘기, 색 변화, 질감)
+- 예시: 딸기 + 우유 → 퐁당 섞이기 → 말차 폼 올리기 → 완성된 음료
+- 키워드: "만들다", "붓다", "섞다", "craft", "handmade"
+
+**4. Hero's Journey (제품의 여정)**
+- 적합한 제품: 브랜드 스토리가 강한 제품, 프리미엄 제품
+- 구조: 제품 소개 → 특별한 특징 → 제품이 만드는 임팩트
+- 예시: 명품 시계 소개 → 정밀한 무브먼트 → 시간의 가치
+
+**5. Emotional Arc (감정 곡선)**
+- 적합한 제품: 럭셔리, 감성적 제품, 선물
+- 구조: 감성적 Hook → 감정 연결 → 클라이맥스 → 만족스러운 결말
+- 예시: 특별한 순간 → 선물 등장 → 감동의 순간
+
+**6. Lifestyle/Moment (라이프스타일 순간)**
+- 적합한 제품: 패션, 액세서리, 라이프스타일 제품
+- 구조: 일상 속 순간 → 제품과 함께하는 모습 → 완성된 라이프스타일
+- 예시: 카페에서 → 시계 착용 → 세련된 일상
+
+**스토리 복잡도 가이드:**
+- {cut_count}개 컷: {"간결하고 빠른 전개 (핵심 메시지만)" if cut_count <= 4 else "중간 깊이 전개 (감정 연결 + 제품 특징)" if cut_count <= 6 else "상세한 스토리 (깊은 감정적 여정)"}
+
+**👥 캐릭터/모델 가이드라인 (사람 등장 시 필수):**
+
+사람이 등장하는 컷에서는 브랜드 컨텍스트의 "타겟 고객" 정보를 반드시 확인하고:
+- **국적**: 반드시 한국인 (Korean)으로 설정
+- **성별**: 타겟 성별과 일치 (남성/여성/중성)
+- **나이대**: 타겟 나이대와 일치 (예: 20대 초반, 30대, 40-50대 등)
+- **외모 특징**: 한국인의 자연스러운 외모, 피부톤, 헤어스타일 포함
+
+예시:
+- 타겟이 "20-30대 여성" → image_prompt에 "Korean woman in her 20s-30s, natural Korean beauty" 포함
+- 타겟이 "40대 남성" → image_prompt에 "Korean man in his 40s, professional appearance" 포함
+
+**🎯 핵심 원칙: 비주얼 일관성 및 제품 정확성**
+
+**모든 컷 이미지는 AI로 9:16 비율로 생성됩니다.**
+
+업로드된 제품 이미지를 참고하여:
+1. **제품의 정확한 외관**: 형태, 패키징, 디자인을 정확히 반영
+2. **색상**: 제품의 정확한 색상, 색조, 그라데이션 유지
+3. **디테일**: 로고, 라벨, 질감 등 세부 요소 재현
+4. **비주얼 특징**: 조명, 스타일, 분위기를 일관되게 유지
+
+브랜드 컨텍스트의 "제품 비주얼 특징"을 반드시 확인하고, 모든 컷의 image_prompt에 이를 반영하세요.
 
 **중요: 비용 최적화를 고려하여 컷 정보와 전환 정보를 모두 포함해주세요.**
 
@@ -224,33 +522,55 @@ class MasterPlanningAgent:
 1. cut: 컷 번호 (1부터 시작)
 2. scene_description: 장면 설명 (한국어, 2-3문장)
 3. image_prompt: 이미지 생성 AI 프롬프트 (영어, 상세하게)
-4. duration: 컷 길이 (초, 평균 {avg_duration_per_cut:.1f}초)
+4. duration: 컷 길이 (초, **고정 {cut_duration}초** - 키 프레임만 짧게 표시)
 5. is_hero_shot: true/false
    - 첫 컷, 마지막 컷, 가장 중요한 핵심 컷은 true
    - 나머지는 false
 6. resolution: "1080p" (hero shot) 또는 "720p" (일반)
+7. needs_text: true/false (텍스트 렌더링 필요 여부)
+
+   ⚠️ CRITICAL: needs_text는 매우 제한적으로만 true로 설정하세요.
+
+   **needs_text: true인 경우 (매우 제한적):**
+   - CTA 메시지가 화면에 표시되어야 하는 경우
+     * 예: "50% 할인", "지금 구매", "NEW", "LIMITED"
+   - 핵심 제품 정보가 텍스트로 명확히 표시되어야 하는 경우
+     * 예: 영양 성분표의 "칼로리 0", 성분명 "비타민C 500mg"
+   - 인포그래픽 스타일의 텍스트 설명
+     * 예: "3단계 과정", "Before → After" 라벨
+
+   **needs_text: false인 경우 (대부분, 기본값):**
+   - 제품 패키지의 브랜드명/로고 (AI가 재현하므로 별도 텍스트 렌더링 불필요)
+   - 배경의 간판, 메뉴판, 표지판 (읽을 필요 없는 배경 요소)
+   - 흐릿하거나 장식적인 텍스트
+   - 순수 비주얼 장면 (사람, 제품, 사용 장면 등)
+
+   **원칙**: "텍스트가 없으면 영상이 성립 안 되는 경우"만 needs_text: true
+   **기본값**: needs_text: false
 
 **전환 정보 (컷과 컷 사이):**
-1. method: "kling" 또는 "ffmpeg"
-   - **kling**: 역동적 움직임 또는 실제 액션이 필요한 경우 - AI 비디오 생성
+1. method: "minimax" 또는 "ffmpeg"
+   - **minimax**: 역동적 움직임 또는 실제 액션이 필요한 경우 - MiniMax Hailuo-02 AI 비디오 생성
      * 카메라 움직임: 줌인/아웃, 회전, 복잡한 패닝
      * 객체 동작: 휘젓기, 붓기, 들기, 움직이는 손/사람
      * 역동적 장면 전환: 빠른 모션, 유체 움직임
    - **ffmpeg**: 정적 장면 간 단순 전환만 필요한 경우 - 기본 효과
      * 디졸브, 페이드, 크로스페이드
      * 비슷한 구도의 정적 컷 사이
-   - **사용 전략**: 전체 전환의 50-70%는 kling 사용 (퀄리티 우선)
-   - **kling 비용**: $0.25/video
+   - **사용 전략**: 전체 전환의 50-70%는 minimax 사용 (퀄리티 우선)
+   - **minimax 비용**: $0.28/video (768P, 6초)
 2. effect: 전환 효과명 (참고용)
-   - kling: "dynamic_zoom_in", "dynamic_zoom_out", "dynamic_pan", "complex_transition"
+   - minimax: "dynamic_zoom_in", "dynamic_zoom_out", "dynamic_pan", "complex_transition"
    - ffmpeg: "dissolve", "fade", "zoom_in", "zoom_out", "pan_left", "pan_right"
-3. video_prompt: **구체적인 비디오 생성 프롬프트** (kling 사용 시 필수!)
+3. video_prompt: **구체적인 비디오 생성 프롬프트** (minimax 사용 시 필수!)
    - 제품 특징, 브랜드 톤, 장면 설명 포함
    - 카메라 움직임, 조명, 분위기 상세히 기술
    - 앞 컷과 뒤 컷의 연결을 자연스럽게 설명
    - 예: "Camera smoothly zooms out from close-up of luxury bottle's golden cap, gradually revealing the full pristine white bottle against minimalist marble background, maintaining soft professional lighting throughout"
    - ffmpeg 사용 시에는 간단히 작성 (효과명만 참고)
-4. duration: 전환 길이 (kling: 5초, ffmpeg: 0.5-2초)
+4. duration: 전환 길이 (초)
+   - **minimax**: 평균 {avg_transition_duration:.1f}초 (최소 4초, 최대 6초 권장)
+   - **ffmpeg**: 0.5-2초
 5. reason: 이 방식을 선택한 이유 (한 줄)
 
 **스토리보드 작성 가이드라인:**
@@ -258,45 +578,58 @@ class MasterPlanningAgent:
 - 중간 컷들: 제품 특징, 사용 시나리오, 혜택
 - 마지막 컷: CTA 또는 브랜드 메시지 (hero shot)
 - **전환 전략 (퀄리티 우선):**
-  * 실제 동작/액션이 있는 장면 → 무조건 kling 사용
-  * 역동적 카메라 움직임 필요 → kling 사용
+  * 실제 동작/액션이 있는 장면 → 무조건 minimax 사용
+  * 역동적 카메라 움직임 필요 → minimax 사용
   * 정적 컷 간 단순 전환만 → ffmpeg 사용 가능
-  * 전체의 50-70%는 kling으로 구성하여 영상의 퀄리티 확보
+  * 전체의 50-70%는 minimax로 구성하여 영상의 퀄리티 확보
 - 전체 흐름의 리듬감 유지
-- image_prompt는 조명, 각도, 분위기, 색감 포함하여 상세하게
+- **image_prompt 작성 시 필수 사항:**
+  * 브랜드 컨텍스트의 "제품 비주얼 특징"에 명시된 색상, 스타일, 조명, 분위기를 **반드시** 포함
+  * 예: "주요 색상: white, gold" → image_prompt에 "white and gold color scheme" 포함
+  * 예: "조명 스타일: soft natural lighting" → 모든 컷에 "soft natural lighting" 포함
+  * 예: "배경 스타일: marble texture" → 배경이 있는 컷에는 "marble background" 포함
+  * 조명, 각도, 분위기, 색감을 상세하게 작성하되, 일관성을 최우선으로
 - video_prompt는 앞뒤 컷의 맥락을 고려하여 구체적이고 일관성 있게 작성
 
-**응답 형식 (JSON 배열):**
-[
-  {{
-    "cut": 1,
-    "scene_description": "...",
-    "image_prompt": "...",
-    "duration": 4.0,
-    "is_hero_shot": true,
-    "resolution": "1080p"
-  }},
+**응답 형식 (JSON):**
+{{
+  "story_structure": "선택한 스토리 구조명 (예: Process/Creation, Before-After 등)",
+  "story_rationale": "이 스토리 구조를 선택한 이유 (1-2문장, 한국어)",
+  "storyboard": [
+    {{
+      "cut": 1,
+      "scene_description": "[스토리 역할] 장면 설명",
+      "story_role": "이 컷이 스토리에서 맡는 역할 (예: 문제 제시, 재료 소개 등)",
+      "image_prompt": "...",
+      "duration": {cut_duration},
+      "is_hero_shot": true,
+      "resolution": "1080p",
+      "needs_text": false
+    }},
   {{
     "transition": {{
-      "method": "kling",
+      "method": "minimax",
       "effect": "dynamic_zoom_out",
       "video_prompt": "Camera smoothly zooms out from extreme close-up of product detail, gradually revealing full product in elegant setting with professional lighting",
-      "duration": 5.0,
+      "duration": {avg_transition_duration:.1f},
       "reason": "제품 디테일에서 전체로, 강렬한 전환 필요"
     }}
   }},
   {{
     "cut": 2,
-    "scene_description": "...",
+    "scene_description": "[스토리 역할] 장면 설명",
+    "story_role": "이 컷이 스토리에서 맡는 역할",
     "image_prompt": "...",
-    "duration": 4.0,
+    "duration": {cut_duration},
     "is_hero_shot": false,
-    "resolution": "720p"
+    "resolution": "720p",
+    "needs_text": false
   }},
-  ...
-]
+    ...
+  ]
+}}
 
-다른 설명 없이 JSON 배열만 반환해주세요."""
+다른 설명 없이 위 형식의 JSON만 반환해주세요."""
 
         user_message = f"""제품명: {product_name}
 제품 설명: {product_description or '제공되지 않음'}
@@ -355,7 +688,25 @@ class MasterPlanningAgent:
                 json_end = response_text.find("```", json_start)
                 response_text = response_text[json_start:json_end].strip()
 
-            storyboard = json.loads(response_text)
+            response_json = json.loads(response_text)
+
+            # 새 형식 (객체) 또는 구 형식 (배열) 모두 지원
+            if isinstance(response_json, dict):
+                # 새 형식: {uploaded_image_placement: {...}, storyboard: [...]}
+                uploaded_image_placement = response_json.get('uploaded_image_placement', {})
+                storyboard = response_json.get('storyboard', [])
+
+                # 로그 출력
+                if uploaded_image_placement:
+                    logger.info(f"Uploaded image placement: {uploaded_image_placement.get('position')} (cut {uploaded_image_placement.get('cut_number')})")
+                    logger.info(f"Reason: {uploaded_image_placement.get('reason')}")
+            elif isinstance(response_json, list):
+                # 구 형식: 배열만
+                storyboard = response_json
+                uploaded_image_placement = {}
+                logger.warning("Old format storyboard (array only)")
+            else:
+                raise ValueError("Invalid storyboard format")
 
             # 유효성 검증
             if not isinstance(storyboard, list):
@@ -441,21 +792,23 @@ class ImageGenerationAgent:
                     cut_number = cut['cut']
                     resolution = cut.get('resolution', '720p')
                     is_hero_shot = cut.get('is_hero_shot', False)
+                    needs_text = cut.get('needs_text', False)
 
-                    logger.info(f"Generating image for cut {cut_number}/{len(cuts)}: {cut['image_prompt'][:50]}... (resolution: {resolution}, hero: {is_hero_shot})")
+                    # AI로 모든 이미지 생성 (9:16 비율 보장)
+                    logger.info(f"Generating image for cut {cut_number}/{len(cuts)}: {cut['image_prompt'][:50]}... (resolution: {resolution}, hero: {is_hero_shot}, needs_text: {needs_text})")
 
                     # Job 상태 업데이트
                     job.current_step = f"Generating image {i}/{len(cuts)}"
                     db.commit()
 
-                    # Gemini 2.5 Flash Image로 이미지 생성
+                    # Gemini로 이미지 생성 (needs_text에 따라 Flash 또는 Pro 모델 선택)
                     # TODO: 해상도 최적화 지원 시 resolution 파라미터 활용
-                    image_bytes = await self._generate_with_gemini_image(cut['image_prompt'])
+                    image_bytes = await self._generate_with_gemini_image(cut['image_prompt'], needs_text=needs_text)
 
                     if not image_bytes:
                         raise ValueError(f"Failed to generate image for cut {cut_number}")
 
-                    # 이미지를 Cloudinary에 업로드
+                    # 이미지를 로컬 파일 시스템에 저장
                     image_url = await self._upload_to_cloudinary(
                         image_bytes,
                         job.user_id,
@@ -468,7 +821,8 @@ class ImageGenerationAgent:
                         "url": image_url,
                         "prompt": cut['image_prompt'],
                         "resolution": resolution,
-                        "is_hero_shot": is_hero_shot
+                        "is_hero_shot": is_hero_shot,
+                        "source": "generated"
                     })
 
                     logger.info(f"Image generated and uploaded for cut {cut_number}: {image_url}")
@@ -505,74 +859,86 @@ class ImageGenerationAgent:
             db.commit()
             raise
 
-    async def _generate_with_gemini_image(self, prompt: str) -> bytes:
+    async def _generate_with_gemini_image(self, prompt: str, needs_text: bool = False) -> bytes:
         """
-        Vertex AI Gemini 2.5 Flash Image 모델을 사용하여 이미지 생성
+        Google Gen AI SDK를 사용하여 Gemini 이미지 생성
+        Vertex AI 백엔드 사용, 9:16 aspect ratio 지원
         Exponential backoff 재시도 로직 포함 (429 쿼터 에러 대응)
+
+        Args:
+            prompt: 이미지 생성 프롬프트
+            needs_text: True면 gemini-3-pro-image-preview (텍스트 특화), False면 gemini-2.5-flash-image (일반)
         """
-        import base64
-        from vertexai.generative_models import GenerativeModel
+        from google import genai
+        from google.genai import types
         from google.api_core.exceptions import ResourceExhausted, TooManyRequests
+
+        # needs_text에 따라 모델 선택
+        model_name = 'gemini-3-pro-image-preview' if needs_text else 'gemini-2.5-flash-image'
+        model_display = "Gemini 3 Pro Image (텍스트 특화)" if needs_text else "Gemini 2.5 Flash Image (일반)"
 
         max_retries = 5
         base_delay = 2  # 초기 대기 시간 (초)
 
         for attempt in range(max_retries):
             try:
-                logger.info(f"Vertex AI Gemini 2.5 Flash Image로 이미지 생성 중... (시도 {attempt + 1}/{max_retries}, 프롬프트: {prompt[:50]}...)")
+                logger.info(f"Vertex AI {model_display}로 이미지 생성 중 (9:16)... (시도 {attempt + 1}/{max_retries}, 프롬프트: {prompt[:50]}...)")
 
-                # Vertex AI Gemini 모델 초기화
-                model = GenerativeModel("gemini-2.5-flash-image")
+                # Google Gen AI Client 초기화 (Vertex AI 백엔드 사용)
+                client = genai.Client(
+                    vertexai=True,
+                    project=os.getenv("GOOGLE_CLOUD_PROJECT"),
+                    location=SELECTED_LOCATION  # 전역 변수에서 선택된 지역 사용
+                )
 
-                # 이미지 생성 요청
-                response = model.generate_content([
-                    f"Generate an image with 9:16 aspect ratio (vertical, for short-form video): {prompt}"
-                ])
+                # 이미지 생성 요청 (9:16 aspect ratio 지정)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["IMAGE"],
+                        image_config=types.ImageConfig(
+                            aspect_ratio="9:16",  # 세로 비율 (short-form video)
+                        ),
+                    ),
+                )
 
                 # 응답에서 이미지 추출
-                if response.candidates and len(response.candidates) > 0:
-                    candidate = response.candidates[0]
+                for part in response.parts:
+                    if part.inline_data:
+                        # inline_data에서 이미지 bytes 추출
+                        if hasattr(part.inline_data, 'data'):
+                            image_bytes = part.inline_data.data
+                            mime_type = getattr(part.inline_data, 'mime_type', 'image/png')
 
-                    if candidate.content and candidate.content.parts:
-                        for part in candidate.content.parts:
-                            # inline_data 또는 inlineData 형식 확인
-                            inline_data = getattr(part, 'inline_data', None) or getattr(part, 'inlineData', None)
-
-                            if inline_data:
-                                # Vertex AI는 inline_data.data에 bytes 형식으로 저장
-                                if hasattr(inline_data, 'data'):
-                                    image_bytes = inline_data.data
-                                    mime_type = getattr(inline_data, 'mime_type', 'image/png')
-
-                                    logger.info(f"✅ 이미지 생성 완료 (시도 {attempt + 1}, MIME type: {mime_type}, size: {len(image_bytes)} bytes)")
-                                    return image_bytes
-                                # 또는 Base64 문자열로 저장되어 있을 수도 있음
-                                elif isinstance(inline_data.get('data') if hasattr(inline_data, 'get') else None, str):
-                                    image_data_base64 = inline_data['data']
-                                    image_bytes = base64.b64decode(image_data_base64)
-
-                                    logger.info(f"✅ 이미지 생성 완료 (시도 {attempt + 1}, Base64 디코딩, size: {len(image_bytes)} bytes)")
-                                    return image_bytes
+                            logger.info(f"✅ 이미지 생성 완료 ({model_display}, 9:16 aspect ratio, 시도 {attempt + 1}, MIME type: {mime_type}, size: {len(image_bytes)} bytes)")
+                            return image_bytes
 
                 # 이미지를 찾지 못한 경우
-                logger.error(f"Vertex AI Gemini 응답에서 이미지를 찾지 못함: {response}")
-                raise ValueError("Vertex AI Gemini로부터 이미지를 추출하지 못했습니다.")
-
-            except (ResourceExhausted, TooManyRequests) as e:
-                # 429 쿼터 에러 발생 시 exponential backoff 재시도
-                if attempt < max_retries - 1:
-                    wait_time = base_delay * (2 ** attempt)  # 2, 4, 8, 16, 32초
-                    logger.warning(f"⚠️  429 쿼터 에러 발생 (시도 {attempt + 1}/{max_retries}): {str(e)}")
-                    logger.info(f"🔄 {wait_time}초 후 재시도... (exponential backoff)")
-                    await asyncio.sleep(wait_time)
-                else:
-                    logger.error(f"❌ 최대 재시도 횟수({max_retries})에 도달. 이미지 생성 실패: {str(e)}")
-                    raise
+                logger.error(f"Gemini 응답에서 이미지를 찾지 못함: {response}")
+                raise ValueError("Gemini로부터 이미지를 추출하지 못했습니다.")
 
             except Exception as e:
-                # 429 외의 에러는 즉시 실패
-                logger.error(f"❌ Vertex AI Gemini 2.5 Flash Image 생성 실패: {str(e)}")
-                raise
+                error_str = str(e)
+
+                # 429 쿼터 에러인지 확인 (문자열로 검사)
+                is_quota_error = "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower()
+
+                if is_quota_error:
+                    # 429 쿼터 에러 발생 시 exponential backoff 재시도
+                    if attempt < max_retries - 1:
+                        wait_time = base_delay * (2 ** attempt)  # 2, 4, 8, 16, 32초
+                        logger.warning(f"⚠️  429 쿼터 에러 발생 (시도 {attempt + 1}/{max_retries}): {error_str[:200]}")
+                        logger.info(f"🔄 {wait_time}초 후 재시도... (exponential backoff)")
+                        await asyncio.sleep(wait_time)
+                        continue  # 다음 시도로
+                    else:
+                        logger.error(f"❌ 최대 재시도 횟수({max_retries})에 도달. 이미지 생성 실패: {error_str[:200]}")
+                        raise
+                else:
+                    # 429 외의 에러는 즉시 실패
+                    logger.error(f"❌ {model_display} 생성 실패: {error_str}")
+                    raise
 
     async def _upload_to_cloudinary(
         self,
@@ -736,7 +1102,7 @@ class KlingVideoGenerationAgent:
                     "image_url": image_data_url,
                     "prompt": prompt,
                     "duration": duration,
-                    "aspect_ratio": "16:9"
+                    "aspect_ratio": "9:16"
                 },
                 with_logs=False
             )
@@ -1014,9 +1380,14 @@ class VideoGenerationAgent:
                 return []
 
             generated_videos = []
-            # Vertex AI 모델 사용
-            veo_model = VertexGenerativeModel(self.model)
-            logger.info(f"Using Vertex AI Veo model: {self.model}")
+
+            # Vertex AI Veo 모델 초기화
+            try:
+                veo_model = VertexGenerativeModel(self.model)
+                logger.info(f"✅ Using Vertex AI Veo model: {self.model}")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize Veo model: {str(e)}")
+                raise ValueError(f"Failed to initialize Veo model '{self.model}': {str(e)}")
 
             # 유효한 이미지만 필터링
             valid_images = [img for img in images if img.get('url')]
@@ -1082,31 +1453,95 @@ class VideoGenerationAgent:
 
                     # 효과에 따른 프롬프트 생성
                     video_prompt = self._create_veo_prompt(effect, duration)
+                    logger.info(f"Video prompt: {video_prompt}")
 
-                    # 이미지 다운로드
+                    # 이미지 다운로드 및 base64 인코딩
                     from_image_data = await self._download_image(from_image['url'])
-                    to_image_data = await self._download_image(to_image['url'])
 
-                    # Veo 3.1 API 호출 (Part 객체 사용)
-                    response = veo_model.generate_content([
-                        Part.from_data(data=from_image_data, mime_type="image/png"),
-                        Part.from_data(data=to_image_data, mime_type="image/png"),
-                        video_prompt
-                    ])
+                    logger.info(f"Downloaded from_image: {len(from_image_data)} bytes")
+
+                    # PIL로 이미지 처리
+                    from PIL import Image
+                    import io
+
+                    # 첫 번째 이미지를 reference image로 사용
+                    pil_image = Image.open(io.BytesIO(from_image_data))
+
+                    # PIL Image → bytes 변환
+                    img_byte_arr = io.BytesIO()
+                    pil_image.save(img_byte_arr, format='PNG')
+                    reference_image_bytes = img_byte_arr.getvalue()
+
+                    # Veo 3.1 API 호출 (with exponential backoff for rate limiting)
+                    # 참조 이미지를 기반으로 비디오 생성
+                    logger.info(f"Calling Veo API with prompt: {video_prompt}")
+
+                    # Exponential backoff 설정
+                    max_retries = 5
+                    base_delay = 2  # seconds
+                    response = None
+
+                    for attempt in range(max_retries):
+                        try:
+                            response = veo_model.generate_content([
+                                Part.from_data(data=reference_image_bytes, mime_type="image/png"),
+                                f"{video_prompt}. Duration: {int(duration)} seconds. Aspect ratio: 9:16 vertical video for social media."
+                            ])
+
+                            # 성공하면 루프 탈출
+                            logger.info(f"Veo API call successful (attempt {attempt + 1}/{max_retries})")
+                            break
+
+                        except Exception as api_error:
+                            error_str = str(api_error)
+
+                            # 429 (Resource Exhausted) 또는 503 (Service Unavailable) 에러인 경우 재시도
+                            if '429' in error_str or 'ResourceExhausted' in error_str or '503' in error_str:
+                                if attempt < max_retries - 1:
+                                    delay = base_delay * (2 ** attempt)  # exponential backoff: 2s, 4s, 8s, 16s, 32s
+                                    logger.warning(f"Rate limit/throttling detected (attempt {attempt + 1}/{max_retries}), retrying in {delay}s...")
+                                    await asyncio.sleep(delay)
+                                else:
+                                    logger.error(f"Max retries ({max_retries}) reached for {transition_name}, giving up")
+                                    raise
+                            else:
+                                # 다른 에러는 재시도하지 않고 바로 raise
+                                raise
 
                     # 비디오 데이터 추출
-                    if not response.candidates or not response.candidates[0].content.parts:
-                        raise ValueError(f"No video generated for transition {transition_name}")
+                    if not response or not response.candidates:
+                        raise ValueError(f"No response from Veo API for transition {transition_name}")
 
-                    video_data = response.candidates[0].content.parts[0].inline_data.data
+                    # 응답 구조 확인
+                    logger.info(f"Veo response type: {type(response)}")
 
-                    # 비디오를 Cloudinary에 업로드
-                    video_url = await self._upload_to_cloudinary(
-                        base64.b64decode(video_data),
-                        job.user_id,
-                        job.id,
-                        transition_name
-                    )
+                    # 비디오 데이터 찾기
+                    video_data = None
+                    for part in response.candidates[0].content.parts:
+                        if hasattr(part, 'inline_data') and part.inline_data:
+                            # MIME 타입이 video인지 확인
+                            if 'video' in part.inline_data.mime_type:
+                                video_data = part.inline_data.data
+                                logger.info(f"Found video data: mime_type={part.inline_data.mime_type}")
+                                break
+
+                    if not video_data:
+                        raise ValueError(f"No video data in Veo response for transition {transition_name}")
+
+                    # 비디오 저장 (로컬 파일 시스템)
+                    save_dir = Path("uploads") / "ai_video_transitions" / str(job.user_id) / str(job.id)
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    save_path = save_dir / f"{transition_name}.mp4"
+
+                    # base64 디코딩하여 파일로 저장
+                    video_bytes = base64.b64decode(video_data)
+                    with open(save_path, 'wb') as f:
+                        f.write(video_bytes)
+
+                    # 상대 경로 URL 생성
+                    video_url = f"/uploads/ai_video_transitions/{job.user_id}/{job.id}/{transition_name}.mp4"
+
+                    logger.info(f"Veo video saved to: {save_path} ({len(video_bytes)} bytes)")
 
                     generated_videos.append({
                         "transition": transition_name,
@@ -1222,11 +1657,418 @@ class VideoGenerationAgent:
             raise
 
 
+class MiniMaxVideoGenerationAgent:
+    """
+    MiniMax Hailuo Video Generation Agent
+    - MiniMax Hailuo-02 API를 사용하여 이미지 간 트랜지션 비디오 생성
+    - First-Last Frame 파이프라인 지원
+    - 9:16 세로 비율 지원 (입력 이미지 비율 따름)
+    - 생성된 비디오를 로컬 파일 시스템에 저장
+    """
+
+    def __init__(
+        self,
+        model: str = "MiniMax-Hailuo-02",
+        resolution: str = "768P",
+        duration: int = 6
+    ):
+        self.model = model
+        self.resolution = resolution
+        self.duration = duration
+        self.api_key = os.getenv("MINIMAX_API_KEY")
+        self.base_url = "https://api.minimax.io/v1/video_generation"
+
+        if not self.api_key:
+            raise ValueError("MINIMAX_API_KEY not found in environment variables")
+
+        # API Key 디버깅 (처음 10자만 표시)
+        api_key_preview = self.api_key[:10] + "..." if len(self.api_key) > 10 else self.api_key
+        logger.info(f"MiniMaxVideoGenerationAgent initialized: model={self.model}, resolution={self.resolution}, duration={self.duration}s")
+        logger.info(f"API Key loaded: {api_key_preview} (length: {len(self.api_key)})")
+
+    async def generate_transition_videos(
+        self,
+        job: VideoGenerationJob,
+        storyboard: List[Dict[str, Any]],
+        images: List[Dict[str, str]],
+        db: Session
+    ) -> List[Dict[str, str]]:
+        """
+        이미지 간 트랜지션 비디오 생성 (MiniMax Hailuo 방식)
+
+        Args:
+            job: VideoGenerationJob 인스턴스
+            storyboard: 스토리보드 데이터 (전환 정보 포함)
+            images: 생성된 이미지 리스트
+            db: Database session
+
+        Returns:
+            List[Dict]: 생성된 비디오 URL 리스트
+        """
+        try:
+            # 스토리보드에서 minimax 방식의 전환만 필터링
+            transitions = [
+                item['transition'] for item in storyboard
+                if 'transition' in item and item['transition'].get('method') == 'minimax'
+            ]
+
+            # Job 상태 업데이트
+            job.status = "generating_videos"
+            job.current_step = f"Generating {len(transitions)} MiniMax Hailuo transition videos"
+            db.commit()
+
+            logger.info(f"Starting MiniMax Hailuo video generation for job {job.id}: {len(transitions)} transitions")
+
+            if not transitions:
+                logger.info("No transitions needed - all transitions will use FFmpeg")
+                job.generated_video_urls = []
+                db.commit()
+                return []
+
+            generated_videos = []
+
+            # 유효한 이미지만 필터링
+            valid_images = [img for img in images if img.get('url')]
+
+            if len(valid_images) < 2:
+                raise ValueError("Need at least 2 images to create transition videos")
+
+            # 이미지를 cut 번호로 매핑
+            image_by_cut = {img['cut']: img for img in valid_images}
+
+            # 각 전환 비디오 생성
+            for idx, transition_data in enumerate(transitions, 1):
+                try:
+                    video_prompt = transition_data.get('video_prompt', '')
+                    effect = transition_data.get('effect', 'smooth_transition')
+                    duration = transition_data.get('duration', self.duration)
+                    reason = transition_data.get('reason', '')
+
+                    # 전환이 어느 컷 사이인지 추론
+                    transition_index = None
+                    for i, item in enumerate(storyboard):
+                        if 'transition' in item and item['transition'] == transition_data:
+                            transition_index = i
+                            break
+
+                    if transition_index is None:
+                        logger.warning(f"Could not find transition in storyboard, skipping")
+                        continue
+
+                    # 앞뒤 컷 찾기
+                    from_cut = None
+                    to_cut = None
+
+                    for i in range(transition_index - 1, -1, -1):
+                        if 'cut' in storyboard[i]:
+                            from_cut = storyboard[i]['cut']
+                            break
+
+                    for i in range(transition_index + 1, len(storyboard)):
+                        if 'cut' in storyboard[i]:
+                            to_cut = storyboard[i]['cut']
+                            break
+
+                    if not from_cut or not to_cut:
+                        logger.warning(f"Could not determine from/to cuts, skipping transition")
+                        continue
+
+                    if from_cut not in image_by_cut or to_cut not in image_by_cut:
+                        logger.warning(f"Images for transition {from_cut}-{to_cut} not found, skipping")
+                        continue
+
+                    transition_name = f"{from_cut}-{to_cut}"
+
+                    logger.info(f"Generating MiniMax Hailuo video {idx}/{len(transitions)}: {transition_name}")
+                    job.current_step = f"Generating MiniMax Hailuo transition {idx}/{len(transitions)}"
+                    db.commit()
+
+                    # 시작/종료 이미지 경로
+                    start_image_url = image_by_cut[from_cut]['url']
+                    end_image_url = image_by_cut[to_cut]['url']
+
+                    # MiniMax API 호출 (exponential backoff 포함)
+                    video_url = await self._generate_video_with_retry(
+                        start_image_url=start_image_url,
+                        end_image_url=end_image_url,
+                        prompt=video_prompt,
+                        duration=int(duration),
+                        job=job,
+                        transition_name=transition_name
+                    )
+
+                    generated_videos.append({
+                        "transition": transition_name,
+                        "url": video_url,
+                        "from_cut": from_cut,
+                        "to_cut": to_cut,
+                        "method": "minimax",
+                        "effect": effect,
+                        "duration": duration,
+                        "reason": reason,
+                        "cost": 0.28  # 768P 6초 기준
+                    })
+
+                    logger.info(f"MiniMax Hailuo video generated: {transition_name} -> {video_url}")
+
+                except Exception as e:
+                    logger.error(f"Error generating MiniMax Hailuo video: {str(e)}")
+                    if 'transition_name' in locals():
+                        generated_videos.append({
+                            "transition": transition_name,
+                            "url": None,
+                            "error": str(e),
+                            "method": "minimax",
+                            "effect": transition_data.get('effect', '')
+                        })
+
+            # 생성된 비디오 저장
+            job.generated_video_urls = generated_videos
+            db.commit()
+
+            logger.info(f"MiniMax Hailuo video generation completed for job {job.id}: {len([v for v in generated_videos if v.get('url')])} successful")
+            return generated_videos
+
+        except Exception as e:
+            logger.error(f"Error in MiniMax Hailuo video generation for job {job.id}: {str(e)}")
+            job.status = "failed"
+            job.error_message = f"MiniMax Hailuo video generation failed: {str(e)}"
+            db.commit()
+            raise
+
+    async def _generate_video_with_retry(
+        self,
+        start_image_url: str,
+        end_image_url: str,
+        prompt: str,
+        duration: int,
+        job: VideoGenerationJob,
+        transition_name: str,
+        max_retries: int = 3
+    ) -> str:
+        """
+        MiniMax API 호출 with exponential backoff
+        """
+        base_delay = 2
+
+        for attempt in range(max_retries):
+            try:
+                # 1. Task 생성
+                task_id = await self._create_task(
+                    start_image_url=start_image_url,
+                    end_image_url=end_image_url,
+                    prompt=prompt,
+                    duration=duration
+                )
+
+                logger.info(f"MiniMax task created: {task_id}")
+
+                # 2. Task 완료 대기 (polling)
+                file_id = await self._poll_task_status(task_id, timeout=600)  # 10분 타임아웃
+
+                logger.info(f"MiniMax task completed: file_id={file_id}")
+
+                # 3. 비디오 다운로드
+                video_url = await self._download_video(
+                    file_id=file_id,
+                    job=job,
+                    transition_name=transition_name
+                )
+
+                return video_url
+
+            except Exception as e:
+                error_str = str(e)
+
+                # 429 또는 503 에러인 경우 재시도
+                if '429' in error_str or '503' in error_str or 'rate limit' in error_str.lower():
+                    if attempt < max_retries - 1:
+                        delay = base_delay * (2 ** attempt)
+                        logger.warning(f"Rate limit detected (attempt {attempt + 1}/{max_retries}), retrying in {delay}s...")
+                        await asyncio.sleep(delay)
+                    else:
+                        logger.error(f"Max retries ({max_retries}) reached, giving up")
+                        raise
+                else:
+                    # 다른 에러는 재시도하지 않음
+                    raise
+
+    async def _create_task(
+        self,
+        start_image_url: str,
+        end_image_url: str,
+        prompt: str,
+        duration: int
+    ) -> str:
+        """
+        MiniMax API에 비디오 생성 task 생성
+        """
+        # 이미지를 base64로 인코딩
+        start_image_base64 = await self._image_url_to_base64(start_image_url)
+        end_image_base64 = await self._image_url_to_base64(end_image_url)
+
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "first_frame_image": start_image_base64,
+            "last_frame_image": end_image_base64,
+            "prompt_optimizer": True
+        }
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+        # Authorization 헤더 디버깅
+        auth_preview = headers["Authorization"][:17] + "..." if len(headers["Authorization"]) > 17 else headers["Authorization"]
+        logger.info(f"MiniMax API request: POST {self.base_url}")
+        logger.info(f"Authorization header: {auth_preview}")
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                self.base_url,
+                json=payload,
+                headers=headers
+            )
+
+            if response.status_code != 200:
+                raise Exception(f"MiniMax API error: {response.status_code} - {response.text}")
+
+            result = response.json()
+
+            if "task_id" not in result:
+                raise Exception(f"No task_id in MiniMax response: {result}")
+
+            return result["task_id"]
+
+    async def _poll_task_status(
+        self,
+        task_id: str,
+        timeout: int = 600,
+        poll_interval: int = 10
+    ) -> str:
+        """
+        Task 완료 대기 (polling)
+        """
+        start_time = asyncio.get_event_loop().time()
+        query_url = f"https://api.minimax.io/v1/query/video_generation?task_id={task_id}"
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}"
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            while True:
+                elapsed = asyncio.get_event_loop().time() - start_time
+
+                if elapsed > timeout:
+                    raise Exception(f"MiniMax task timeout after {timeout}s")
+
+                response = await client.get(query_url, headers=headers)
+
+                if response.status_code != 200:
+                    raise Exception(f"MiniMax query error: {response.status_code} - {response.text}")
+
+                result = response.json()
+                status = result.get("status")
+
+                if status == "Success":
+                    file_id = result.get("file_id")
+                    if not file_id:
+                        raise Exception(f"No file_id in completed task: {result}")
+                    return file_id
+                elif status == "Failed":
+                    raise Exception(f"MiniMax task failed: {result.get('error', 'Unknown error')}")
+                elif status in ["Queueing", "Preparing", "Processing"]:
+                    logger.info(f"MiniMax task {task_id} status: {status}, waiting {poll_interval}s...")
+                    await asyncio.sleep(poll_interval)
+                else:
+                    raise Exception(f"Unknown MiniMax task status: {status}")
+
+    async def _download_video(
+        self,
+        file_id: str,
+        job: VideoGenerationJob,
+        transition_name: str
+    ) -> str:
+        """
+        완료된 비디오 다운로드
+        """
+        # Step 1: Get file metadata with CDN download URL
+        metadata_url = f"https://api.minimax.io/v1/files/retrieve?file_id={file_id}"
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}"
+        }
+
+        # 파일 메타데이터 조회
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.get(metadata_url, headers=headers)
+
+            if response.status_code != 200:
+                raise Exception(f"Failed to get file metadata: {response.status_code}")
+
+            metadata = response.json()
+
+            # 메타데이터에서 CDN download_url 추출
+            if "file" not in metadata or "download_url" not in metadata["file"]:
+                raise Exception(f"No download_url in metadata: {metadata}")
+
+            cdn_url = metadata["file"]["download_url"]
+            logger.info(f"MiniMax CDN URL: {cdn_url}")
+
+        # Step 2: Download actual video from CDN (no auth needed)
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.get(cdn_url)
+
+            if response.status_code != 200:
+                raise Exception(f"Failed to download video from CDN: {response.status_code}")
+
+            video_bytes = response.content
+
+        # 로컬 파일 시스템에 저장
+        save_dir = Path("uploads") / "ai_video_transitions" / str(job.user_id) / str(job.id)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        save_path = save_dir / f"{transition_name}.mp4"
+
+        with open(save_path, 'wb') as f:
+            f.write(video_bytes)
+
+        # 상대 경로 URL 생성
+        video_url = f"/uploads/ai_video_transitions/{job.user_id}/{job.id}/{transition_name}.mp4"
+
+        logger.info(f"MiniMax video saved: {save_path} ({len(video_bytes)} bytes)")
+
+        return video_url
+
+    async def _image_url_to_base64(self, image_url: str) -> str:
+        """
+        이미지 URL을 base64로 인코딩
+        """
+        # 로컬 파일 경로인 경우
+        if image_url.startswith('/uploads/'):
+            file_path = Path(image_url.lstrip('/'))
+            with open(file_path, 'rb') as f:
+                image_bytes = f.read()
+        else:
+            # URL인 경우 다운로드
+            async with httpx.AsyncClient() as client:
+                response = await client.get(image_url)
+                if response.status_code != 200:
+                    raise Exception(f"Failed to download image: {response.status_code}")
+                image_bytes = response.content
+
+        # base64 인코딩
+        base64_str = base64.b64encode(image_bytes).decode('utf-8')
+        return f"data:image/jpeg;base64,{base64_str}"
+
+
 class VideoCompositionAgent:
     """
     Video Composition Agent
     - moviepy/ffmpeg를 사용하여 이미지와 트랜지션 비디오를 최종 비디오로 합성
-    - Kling AI 비디오 + FFmpeg 기반 간단한 전환 효과 혼합 지원
+    - AI 비디오 (Veo/MiniMax) + FFmpeg 기반 간단한 전환 효과 혼합 지원
     - 생성된 최종 비디오를 로컬 파일 시스템에 저장
     """
 
@@ -1348,13 +2190,13 @@ class VideoCompositionAgent:
         db: Session
     ) -> str:
         """
-        최종 비디오 합성 (Kling 전환 + FFmpeg 전환 혼합)
+        최종 비디오 합성 (AI 전환 + FFmpeg 전환 혼합)
 
         Args:
             job: VideoGenerationJob 인스턴스
             storyboard: 스토리보드 데이터 (컷과 전환이 혼합된 배열)
             images: 생성된 이미지 리스트
-            transition_videos: 생성된 Kling 트랜지션 비디오 리스트
+            transition_videos: 생성된 AI 트랜지션 비디오 리스트 (Veo/MiniMax)
             db: Database session
 
         Returns:
@@ -1399,14 +2241,14 @@ class VideoCompositionAgent:
             if not image_by_cut:
                 raise ValueError("No valid images to compose video")
 
-            # Kling 트랜지션 비디오 매핑
-            kling_videos = {
+            # AI 트랜지션 비디오 매핑 (Veo/MiniMax)
+            ai_videos = {
                 tv['transition']: tv
                 for tv in transition_videos
                 if tv.get('url')
             }
 
-            logger.info(f"Processing {len(image_by_cut)} images, {len(kling_videos)} Kling transitions")
+            logger.info(f"Processing {len(image_by_cut)} images, {len(ai_videos)} AI-generated transitions")
 
             clips = []
             image_clips_cache = {}  # 이미지 클립 캐시 (FFmpeg 전환에 재사용)
@@ -1431,7 +2273,8 @@ class VideoCompositionAgent:
                             f.write(image_bytes)
 
                         # ImageClip 생성
-                        duration = cut.get('duration', 4.0)
+                        # 컷 이미지는 키 프레임만 짧게 표시 (0.3초 고정)
+                        duration = 0.3
                         image_clip = ImageClip(image_path, duration=duration)
                         clips.append(image_clip)
 
@@ -1472,11 +2315,11 @@ class VideoCompositionAgent:
                     transition_key = f"{from_cut}-{to_cut}"
 
                     try:
-                        if method == "kling":
-                            # Kling 비디오 사용
-                            if transition_key in kling_videos:
-                                transition_path = os.path.join(temp_dir, f"kling_transition_{transition_key}.mp4")
-                                video_bytes = await self._download_file(kling_videos[transition_key]['url'])
+                        if method in ["veo", "minimax"]:
+                            # AI 생성 비디오 사용 (Veo/MiniMax)
+                            if transition_key in ai_videos:
+                                transition_path = os.path.join(temp_dir, f"ai_transition_{transition_key}.mp4")
+                                video_bytes = await self._download_file(ai_videos[transition_key]['url'])
 
                                 with open(transition_path, 'wb') as f:
                                     f.write(video_bytes)
@@ -1484,9 +2327,9 @@ class VideoCompositionAgent:
                                 transition_clip = VideoFileClip(transition_path)
                                 clips.append(transition_clip)
 
-                                logger.info(f"Added Kling transition {transition_key} ({effect})")
+                                logger.info(f"Added {method.upper()} transition {transition_key} ({effect})")
                             else:
-                                logger.warning(f"Kling video for {transition_key} not found, falling back to FFmpeg")
+                                logger.warning(f"{method.upper()} video for {transition_key} not found, falling back to FFmpeg")
                                 # FFmpeg 폴백
                                 if from_cut in image_clips_cache and to_cut in image_clips_cache:
                                     ffmpeg_transition = self._create_ffmpeg_transition(
@@ -1511,6 +2354,19 @@ class VideoCompositionAgent:
                                 logger.info(f"Added FFmpeg transition {transition_key} ({effect})")
                             else:
                                 logger.warning(f"Image clips for {transition_key} not found in cache")
+
+                        else:
+                            # 예상치 못한 method 값 - FFmpeg로 폴백
+                            logger.warning(f"Unknown transition method '{method}' for {transition_key}, falling back to FFmpeg")
+                            if from_cut in image_clips_cache and to_cut in image_clips_cache:
+                                ffmpeg_transition = self._create_ffmpeg_transition(
+                                    image_clips_cache[from_cut],
+                                    image_clips_cache[to_cut],
+                                    effect,
+                                    duration
+                                )
+                                clips.append(ffmpeg_transition)
+                                logger.info(f"Added FFmpeg fallback transition {transition_key} (unknown method: {method})")
 
                     except Exception as e:
                         logger.error(f"Error processing transition {transition_key}: {str(e)}")
@@ -1737,12 +2593,13 @@ async def run_video_generation_pipeline(job_id: int, db: Session):
         image_agent = ImageGenerationAgent()
         images = await image_agent.generate_images(job, storyboard, db)
 
-        # 3. Video Generation (Kling transitions only)
-        logger.info(f"Step 3/4: Generating Kling transition videos")
-        video_agent = KlingVideoGenerationAgent()
+        # 3. Video Generation (MiniMax Hailuo transitions)
+        logger.info(f"Step 3/4: Generating MiniMax Hailuo transition videos")
+        # video_agent = VideoGenerationAgent()  # ← Veo 3.1 Fast
+        video_agent = MiniMaxVideoGenerationAgent()  # ← MiniMax Hailuo-02 사용
         videos = await video_agent.generate_transition_videos(job, storyboard, images, db)
 
-        # 4. Video Composition (mixed: Kling + FFmpeg transitions)
+        # 4. Video Composition (mixed: Veo + FFmpeg transitions)
         logger.info(f"Step 4/4: Composing final video with mixed transitions")
         composition_agent = VideoCompositionAgent()
         final_video_url = await composition_agent.compose_final_video(
