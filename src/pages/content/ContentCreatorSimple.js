@@ -4,6 +4,7 @@ import api, { contentSessionAPI } from '../../services/api';
 import { generateAgenticContent } from '../../services/agenticService';
 import './ContentCommon.css';
 import './ContentCreatorSimple.css';
+import './AIVideoGenerator.css';
 
 // ========== 상수 정의 ==========
 const STYLES = [
@@ -79,6 +80,32 @@ const copyToClipboard = (text, message) => {
 
 const getStyleLabel = (styleId) => STYLES.find(s => s.id === styleId)?.label || styleId;
 
+const getProgressPercentage = (status) => {
+  const statusMap = {
+    'pending': 10,
+    'planning': 30,
+    'generating_images': 50,
+    'generating_videos': 70,
+    'composing': 85,
+    'completed': 100,
+    'failed': 0
+  };
+  return statusMap[status] || 0;
+};
+
+const getStatusText = (status) => {
+  const statusMap = {
+    'pending': '대기 중',
+    'planning': '스토리보드 생성 중',
+    'generating_images': '이미지 생성 중',
+    'generating_videos': '전환 비디오 생성 중',
+    'composing': '최종 비디오 합성 중',
+    'completed': '완료',
+    'failed': '실패'
+  };
+  return statusMap[status] || status;
+};
+
 // ========== 서브 컴포넌트 ==========
 const ResultCard = ({ title, children, onCopy }) => (
   <div className="result-card">
@@ -142,6 +169,9 @@ function ContentCreatorSimple() {
   const [uploadedImages, setUploadedImages] = useState([]);
   const [videoDuration, setVideoDuration] = useState('standard');
 
+  // 숏폼 영상 작업 상태
+  const [currentVideoJob, setCurrentVideoJob] = useState(null);
+
   // 생성 상태
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState('');
@@ -172,6 +202,68 @@ function ContentCreatorSimple() {
   useEffect(() => {
     if (activeTab === 'history') fetchHistory();
   }, [activeTab, fetchHistory]);
+
+  // ========== 비디오 작업 폴링 ==========
+  const pollVideoJobStatus = useCallback(async (jobId) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await api.get(`/api/ai-video/jobs/${jobId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setCurrentVideoJob(response.data);
+
+      if (['completed', 'failed'].includes(response.data.status)) {
+        return;
+      }
+    } catch (err) {
+      console.error('Failed to poll job status:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    let interval;
+    if (currentVideoJob && ['pending', 'planning', 'generating_images', 'generating_videos', 'composing'].includes(currentVideoJob.status)) {
+      interval = setInterval(() => {
+        pollVideoJobStatus(currentVideoJob.id);
+      }, 3000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [currentVideoJob, pollVideoJobStatus]);
+
+  // 비디오 작업 상태에 따른 진행 메시지 업데이트
+  useEffect(() => {
+    if (currentVideoJob) {
+      const statusMessages = {
+        'pending': '비디오 생성 대기 중...',
+        'planning': '스토리보드 생성 중...',
+        'generating_images': '이미지 생성 중...',
+        'generating_videos': '전환 비디오 생성 중...',
+        'composing': '최종 비디오 합성 중...',
+        'completed': '비디오 생성 완료!',
+        'failed': '비디오 생성 실패'
+      };
+      setProgress(currentVideoJob.current_step || statusMessages[currentVideoJob.status] || '처리 중...');
+
+      if (currentVideoJob.status === 'completed') {
+        setResult(prev => ({
+          ...prev,
+          video: {
+            ...prev?.video,
+            url: currentVideoJob.final_video_url,
+            thumbnailUrl: currentVideoJob.thumbnail_url,
+            status: 'completed'
+          }
+        }));
+        setIsGenerating(false);
+        setActiveTab('result');
+      } else if (currentVideoJob.status === 'failed') {
+        setIsGenerating(false);
+        alert(`비디오 생성 실패: ${currentVideoJob.error_message || '알 수 없는 오류'}`);
+      }
+    }
+  }, [currentVideoJob]);
 
   const handleSelectHistory = async (item) => {
     const firstTab = item.blog ? 'blog' : item.sns ? 'sns' : item.x ? 'x' : item.threads ? 'threads' : (item.image_count > 0 ? 'images' : 'blog');
@@ -309,13 +401,47 @@ function ContentCreatorSimple() {
           setProgress(`AI가 이미지를 생성하고 있습니다... (${i + 1}/${imageCount})`);
           try {
             const enhancedPrompt = imageStylePrompt ? `${topic}. Style: ${imageStylePrompt}` : topic;
-            const imageResponse = await api.post('/api/generate-image', { prompt: enhancedPrompt, model: 'nanovana' });
+            const imageResponse = await api.post('/api/generate-image', { prompt: enhancedPrompt, model: 'nanobanana' });
             if (imageResponse.data.imageUrl) {
               generatedResult.images.push({ url: imageResponse.data.imageUrl, prompt: topic });
             }
           } catch (imgError) {
             console.error(`이미지 ${i + 1} 생성 실패:`, imgError);
           }
+        }
+      }
+
+      // 숏폼 영상 생성
+      if (contentType === 'shortform') {
+        setProgress('AI 비디오 생성을 시작합니다...');
+
+        try {
+          const token = localStorage.getItem('access_token');
+          const formData = new FormData();
+          formData.append('product_name', topic);
+          formData.append('product_description', topic);
+          formData.append('tier', videoDuration);
+          formData.append('image', uploadedImages[0].file);
+
+          const response = await api.post('/api/ai-video/jobs', formData, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data'
+            }
+          });
+
+          setCurrentVideoJob(response.data);
+          generatedResult.video = {
+            jobId: response.data.id,
+            status: response.data.status,
+            productName: response.data.product_name,
+            tier: response.data.tier
+          };
+          setProgress('비디오 생성 중... (스토리보드 작성)');
+        } catch (videoError) {
+          console.error('비디오 생성 실패:', videoError);
+          alert('비디오 생성 중 오류가 발생했습니다.');
+          throw videoError;
         }
       }
 
@@ -354,6 +480,7 @@ function ContentCreatorSimple() {
     setResult(null);
     setTopic('');
     setProgress('');
+    setCurrentVideoJob(null);
     setActiveTab('create');
   };
 
@@ -550,6 +677,133 @@ function ContentCreatorSimple() {
       {/* 결과 탭 */}
       {activeTab === 'result' && result && (
         <div className="result-content">
+          {/* 비디오 생성 진행 상황 및 결과 */}
+          {(currentVideoJob || result.video) && (
+            <div className="result-card result-video-top">
+              {/* 진행 상황 헤더 */}
+              <div className="progress-header">
+                <h3>{topic}</h3>
+                {currentVideoJob && (
+                  <span className={`status-badge ${currentVideoJob.status}`}>
+                    {getStatusText(currentVideoJob.status)}
+                  </span>
+                )}
+              </div>
+
+              {/* 진행 바 */}
+              {currentVideoJob && currentVideoJob.status !== 'completed' && (
+                <>
+                  <div className="progress-bar-container">
+                    <div
+                      className="progress-bar"
+                      style={{ width: `${getProgressPercentage(currentVideoJob.status)}%` }}
+                    />
+                    <span className="progress-percentage">
+                      {getProgressPercentage(currentVideoJob.status)}%
+                    </span>
+                  </div>
+
+                  {/* 현재 단계 */}
+                  {currentVideoJob.current_step && (
+                    <div className="current-step">
+                      <p>{currentVideoJob.current_step}</p>
+                    </div>
+                  )}
+
+                  {/* 단계별 아이콘 표시 */}
+                  <div className="steps-container">
+                    <div className={`step ${['planning', 'generating_images', 'generating_videos', 'composing', 'completed'].includes(currentVideoJob.status) ? 'completed' : currentVideoJob.status === 'pending' ? 'active' : ''}`}>
+                      <div className="step-icon">📝</div>
+                      <div className="step-label">스토리보드 생성</div>
+                    </div>
+                    <div className={`step ${['generating_images', 'generating_videos', 'composing', 'completed'].includes(currentVideoJob.status) ? 'completed' : currentVideoJob.status === 'planning' ? 'active' : ''}`}>
+                      <div className="step-icon">🎨</div>
+                      <div className="step-label">이미지 생성</div>
+                    </div>
+                    <div className={`step ${['generating_videos', 'composing', 'completed'].includes(currentVideoJob.status) ? 'completed' : currentVideoJob.status === 'generating_images' ? 'active' : ''}`}>
+                      <div className="step-icon">🎥</div>
+                      <div className="step-label">전환 비디오</div>
+                    </div>
+                    <div className={`step ${['composing', 'completed'].includes(currentVideoJob.status) ? 'completed' : currentVideoJob.status === 'generating_videos' ? 'active' : ''}`}>
+                      <div className="step-icon">🎬</div>
+                      <div className="step-label">최종 합성</div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* 완료: 비디오 표시 */}
+              {currentVideoJob?.status === 'completed' && currentVideoJob.final_video_url && (
+                <div className="video-result">
+                  <h3>✅ 비디오 생성 완료!</h3>
+
+                  <div className="video-preview">
+                    <video
+                      src={`http://localhost:8000${currentVideoJob.final_video_url}`}
+                      controls
+                      autoPlay
+                      loop
+                      className="generated-video"
+                      poster={currentVideoJob.thumbnail_url ? `http://localhost:8000${currentVideoJob.thumbnail_url}` : undefined}
+                      style={{
+                        width: 'auto',
+                        maxWidth: '100%',
+                        height: 'auto',
+                        maxHeight: '600px',
+                        aspectRatio: '9/16',
+                        margin: '0 auto',
+                        display: 'block'
+                      }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+
+                    <div className="video-actions">
+                      <a
+                        href={`http://localhost:8000${currentVideoJob.final_video_url}`}
+                        download={`${currentVideoJob.product_name}.mp4`}
+                        className="btn-download"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <span>⬇️</span>
+                        다운로드
+                      </a>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(`http://localhost:8000${currentVideoJob.final_video_url}`)}
+                        className="btn-copy"
+                      >
+                        <span>🔗</span>
+                        URL 복사
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 스토리보드 정보 */}
+                  {currentVideoJob.storyboard && (
+                    <div className="storyboard-info">
+                      <h4>📋 스토리보드</h4>
+                      <div className="storyboard-summary">
+                        <p>총 {currentVideoJob.cut_count}개 컷, {currentVideoJob.duration_seconds}초 영상</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 실패: 에러 메시지 */}
+              {currentVideoJob?.status === 'failed' && (
+                <div className="error-message">
+                  <span className="error-icon">⚠️</span>
+                  <div>
+                    <strong>생성 실패</strong>
+                    <p>{currentVideoJob.error_message || '비디오 생성 중 오류가 발생했습니다.'}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 생성된 이미지 */}
           {result.images?.length > 0 && (
             <div className="result-card result-images-top">

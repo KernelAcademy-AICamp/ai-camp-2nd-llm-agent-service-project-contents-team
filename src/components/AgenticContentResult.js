@@ -153,7 +153,7 @@ function AgenticContentResult({ result, onEdit }) {
         },
         body: JSON.stringify({
           prompt: prompt,
-          model: 'nanovana',
+          model: 'nanobanana',
         }),
       });
 
