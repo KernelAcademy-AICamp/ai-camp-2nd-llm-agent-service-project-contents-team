@@ -268,6 +268,7 @@ class PublishedContentBase(BaseModel):
 
 class PublishedContentCreate(PublishedContentBase):
     """발행 콘텐츠 생성 스키마 (임시저장)"""
+    id: Optional[int] = None  # 기존 콘텐츠 ID (있으면 업데이트, 없으면 생성)
     session_id: Optional[int] = None  # 원본 세션 ID
     image_ids: Optional[List[int]] = None  # 이미지 ID 목록
     uploaded_image_url: Optional[str] = None  # 직접 업로드한 이미지 URL

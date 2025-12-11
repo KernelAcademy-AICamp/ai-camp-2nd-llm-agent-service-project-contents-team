@@ -148,8 +148,10 @@ function SNSConnections() {
     <div className="sns-page">
       {/* 헤더 */}
       <div className="sns-page-header">
-        <h2>SNS 연동 관리</h2>
-        <p className="sns-page-subtitle">소셜 미디어 플랫폼을 연동하여 콘텐츠를 발행하세요</p>
+        <div className="header-left">
+          <h2>SNS 연동 관리</h2>
+          <p className="header-subtitle">소셜 미디어 플랫폼을 연동하여 콘텐츠를 발행하세요</p>
+        </div>
       </div>
 
       {/* 통계 그리드 - Dashboard와 동일한 스타일 */}

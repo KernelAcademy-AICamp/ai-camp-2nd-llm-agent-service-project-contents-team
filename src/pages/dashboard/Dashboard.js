@@ -232,8 +232,10 @@ function Dashboard() {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h2>Dashboard</h2>
-        <p className="dashboard-greeting">{getGreeting()}, {user?.username || 'User'}님!</p>
+        <div className="header-left">
+          <h2>대시보드</h2>
+          <p className="header-subtitle">{getGreeting()}, {user?.username || 'User'}님! 오늘의 콘텐츠 현황을 확인하세요.</p>
+        </div>
       </div>
 
       <div className="stats-grid">

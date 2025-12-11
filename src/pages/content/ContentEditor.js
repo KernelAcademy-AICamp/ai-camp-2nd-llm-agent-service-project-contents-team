@@ -180,6 +180,7 @@ function ContentEditor() {
       }
 
       const savedContent = await publishedContentAPI.saveDraft({
+        id: savedContentIds[activePlatform] || null,  // 기존 ID가 있으면 전달 (업데이트)
         session_id: sessionId || null,
         platform: activePlatform,
         title: data.title || null,
@@ -204,7 +205,7 @@ function ContentEditor() {
     } finally {
       setIsSaving(false);
     }
-  }, [editedContent, activePlatform, sessionId, imageIds, isSaved, isSaving]);
+  }, [editedContent, activePlatform, sessionId, imageIds, isSaved, isSaving, savedContentIds, uploadedImages]);
 
   // 뒤로가기 핸들러 (저장 확인)
   const handleGoBack = useCallback(() => {
@@ -267,6 +268,7 @@ function ContentEditor() {
       }
 
       await publishedContentAPI.schedule({
+        id: savedContentIds[activePlatform] || null,  // 기존 ID가 있으면 전달
         session_id: sessionId || null,
         platform: activePlatform,
         title: data.title || null,
@@ -316,6 +318,7 @@ function ContentEditor() {
       try {
         const data = editedContent[platform];
         const savedContent = await publishedContentAPI.saveDraft({
+          id: savedContentIds[platform] || null,  // 기존 ID가 있으면 전달
           session_id: sessionId || null,
           platform: platform,
           title: data.title || null,

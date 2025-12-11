@@ -72,26 +72,51 @@ async def save_draft(
 ):
     """
     콘텐츠 임시저장 (작성 중)
-    - 생성된 콘텐츠를 편집하여 임시저장
+    - id가 있으면 기존 콘텐츠 업데이트
+    - id가 없으면 새로 생성
     """
     try:
-        published = PublishedContent(
-            user_id=current_user.id,
-            session_id=request.session_id,
-            platform=request.platform,
-            title=request.title,
-            content=request.content,
-            tags=request.tags,
-            image_ids=request.image_ids,
-            uploaded_image_url=request.uploaded_image_url,
-            status="draft"
-        )
-        db.add(published)
-        db.commit()
-        db.refresh(published)
+        # 기존 콘텐츠가 있는지 확인 (id로 조회)
+        existing = None
+        if request.id:
+            existing = db.query(PublishedContent).filter(
+                PublishedContent.id == request.id,
+                PublishedContent.user_id == current_user.id
+            ).first()
 
-        logger.info(f"임시저장 완료: user_id={current_user.id}, id={published.id}")
-        return published
+        if existing:
+            # 기존 콘텐츠 업데이트
+            existing.title = request.title
+            existing.content = request.content
+            existing.tags = request.tags
+            existing.image_ids = request.image_ids
+            existing.uploaded_image_url = request.uploaded_image_url
+            # session_id와 platform은 변경하지 않음
+
+            db.commit()
+            db.refresh(existing)
+
+            logger.info(f"임시저장 업데이트: user_id={current_user.id}, id={existing.id}")
+            return existing
+        else:
+            # 새로 생성
+            published = PublishedContent(
+                user_id=current_user.id,
+                session_id=request.session_id,
+                platform=request.platform,
+                title=request.title,
+                content=request.content,
+                tags=request.tags,
+                image_ids=request.image_ids,
+                uploaded_image_url=request.uploaded_image_url,
+                status="draft"
+            )
+            db.add(published)
+            db.commit()
+            db.refresh(published)
+
+            logger.info(f"임시저장 생성: user_id={current_user.id}, id={published.id}")
+            return published
 
     except Exception as e:
         db.rollback()
@@ -107,31 +132,57 @@ async def schedule_publish(
 ):
     """
     콘텐츠 예약발행
-    - scheduled_at 시간에 자동 발행 예약
+    - id가 있으면 기존 콘텐츠 업데이트 후 예약
+    - id가 없으면 새로 생성 후 예약
     """
     try:
         # 예약 시간 검증
         if request.scheduled_at <= datetime.now(request.scheduled_at.tzinfo):
             raise HTTPException(status_code=400, detail="예약 시간은 현재 시간 이후여야 합니다.")
 
-        published = PublishedContent(
-            user_id=current_user.id,
-            session_id=request.session_id,
-            platform=request.platform,
-            title=request.title,
-            content=request.content,
-            tags=request.tags,
-            image_ids=request.image_ids,
-            uploaded_image_url=request.uploaded_image_url,
-            status="scheduled",
-            scheduled_at=request.scheduled_at
-        )
-        db.add(published)
-        db.commit()
-        db.refresh(published)
+        # 기존 콘텐츠가 있는지 확인
+        existing = None
+        if request.id:
+            existing = db.query(PublishedContent).filter(
+                PublishedContent.id == request.id,
+                PublishedContent.user_id == current_user.id
+            ).first()
 
-        logger.info(f"예약발행 설정: user_id={current_user.id}, id={published.id}, scheduled_at={request.scheduled_at}")
-        return published
+        if existing:
+            # 기존 콘텐츠 업데이트
+            existing.title = request.title
+            existing.content = request.content
+            existing.tags = request.tags
+            existing.image_ids = request.image_ids
+            existing.uploaded_image_url = request.uploaded_image_url
+            existing.status = "scheduled"
+            existing.scheduled_at = request.scheduled_at
+
+            db.commit()
+            db.refresh(existing)
+
+            logger.info(f"예약발행 업데이트: user_id={current_user.id}, id={existing.id}, scheduled_at={request.scheduled_at}")
+            return existing
+        else:
+            # 새로 생성
+            published = PublishedContent(
+                user_id=current_user.id,
+                session_id=request.session_id,
+                platform=request.platform,
+                title=request.title,
+                content=request.content,
+                tags=request.tags,
+                image_ids=request.image_ids,
+                uploaded_image_url=request.uploaded_image_url,
+                status="scheduled",
+                scheduled_at=request.scheduled_at
+            )
+            db.add(published)
+            db.commit()
+            db.refresh(published)
+
+            logger.info(f"예약발행 생성: user_id={current_user.id}, id={published.id}, scheduled_at={request.scheduled_at}")
+            return published
 
     except HTTPException:
         raise

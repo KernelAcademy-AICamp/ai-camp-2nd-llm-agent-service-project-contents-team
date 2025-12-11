@@ -3,11 +3,10 @@
    ======================================== */
 
 .sns-page {
-  min-height: calc(100vh - 60px);
-  padding: var(--space-xl);
-  max-width: 1200px;
+  max-width: 1280px;
+  padding: var(--space-2xl) var(--space-xl);
   margin: 0 auto;
-  animation: fadeIn 0.3s ease;
+  animation: fadeIn var(--transition-normal) ease-out;
 }
 
 @keyframes fadeIn {
@@ -22,26 +21,29 @@
 }
 
 /* ==========================================
-   헤더 - Dashboard와 동일
+   헤더 - 콘텐츠 관리/템플릿과 동일한 스타일
    ========================================== */
 
 .sns-page-header {
-  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: var(--space-2xl);
+  flex-wrap: wrap;
+  gap: var(--space-lg);
 }
 
-.sns-page-header h2 {
-  font-family: var(--font-display);
-  font-size: 36px;
+.sns-page-header .header-left h2 {
+  font-size: var(--text-3xl);
   font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 var(--space-sm) 0;
-  line-height: 1.3;
+  margin: 0 0 var(--space-xs) 0;
+  letter-spacing: -0.02em;
 }
 
-.sns-page-subtitle {
-  font-size: 16px;
-  color: var(--text-secondary);
+.sns-page-header .header-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
   margin: 0;
 }
 
