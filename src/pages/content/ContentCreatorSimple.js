@@ -288,7 +288,7 @@ function ContentCreatorSimple() {
           setProgress(`AI가 이미지를 생성하고 있습니다... (${i + 1}/${imageCount})`);
           try {
             const enhancedPrompt = imageStylePrompt ? `${topic}. Style: ${imageStylePrompt}` : topic;
-            const imageResponse = await api.post('/api/generate-image', { prompt: enhancedPrompt, model: 'nanovana' });
+            const imageResponse = await api.post('/api/generate-image', { prompt: enhancedPrompt, model: 'nanobanana' });
             if (imageResponse.data.imageUrl) {
               generatedResult.images.push({ url: imageResponse.data.imageUrl, prompt: topic });
             }
