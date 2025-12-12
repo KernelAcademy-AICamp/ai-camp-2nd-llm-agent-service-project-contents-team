@@ -40,7 +40,7 @@ class OrchestratorAgent:
 
             print(f"✅ GOOGLE_API_KEY 확인됨: {google_api_key[:20]}...")
             genai.configure(api_key=google_api_key)
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            model = genai.GenerativeModel('gemini-2.5-flash')
 
             prompt = f"""당신은 콘텐츠 제작 프로젝트 매니저입니다.
 
@@ -48,22 +48,25 @@ class OrchestratorAgent:
 목적: {purpose}
 
 다음을 분석하세요:
-1. 카드뉴스 페이지 수: 5장 (고정)
+1. 카드뉴스 최적 페이지 수: 콘텐츠 분량과 복잡도에 따라 3-5장 중 최적의 장수 결정
+   - 간단한 메시지/단일 주제: 3장
+   - 일반적인 내용/중간 분량: 4장
+   - 복잡한 내용/상세 설명 필요: 5장
+   - 가능한 한 적은 페이지로 핵심만 전달하도록 권장
 2. 타겟 청중
 3. 콘텐츠 톤앤매너
 4. 핵심 전달 메시지
 5. 비주얼 스타일 (modern/minimal/vibrant/professional)
 
-JSON 형식으로만 응답:
-{{
-  "content_type": "cardnews",
-  "page_count": 5,
-  "target_audience": "20-30대 직장인",
-  "tone": "전문적이면서 친근한",
-  "key_message": "핵심 메시지 요약",
-  "requires_images": true,
-  "style": "modern"
-}}"""
+JSON 형식으로만 응답하세요. 다음 필드를 포함해야 합니다:
+- content_type: "cardnews"
+- page_count: 숫자 (3-5)
+- page_count_reason: 페이지 수 선택 이유
+- target_audience: 타겟 청중
+- tone: 콘텐츠 톤앤매너
+- key_message: 핵심 메시지
+- requires_images: true
+- style: 비주얼 스타일"""
 
             response = model.generate_content(prompt)
             response_text = response.text.strip()
@@ -88,9 +91,19 @@ JSON 형식으로만 응답:
     @staticmethod
     def _get_fallback_analysis(user_input: str, purpose: str) -> Dict:
         """폴백 분석 결과"""
+        # 입력 길이 기반으로 페이지 수 추정 (보수적: 3-5장)
+        input_length = len(user_input)
+        if input_length < 50:
+            page_count = 3
+        elif input_length < 100:
+            page_count = 4
+        else:
+            page_count = 5
+
         return {
             "content_type": "cardnews",
-            "page_count": 1,
+            "page_count": page_count,
+            "page_count_reason": f"입력 길이({input_length}자) 기반 자동 결정",
             "target_audience": "일반 대중",
             "tone": "친근하고 이해하기 쉬운",
             "key_message": user_input[:50],
@@ -128,13 +141,14 @@ class ContentPlannerAgent:
 
             print(f"✅ GOOGLE_API_KEY 확인됨: {google_api_key[:20]}...")
             genai.configure(api_key=google_api_key)
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            model = genai.GenerativeModel('gemini-2.5-flash')
 
             tone = analysis.get('tone', '친근한')
             audience = analysis.get('target_audience', '일반 대중')
+            page_count = analysis.get('page_count', 5)
 
             prompt = f"""당신은 카드뉴스 전문가입니다.
-5개의 페이지를 생성해야 합니다.
+{page_count}개의 페이지를 생성해야 합니다.
 
 ⚠️ 절대절대절대절대절대절대 같은 내용 반복 금지, 반복하면 GPT로 대체할거임 ⚠️
 
@@ -145,86 +159,84 @@ class ContentPlannerAgent:
 2) 아래 JSON 스키마를 반드시 그대로 따르기
 3) 각 페이지의 title과 content는 완전히 다른 내용이어야 함
 4) title은 간결하고 임팩트 있게 (5-15자)
-5) content는 핵심 메시지를 명확하게 (20-60자)
+5) 첫 페이지: subtitle 필수 (10-20자)
+6) 본문 페이지: content는 bullet points 배열 (각 15-30자, 2-4개 항목)
+7) 줄글 형태 금지, 구조화된 형식만 사용
 
 ────────────────────────
-📌 스토리텔링 구조 (5페이지)
+📌 스토리텔링 구조 ({page_count}페이지)
 ────────────────────────
 1페이지 (Hook): 시선을 확 끄는 강력한 메시지
    - 질문형, 통계, 충격적 사실로 호기심 유발
-   - 예: "필라테스 3개월, 체형이 달라질까요?"
+   - title + subtitle 형식
+   - 예: title="필라테스 3개월의 변화", subtitle="당신의 체형이 달라집니다"
 
-2페이지 (Introduction): 문제 제기 + 공감
-   - 타겟이 겪는 문제를 명확히 제시
-   - 예: "바른 자세, 유연성... 혼자선 어렵죠"
+중간 페이지: 문제 제기 → 솔루션 → 부가 가치
+   - 각 페이지마다 명확한 주제와 bullet points
+   - 타겟의 고민, 핵심 솔루션, 추가 혜택 등을 순서대로 전개
+   - bullet points로 간결하게 정리
 
-3페이지 (Main Benefit): 핵심 솔루션 + 차별점
-   - 이 서비스/제품의 가장 큰 장점 1가지
-   - 예: "1:1 맞춤 수업으로 당신만의 루틴 완성"
-
-4페이지 (Additional Value): 부가 가치 + 신뢰 구축
-   - 추가 혜택, 후기, 인증 등
-   - 예: "전문 강사진 + 소그룹 케어 + 합리적 가격"
-
-5페이지 (CTA): 행동 유도 + 마무리
+마지막 페이지 (CTA): 행동 유도 + 마무리
    - 명확한 다음 단계 제시
-   - 예: "오늘 체험 수업 신청하고 변화를 시작하세요!"
-
-────────────────────────
-📌 반복 금지 체크리스트
-────────────────────────
-✅ 각 페이지의 title이 모두 다른가?
-✅ 각 페이지의 content가 서로 다른 메시지를 전달하는가?
-✅ 1페이지는 호기심, 2페이지는 공감, 3페이지는 솔루션, 4페이지는 신뢰, 5페이지는 행동을 유도하는가?
+   - 예: title="오늘 시작하세요", content=["• 무료 체험 수업 신청", "• 1:1 맞춤 상담", "• 첫 달 50% 할인"]
 
 ────────────────────────
 📌 JSON 스키마 (변경 금지)
+────────────────────────
 [
   {{
     "page": 1,
-    "title": "질문형/통계/충격적 사실",
-    "content": "호기심을 유발하는 한 문장",
+    "title": "강력한 Hook 제목",
+    "subtitle": "부제목으로 핵심 요약",
+    "content": [
+      "• 간결한 핵심 메시지 1",
+      "• 간결한 핵심 메시지 2"
+    ],
+    "content_type": "bullet",
     "visual_concept": "임팩트 있는 비주얼 설명",
     "layout": "center"
   }},
   {{
     "page": 2,
-    "title": "문제 제기",
-    "content": "타겟의 고민에 공감하는 내용",
+    "title": "문제 제기 또는 솔루션",
+    "content": [
+      "• 타겟의 고민 1",
+      "• 타겟의 고민 2",
+      "• 타겟의 고민 3"
+    ],
+    "content_type": "bullet",
     "visual_concept": "공감 유도 비주얼",
     "layout": "top"
   }},
+  ...
   {{
-    "page": 3,
-    "title": "핵심 솔루션",
-    "content": "가장 큰 차별점 1가지",
-    "visual_concept": "솔루션 강조 비주얼",
-    "layout": "center"
-  }},
-  {{
-    "page": 4,
-    "title": "부가 가치",
-    "content": "추가 혜택/후기/인증",
-    "visual_concept": "신뢰 구축 비주얼",
-    "layout": "bottom"
-  }},
-  {{
-    "page": 5,
+    "page": {page_count},
     "title": "행동 유도",
-    "content": "명확한 다음 단계",
+    "content": [
+      "• 명확한 다음 단계 1",
+      "• 명확한 다음 단계 2"
+    ],
+    "content_type": "bullet",
     "visual_concept": "CTA 강조 비주얼",
     "layout": "center"
   }}
 ]
 
+📌 중요:
+- 첫 페이지만 subtitle 포함
+- 모든 content는 배열 형태 (bullet points)
+- 각 bullet point는 "• "로 시작
+- 페이지 수는 정확히 {page_count}개
+
 ────────────────────────
 
 사용자 요청: "{user_input}"
-페이지 수: 5
+페이지 수: {page_count}
 톤: {tone}
 타겟: {audience}
 
-**위 스토리텔링 구조를 따르며, 각 페이지가 완전히 다른 내용을 담도록 JSON만 출력하세요.**"""
+**위 스토리텔링 구조를 따르며, 정확히 {page_count}개의 페이지를 생성하고, 각 페이지가 완전히 다른 내용을 담도록 JSON만 출력하세요.**
+**첫 페이지는 반드시 subtitle을 포함하고, 모든 content는 배열 형태의 bullet points로 작성하세요.**"""
 
             # Gemini API 호출
             response = model.generate_content(prompt)
@@ -269,15 +281,29 @@ class ContentPlannerAgent:
     @staticmethod
     def _get_fallback_content(user_input: str, analysis: Dict) -> List[Dict]:
         """폴백 콘텐츠"""
-        return [
-            {
-                "page": 1,
+        page_count = analysis.get('page_count', 5)
+        pages = []
+
+        for i in range(page_count):
+            page = {
+                "page": i + 1,
                 "title": user_input[:20] if len(user_input) > 20 else user_input,
-                "content": "카드뉴스 내용입니다.",
+                "content": [
+                    "• 카드뉴스 내용입니다",
+                    "• 자세한 내용은 곧 추가됩니다"
+                ],
+                "content_type": "bullet",
                 "visual_concept": "심플한 배경",
-                "layout": "title_center"
+                "layout": "center"
             }
-        ]
+
+            # 첫 페이지에 subtitle 추가
+            if i == 0:
+                page["subtitle"] = "자세한 내용을 확인하세요"
+
+            pages.append(page)
+
+        return pages
 
 
 # ==================== Agent 3: Visual Designer (비주얼 디자이너) ====================
@@ -304,7 +330,7 @@ class VisualDesignerAgent:
                 return VisualDesignerAgent._generate_prompts_only(pages, style)
 
             genai.configure(api_key=google_api_key)
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            model = genai.GenerativeModel('gemini-2.5-flash')
 
             print(f"\n🎨 [Visual Designer] 각 페이지마다 고유한 비주얼 프롬프트 생성 중...")
 
@@ -401,7 +427,7 @@ class QualityAssuranceAgent:
                 return QualityAssuranceAgent._get_fallback_validation()
 
             genai.configure(api_key=google_api_key)
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            model = genai.GenerativeModel('gemini-2.5-flash')
 
             pages_summary = "\n".join([
                 f"페이지 {p['page']}: {p['title']} - {p['content']}"

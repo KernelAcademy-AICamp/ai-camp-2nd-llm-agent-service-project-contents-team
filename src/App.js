@@ -15,7 +15,6 @@ import Settings from './pages/settings/Settings';
 import CardNews from './pages/content/CardNews';
 import ImageStudio from './pages/content/ImageStudio';
 import MyPage from './pages/profile/MyPage';
-import AIVideoGenerator from './pages/content/AIVideoGenerator';
 import ContentHub from './pages/content/ContentHub';
 import ContentCreatorSimple from './pages/content/ContentCreatorSimple';
 import ContentHistory from './pages/content/ContentHistory';
@@ -128,16 +127,6 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <CardNews />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/ai-video"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <AIVideoGenerator />
                 </Layout>
               </ProtectedRoute>
             }

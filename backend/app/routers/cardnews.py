@@ -8,7 +8,6 @@ import io
 import os
 import requests
 from pathlib import Path
-from anthropic import Anthropic
 import asyncio
 import re
 import httpx
@@ -143,41 +142,60 @@ class FontManager:
     """폰트 다운로드 및 로드 관리"""
 
     FONTS = {
+        # Pretendard (현대적, 가독성 우수)
+        "pretendard_bold": {
+            "name": "Pretendard-Bold.otf",
+            "url": "https://cdn.jsdelivr.net/gh/fonts-archive/Pretendard/Pretendard-Bold.otf"
+        },
+        "pretendard_medium": {
+            "name": "Pretendard-Medium.otf",
+            "url": "https://cdn.jsdelivr.net/gh/fonts-archive/Pretendard/Pretendard-Medium.otf"
+        },
+        "pretendard_regular": {
+            "name": "Pretendard-Regular.otf",
+            "url": "https://cdn.jsdelivr.net/gh/fonts-archive/Pretendard/Pretendard-Regular.otf"
+        },
+
+        # Noto Sans KR (Google 웹폰트)
+        "noto_sans_kr_bold": {
+            "name": "NotoSansKR-Bold.otf",
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf"
+        },
+        "noto_sans_kr_medium": {
+            "name": "NotoSansKR-Medium.otf",
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Medium.otf"
+        },
+        "noto_sans_kr_regular": {
+            "name": "NotoSansKR-Regular.otf",
+            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf"
+        },
+
+        # Spoqa Han Sans (기업용, 깔끔함)
+        "spoqa_bold": {
+            "name": "SpoqaHanSansNeo-Bold.otf",
+            "url": "https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Bold.otf"
+        },
+        "spoqa_medium": {
+            "name": "SpoqaHanSansNeo-Medium.otf",
+            "url": "https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Medium.otf"
+        },
+        "spoqa_regular": {
+            "name": "SpoqaHanSansNeo-Regular.otf",
+            "url": "https://cdn.jsdelivr.net/gh/spoqa/spoqa-han-sans@latest/Subset/SpoqaHanSansNeo/SpoqaHanSansNeo-Regular.otf"
+        },
+
+        # 기존 폰트 유지 (호환성)
         "rounded_bold": {
-            "name": "NotoSansKR-Bold.ttf",
+            "name": "NotoSansKR-Bold-Legacy.otf",
             "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf"
         },
         "rounded_medium": {
-            "name": "NotoSansKR-Medium.ttf",
+            "name": "NotoSansKR-Medium-Legacy.otf",
             "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Medium.otf"
         },
         "rounded_regular": {
-            "name": "NotoSansKR-Regular.ttf",
+            "name": "NotoSansKR-Regular-Legacy.otf",
             "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf"
-        },
-        "sharp_bold": {
-            "name": "BlackHanSans-Regular.ttf",
-            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Black.otf"
-        },
-        "sharp_regular": {
-            "name": "NanumGothic-Regular.ttf",
-            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf"
-        },
-        "modern_bold": {
-            "name": "NanumSquareRound-Bold.ttf",
-            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf"
-        },
-        "modern_regular": {
-            "name": "NanumSquareRound-Regular.ttf",
-            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Regular.otf"
-        },
-        "cute_bold": {
-            "name": "Sunflower-Bold.ttf",
-            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Bold.otf"
-        },
-        "cute_regular": {
-            "name": "Sunflower-Medium.ttf",
-            "url": "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/OTF/Korean/NotoSansCJKkr-Medium.otf"
         }
     }
 
@@ -200,42 +218,42 @@ class FontManager:
             return None
 
     @classmethod
-    def get_font(cls, font_style: str, font_size: int, weight: str = "light") -> ImageFont.FreeTypeFont:
+    def get_font(cls, font_style: str, font_size: int, weight: str = "regular") -> ImageFont.FreeTypeFont:
         """폰트 가져오기
 
         Args:
-            font_style: 폰트 스타일 (rounded, sharp, modern, cute)
+            font_style: 폰트 스타일 (pretendard, noto_sans_kr, spoqa, rounded)
             font_size: 폰트 크기
-            weight: 폰트 굵기 (light, medium, bold)
+            weight: 폰트 굵기 (regular, medium, bold)
         """
         # weight에 따라 폰트 키 결정
-        # light: regular 폰트 (얇게)
-        # medium: medium 폰트 (중간)
-        # bold: bold 폰트 (굵게)
+        # regular: 기본 폰트
+        # medium: 중간 굵기
+        # bold: 굵은 폰트
 
         if weight == "bold":
             font_map = {
-                "rounded": "rounded_bold",
-                "sharp": "sharp_bold",
-                "modern": "modern_bold",
-                "cute": "cute_bold"
+                "pretendard": "pretendard_bold",
+                "noto_sans_kr": "noto_sans_kr_bold",
+                "spoqa": "spoqa_bold",
+                "rounded": "rounded_bold",  # 호환성 유지
             }
         elif weight == "medium":
             font_map = {
-                "rounded": "rounded_medium",
-                "sharp": "sharp_regular",  # sharp는 medium이 없어서 regular 사용
-                "modern": "modern_regular",  # modern은 medium이 없어서 regular 사용
-                "cute": "cute_regular"
+                "pretendard": "pretendard_medium",
+                "noto_sans_kr": "noto_sans_kr_medium",
+                "spoqa": "spoqa_medium",
+                "rounded": "rounded_medium",  # 호환성 유지
             }
-        else:  # light
+        else:  # regular
             font_map = {
-                "rounded": "rounded_regular",
-                "sharp": "sharp_regular",
-                "modern": "modern_regular",
-                "cute": "cute_regular"
+                "pretendard": "pretendard_regular",
+                "noto_sans_kr": "noto_sans_kr_regular",
+                "spoqa": "spoqa_regular",
+                "rounded": "rounded_regular",  # 호환성 유지
             }
 
-        font_key = font_map.get(font_style, "rounded_regular")
+        font_key = font_map.get(font_style, "pretendard_regular")  # 기본 폰트를 Pretendard로 변경
 
         # 폰트 다운로드
         font_info = cls.FONTS[font_key]
@@ -253,66 +271,6 @@ class FontManager:
             return ImageFont.truetype("/System/Library/Fonts/Supplemental/AppleGothic.ttf", font_size)
         except:
             return ImageFont.load_default()
-
-# ==================== AI 콘텐츠 생성 ====================
-
-class AIContentGenerator:
-    """AI를 사용한 카드뉴스 콘텐츠 생성"""
-
-    @staticmethod
-    async def generate_cardnews_content(description: str, purpose: str) -> List[dict]:
-        """사용자 설명을 기반으로 1장의 카드뉴스 콘텐츠 생성"""
-        try:
-            anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-            if not anthropic_key:
-                print("⚠️ ANTHROPIC_API_KEY가 설정되지 않음")
-                return []
-
-            client = Anthropic()
-
-            prompt = f"""당신은 SNS 마케팅 전문가입니다. 다음 설명을 바탕으로 1장의 카드뉴스를 기획해주세요.
-
-**사용자 입력**: {description}
-**용도**: {PURPOSE_MAP.get(purpose, purpose)}
-
-**카드뉴스 구성 가이드**:
-- 핵심 메시지를 간결하고 임팩트 있게 전달
-- 관심을 끄는 제목과 행동을 유도하는 설명
-
-**작성 규칙**:
-- 제목: 간결하고 임팩트 있게 (최대 15자)
-- 설명: 구체적이고 매력적으로 (최대 35자)
-- 이모지 제거, 순수 한글/영문/숫자만 사용
-
-JSON 배열 형식으로만 응답:
-[
-  {{"title": "카드 제목", "description": "카드 설명"}}
-]"""
-
-            message = client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=500,
-                messages=[{"role": "user", "content": prompt}]
-            )
-
-            response_text = message.content[0].text.strip()
-
-            # JSON 추출
-            json_match = re.search(r'\[[\s\S]*\]', response_text)
-
-            if json_match:
-                cards = json.loads(json_match.group(0))
-                if isinstance(cards, list) and len(cards) == 1:
-                    print(f"✅ AI가 1장의 카드뉴스 콘텐츠 생성 완료:")
-                    print(f"   1. {cards[0]['title']} - {cards[0]['description']}")
-                    return cards
-
-            print("⚠️ AI 응답 형식이 올바르지 않음")
-            return []
-
-        except Exception as e:
-            print(f"⚠️ AI 콘텐츠 생성 실패: {str(e)}")
-            return []
 
 # ==================== 텍스트 렌더링 ====================
 
@@ -399,6 +357,54 @@ class TextRenderer:
             # 다음 줄 위치
             y += text_height + line_spacing
 
+    @staticmethod
+    def draw_bullet_point(
+        image: Image.Image,
+        text: str,
+        position: tuple,
+        font: ImageFont.FreeTypeFont,
+        color: str = "white",
+        bullet_symbol: str = "•"
+    ):
+        """Bullet point 렌더링 (• 기호 처리 + 들여쓰기)"""
+        draw = ImageDraw.Draw(image, 'RGBA')
+        x, y = position
+
+        # "• " 또는 "- " 제거 후 텍스트 추출
+        clean_text = text.lstrip('•- ').strip()
+
+        # Bullet 기호 그리기
+        draw.text((x, y), bullet_symbol, font=font, fill=color)
+
+        # 텍스트 그리기 (들여쓰기 30px)
+        draw.text((x + 35, y), clean_text, font=font, fill=color)
+
+    @staticmethod
+    def draw_structured_content(
+        image: Image.Image,
+        content: List[str],
+        start_y: int,
+        font: ImageFont.FreeTypeFont,
+        color: str = "white",
+        line_spacing: int = 50,
+        start_x: int = 100
+    ) -> int:
+        """
+        구조화된 콘텐츠 렌더링 (bullet points 배열)
+
+        Returns:
+            최종 y 위치 (다음 요소 렌더링에 활용)
+        """
+        current_y = start_y
+
+        for line in content:
+            TextRenderer.draw_bullet_point(
+                image, line, (start_x, current_y), font, color
+            )
+            current_y += line_spacing
+
+        return current_y
+
 # ==================== 카드 빌더 ====================
 
 class CardNewsBuilder:
@@ -408,7 +414,7 @@ class CardNewsBuilder:
         self.theme = theme
         self.font_style = font_style
         self.purpose = purpose
-        self.layout_type = layout_type  # top, center, bottom
+        self.layout_type = layout_type  # 하위 호환성 유지, 실제로는 미사용 (페이지별 layout 사용)
         self.font_weight = font_weight  # light, medium, bold
         self.badge_text = BADGE_TEXT_MAP.get(purpose, '정보')
 
@@ -536,7 +542,7 @@ class CardNewsBuilder:
         description: str,
         page_num: int = 1
     ) -> Image.Image:
-        """완전한 카드 생성"""
+        """완전한 카드 생성 (기존 방식)"""
         # 배경 준비
         card = self.prepare_background(background_image)
 
@@ -548,157 +554,132 @@ class CardNewsBuilder:
 
         return card
 
-# ==================== API 엔드포인트 ====================
+    def build_first_page(
+        self,
+        background_image: Image.Image,
+        title: str,
+        subtitle: str,
+        page_num: int = 1,
+        layout: str = "center"
+    ) -> str:
+        """
+        첫 페이지 전용 렌더링 (제목 + 소제목 + AI 배경)
+        Agent가 판단한 layout에 따라 텍스트 위치 조정
+        """
+        # 배경 준비
+        card = self.prepare_background(background_image)
 
-@router.post("/generate-cardnews-stream")
-async def generate_cardnews_stream(
-    images: List[UploadFile] = File(...),
-    titles: str = Form(...),
-    descriptions: str = Form(...),
-    fontStyle: str = Form(default="rounded"),
-    colorTheme: str = Form(default="warm"),
-    purpose: str = Form(default="promotion"),
-    layoutStyle: str = Form(default="overlay"),
-    layoutType: str = Form(default="bottom")
-):
-    """카드뉴스 스트리밍 생성 API"""
+        # 로고 추가
+        self.add_logo(card)
 
-    async def event_stream():
-        try:
-            # 검증
-            if not images or len(images) == 0:
-                yield f"data: {json.dumps({'type': 'error', 'message': '최소 1개 이상의 이미지가 필요합니다.'})}\n\n"
-                return
+        # 폰트 설정 (2배 크기)
+        title_font = FontManager.get_font(self.font_style, 96, weight='bold')
+        subtitle_font = FontManager.get_font(self.font_style, 56, weight='medium')
 
-            # 상태 전송
-            yield f"data: {json.dumps({'type': 'status', 'message': 'AI가 카드뉴스 콘텐츠를 분석하고 있습니다...'})}\n\n"
-            await asyncio.sleep(0.1)
+        # 텍스트 총 높이 계산
+        draw = ImageDraw.Draw(card)
+        title_lines = TextRenderer.wrap_text(title, title_font, CARD_WIDTH - 120, draw)
+        subtitle_lines = TextRenderer.wrap_text(subtitle, subtitle_font, CARD_WIDTH - 120, draw)
 
-            # JSON 파싱
-            title_array = json.loads(titles)
-            user_description = title_array[0] if len(title_array) > 0 else ""
+        title_height = len(title_lines) * 60  # 폰트 크기 + 여백
+        subtitle_height = len(subtitle_lines) * 36
+        total_height = title_height + subtitle_height + 20  # 제목-부제목 간격
 
-            # AI 콘텐츠 생성
-            ai_cards = await AIContentGenerator.generate_cardnews_content(user_description, purpose)
+        # Agent가 판단한 layout에 따라 시작 위치 결정
+        if layout == "top":
+            title_y = CARD_HEIGHT // 3  # 1/3 지점 (360px)
+        elif layout == "bottom":
+            title_y = CARD_HEIGHT - total_height - 150  # 하단
+        else:  # center (기본값)
+            title_y = (CARD_HEIGHT - total_height) // 2  # 중앙
 
-            if not ai_cards or len(ai_cards) != 1:
-                yield f"data: {json.dumps({'type': 'error', 'message': 'AI 콘텐츠 생성에 실패했습니다.'})}\n\n"
-                return
+        # 제목 렌더링 (중앙 정렬 수정: x 시작점을 60으로)
+        TextRenderer.draw_text_with_shadow(
+            card, title, (60, title_y),
+            title_font, color=self.theme["text"],
+            max_width=CARD_WIDTH - 120,
+            align="center", shadow=True,
+            line_spacing=24
+        )
 
-            # 배경 이미지 로드
-            image_data = await images[0].read()
-            background_image = Image.open(io.BytesIO(image_data))
+        # 소제목 렌더링 (제목 아래)
+        subtitle_y = title_y + title_height + 40
+        TextRenderer.draw_text_with_shadow(
+            card, subtitle, (60, subtitle_y),
+            subtitle_font, color=self.theme["text"],
+            max_width=CARD_WIDTH - 120,
+            align="center", shadow=False,
+            line_spacing=16
+        )
 
-            # 테마 선택
-            theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
+        # 페이지 번호
+        self._add_page_number(card, page_num)
 
-            # 카드 빌더 생성
-            builder = CardNewsBuilder(theme, fontStyle, purpose, layoutType)
+        # Base64 변환
+        import io
+        buffer = io.BytesIO()
+        card.save(buffer, format="PNG")
+        return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
-            # 카드 생성
-            for i, card_content in enumerate(ai_cards):
-                yield f"data: {json.dumps({'type': 'status', 'message': '카드 생성 중...'})}\n\n"
+    def build_content_page(
+        self,
+        bg_color: tuple,
+        title: str,
+        content_lines: List[str],
+        page_num: int
+    ) -> str:
+        """
+        본문 페이지 렌더링 (섹션 제목 + bullet points + 컬러 배경)
+        모든 본문 페이지는 상단(1/3 지점)에서 시작
+        """
+        # 컬러 배경 생성
+        card = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), bg_color)
 
-                title = card_content["title"]
-                description = card_content["description"]
+        # 로고 추가
+        self.add_logo(card)
 
-                # 카드 생성
-                card_image = builder.build_card(background_image, title, description, i + 1)
+        # 폰트 설정 (2배 크기)
+        title_font = FontManager.get_font(self.font_style, 72, weight='bold')
+        bullet_font = FontManager.get_font(self.font_style, 48, weight='regular')
 
-                # Base64 변환
-                buffer = io.BytesIO()
-                card_image.save(buffer, format="PNG")
-                base64_image = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+        # 섹션 제목 (1/3 지점에서 시작, 중앙 정렬 수정)
+        title_y = CARD_HEIGHT // 3  # 360px (1/3 지점)
+        TextRenderer.draw_text_with_shadow(
+            card, title, (60, title_y),
+            title_font, color=self.theme["text"],
+            max_width=CARD_WIDTH - 120,
+            align="center", shadow=False
+        )
 
-                # 카드 전송
-                yield f"data: {json.dumps({'type': 'card', 'index': i, 'card': base64_image})}\n\n"
-                await asyncio.sleep(0.1)
+        # Bullet points 렌더링 (제목 아래)
+        bullet_y = title_y + 120  # 제목 아래 120px 간격
+        TextRenderer.draw_structured_content(
+            card, content_lines, bullet_y,
+            bullet_font, color=self.theme["text"],
+            line_spacing=120, start_x=100
+        )
 
-            # 완료 메시지
-            yield f"data: {json.dumps({'type': 'complete', 'message': '카드뉴스 생성이 완료되었습니다!'})}\n\n"
+        # 페이지 번호
+        self._add_page_number(card, page_num)
 
-        except Exception as e:
-            print(f"스트리밍 카드뉴스 생성 실패: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+        # Base64 변환
+        import io
+        buffer = io.BytesIO()
+        card.save(buffer, format="PNG")
+        return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    def _add_page_number(self, image: Image.Image, page_num: int):
+        """페이지 번호 추가"""
+        draw = ImageDraw.Draw(image, 'RGBA')
+        page_font = FontManager.get_font(self.font_style, 20, weight='regular')
 
-
-@router.post("/generate-cardnews")
-async def generate_cardnews(
-    images: List[UploadFile] = File(...),
-    titles: str = Form(...),
-    descriptions: str = Form(...),
-    fontStyle: str = Form(default="rounded"),
-    colorTheme: str = Form(default="warm"),
-    purpose: str = Form(default="promotion"),
-    layoutStyle: str = Form(default="overlay"),
-    layoutType: str = Form(default="bottom")
-):
-    """카드뉴스 생성 API (비스트리밍)"""
-    try:
-        if not images or len(images) == 0:
-            raise HTTPException(status_code=400, detail="최소 1개 이상의 이미지가 필요합니다.")
-
-        print(f"📰 카드뉴스 생성 시작")
-        print(f"🎨 스타일: 폰트={fontStyle}, 색상={colorTheme}, 용도={purpose}")
-
-        # JSON 파싱
-        title_array = json.loads(titles)
-        user_description = title_array[0] if len(title_array) > 0 else ""
-
-        # AI 콘텐츠 생성
-        print(f"\n🤖 AI가 '{user_description}'를 기반으로 1장의 카드뉴스 콘텐츠를 생성 중...")
-        ai_cards = await AIContentGenerator.generate_cardnews_content(user_description, purpose)
-
-        if not ai_cards or len(ai_cards) != 1:
-            raise HTTPException(status_code=500, detail="AI 콘텐츠 생성에 실패했습니다.")
-
-        # 배경 이미지 로드
-        image_data = await images[0].read()
-        background_image = Image.open(io.BytesIO(image_data))
-
-        # 테마 선택
-        theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
-
-        # 카드 빌더 생성
-        builder = CardNewsBuilder(theme, fontStyle, purpose, layoutType)
-
-        # 카드 생성
-        card_news_images = []
-        for i, card_content in enumerate(ai_cards):
-            print(f"\n📄 {i + 1}번째 카드 생성 중...")
-
-            title = card_content["title"]
-            description = card_content["description"]
-
-            # 카드 생성
-            card_image = builder.build_card(background_image, title, description, i + 1)
-
-            # Base64 변환
-            buffer = io.BytesIO()
-            card_image.save(buffer, format="PNG")
-            base64_image = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
-            card_news_images.append(base64_image)
-
-            print(f"✅ 카드 {i + 1} 생성 완료")
-
-        print(f"\n✅ 총 {len(card_news_images)}장의 카드뉴스 생성 완료\n")
-
-        return {
-            "success": True,
-            "images": card_news_images,
-            "count": len(card_news_images)
-        }
-
-    except Exception as e:
-        print(f"카드뉴스 생성 실패: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"카드뉴스 생성 중 오류가 발생했습니다: {str(e)}")
-
+        page_text = f"{page_num}"
+        draw.text(
+            (CARD_WIDTH - 50, CARD_HEIGHT - 40),
+            page_text,
+            fill=self.theme.get("text", "white"),
+            font=page_font
+        )
 
 # ==================== AI Agentic 카드뉴스 생성 (스트리밍) ====================
 
@@ -878,7 +859,7 @@ async def generate_agentic_cardnews(
         pages = result['pages']
         quality_report = result['quality_report']
 
-        # Step 2: 배경 이미지 생성 (옵션)
+        # Step 2: 배경 이미지 생성 (첫 페이지만 AI 이미지, 나머지는 컬러 배경)
         print("\n🖼️ 배경 이미지 생성 중...")
         background_images = []
 
@@ -886,58 +867,73 @@ async def generate_agentic_cardnews(
             google_api_key = os.getenv('GOOGLE_API_KEY')
             if google_api_key:
                 for i, page in enumerate(pages):
-                    try:
-                        print(f"  📸 페이지 {i+1} 이미지 생성 중...")
-                        image_url = await generate_background_image_with_gemini(
-                            page.get('image_prompt', page.get('visual_concept', 'modern background'))
-                        )
-                        background_images.append(image_url)
-                        print(f"  ✅ 페이지 {i+1} 이미지 생성 완료")
-                    except Exception as e:
-                        print(f"  ⚠️ 페이지 {i+1} 이미지 생성 실패: {e}")
-                        # 폴백: 단색 배경 생성
+                    if i == 0:  # 첫 페이지만 AI 이미지 생성
+                        try:
+                            print(f"  📸 페이지 1 AI 이미지 생성 중...")
+                            image_url = await generate_background_image_with_gemini(
+                                page.get('image_prompt', page.get('visual_concept', 'modern background'))
+                            )
+                            background_images.append(image_url)
+                            print(f"  ✅ 페이지 1 AI 이미지 생성 완료")
+                        except Exception as e:
+                            print(f"  ⚠️ 페이지 1 이미지 생성 실패: {e}")
+                            # 폴백: 단색 배경 생성
+                            background_images.append(create_fallback_background(colorTheme))
+                    else:  # 나머지 페이지는 컬러 배경
+                        print(f"  🎨 페이지 {i+1} 컬러 배경 생성 중...")
                         background_images.append(create_fallback_background(colorTheme))
+                        print(f"  ✅ 페이지 {i+1} 컬러 배경 생성 완료")
             else:
-                print("  ⚠️ Google API Key 없음, 단색 배경 사용")
+                print("  ⚠️ Google API Key 없음, 모든 페이지 단색 배경 사용")
                 for _ in pages:
                     background_images.append(create_fallback_background(colorTheme))
         else:
             # 단색 배경 사용
+            print("  ℹ️ 이미지 생성 비활성화, 모든 페이지 단색 배경 사용")
             for _ in pages:
                 background_images.append(create_fallback_background(colorTheme))
 
         # Step 3: 최종 카드뉴스 생성
         print("\n📰 최종 카드뉴스 조립 중...")
         theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
-        builder = CardNewsBuilder(theme, fontStyle, purpose, layoutType)
+        # layoutType 제거: 첫 페이지는 Agent가 판단, 나머지는 상단 고정
+        builder = CardNewsBuilder(theme, "pretendard", purpose, font_weight="regular")
 
         final_cards = []
         for i, (page, bg_image_data) in enumerate(zip(pages, background_images)):
             print(f"  🎨 카드 {i+1}/{len(pages)} 생성 중...")
 
-            # 배경 이미지 로드
-            if bg_image_data.startswith('data:image'):
-                # Base64 디코딩
-                image_data = bg_image_data.split(',')[1]
-                bg_image = Image.open(io.BytesIO(base64.b64decode(image_data)))
-            else:
-                # URL에서 다운로드
-                response = requests.get(bg_image_data, timeout=30)
-                bg_image = Image.open(io.BytesIO(response.content))
+            if i == 0:  # 첫 페이지: AI 이미지 + 제목 + 소제목
+                # 배경 이미지 로드
+                if bg_image_data.startswith('data:image'):
+                    image_data = bg_image_data.split(',')[1]
+                    bg_image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+                else:
+                    response = requests.get(bg_image_data, timeout=30)
+                    bg_image = Image.open(io.BytesIO(response.content))
 
-            # 카드 생성 (사용자 프롬프트만 표시, AI 생성 title/content 제거)
-            card = builder.build_card(
-                bg_image,
-                prompt,
-                "",
-                i + 1
-            )
+                # 첫 페이지 생성 (Agent가 판단한 layout 사용)
+                card_base64 = builder.build_first_page(
+                    background_image=bg_image,
+                    title=page['title'],
+                    subtitle=page.get('subtitle', ''),
+                    page_num=i + 1,
+                    layout=page.get('layout', 'center')  # Agent가 결정한 layout
+                )
+                final_cards.append(card_base64)
 
-            # Base64 변환
-            buffer = io.BytesIO()
-            card.save(buffer, format="PNG")
-            card_base64 = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
-            final_cards.append(card_base64)
+            else:  # 나머지 페이지: 컬러 배경 + 제목 + bullet points
+                # 컬러 배경 사용
+                bg_color = theme.get("primary", (255, 94, 77))
+
+                # 본문 페이지 생성
+                card_base64 = builder.build_content_page(
+                    bg_color=bg_color,
+                    title=page['title'],
+                    content_lines=page.get('content', ["• 내용이 없습니다"]),
+                    page_num=i + 1
+                )
+                final_cards.append(card_base64)
 
             print(f"  ✅ 카드 {i+1} 완성")
 
@@ -960,7 +956,8 @@ async def generate_agentic_cardnews(
                 {
                     "page": p['page'],
                     "title": p['title'],
-                    "content": p['content']
+                    "subtitle": p.get('subtitle', ''),
+                    "content": p.get('content', [])
                 }
                 for p in pages
             ]
@@ -979,16 +976,16 @@ async def generate_agentic_cardnews(
 
 
 async def generate_background_image_with_gemini(prompt: str) -> str:
-    """Gemini 2.0 Flash로 배경 이미지 생성"""
-    google_api_key = os.getenv('GOOGLE_API_KEY')
+    """Gemini 2.5 Flash Image로 배경 이미지 생성 (image.py와 동일)"""
+    google_api_key = os.getenv('REACT_APP_GEMINI_API_KEY')  # image.py와 동일한 키 사용
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={google_api_key}",
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key={google_api_key}",
             json={
                 "contents": [{
                     "parts": [{
-                        "text": f"Generate an image: {prompt}"
+                        "text": f"Generate an image without any text or words: {prompt}. The image should be a clean background with no typography, letters, or textual elements."
                     }]
                 }]
             },
@@ -1000,14 +997,14 @@ async def generate_background_image_with_gemini(prompt: str) -> str:
 
     data = response.json()
 
-    # 이미지 추출
+    # 이미지 추출 (image.py와 동일: camelCase 사용)
     if data.get("candidates") and len(data["candidates"]) > 0:
         candidate = data["candidates"][0]
         if candidate.get("content") and candidate["content"].get("parts"):
             for part in candidate["content"]["parts"]:
-                if part.get("inline_data") and part["inline_data"].get("data"):
-                    mime_type = part["inline_data"].get("mime_type", "image/png")
-                    image_data = part["inline_data"]["data"]
+                if part.get("inlineData") and part["inlineData"].get("data"):
+                    mime_type = part["inlineData"].get("mimeType", "image/png")
+                    image_data = part["inlineData"]["data"]
                     return f"data:{mime_type};base64,{image_data}"
 
     raise Exception("Gemini에서 이미지를 추출할 수 없습니다")
@@ -1027,89 +1024,3 @@ def create_fallback_background(color_theme: str) -> str:
     return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
 
-# ==================== 커스텀 이미지 + 텍스트 카드뉴스 생성 ====================
-
-@router.post("/generate-custom-cardnews")
-async def generate_custom_cardnews(
-    images: List[UploadFile] = File(...),
-    texts: str = Form(...),
-    colorTheme: str = Form(default="black"),
-    fontWeight: str = Form(default="bold"),
-    layoutType: str = Form(default="center")
-):
-    """
-    사용자가 업로드한 이미지에 텍스트를 추가하여 카드뉴스 생성
-
-    Args:
-        images: 업로드된 이미지 파일들
-        texts: JSON 배열 형태의 텍스트 목록 (각 이미지에 추가할 텍스트)
-        colorTheme: 색상 테마 (텍스트 색상에 영향)
-        fontWeight: 폰트 굵기 (light/medium/bold)
-        layoutType: 텍스트 위치 (top/center/bottom)
-    """
-    try:
-        print("\n" + "="*80)
-        print("🖼️ 커스텀 이미지 카드뉴스 생성 시작")
-        print(f"📸 업로드된 이미지 수: {len(images)}")
-        print("="*80 + "\n")
-
-        # 텍스트 파싱
-        text_list = json.loads(texts)
-
-        if not images or len(images) == 0:
-            raise HTTPException(status_code=400, detail="최소 1개 이상의 이미지가 필요합니다.")
-
-        # 테마 선택
-        theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["black"])
-
-        # 카드 빌더 생성 (purpose는 'info'로 기본값)
-        builder = CardNewsBuilder(theme, "rounded", "info", layoutType, fontWeight)
-
-        final_cards = []
-
-        for i, image_file in enumerate(images):
-            print(f"  🎨 카드 {i+1}/{len(images)} 처리 중...")
-
-            # 이미지 로드
-            image_data = await image_file.read()
-            original_image = Image.open(io.BytesIO(image_data))
-
-            # 해당 인덱스의 텍스트 가져오기 (없으면 빈 문자열)
-            card_text = text_list[i] if i < len(text_list) else ""
-
-            # 카드 생성 (텍스트 추가)
-            card = builder.build_card(
-                original_image,
-                card_text,  # 제목으로 사용
-                "",  # 설명은 비워둠
-                i + 1
-            )
-
-            # Base64 변환
-            buffer = io.BytesIO()
-            card.save(buffer, format="PNG")
-            card_base64 = f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
-            final_cards.append(card_base64)
-
-            print(f"  ✅ 카드 {i+1} 완성")
-
-        print("\n" + "="*80)
-        print(f"✅ {len(final_cards)}장의 커스텀 카드뉴스 생성 완료!")
-        print("="*80 + "\n")
-
-        return {
-            "success": True,
-            "cards": final_cards,
-            "count": len(final_cards)
-        }
-
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"텍스트 형식이 올바르지 않습니다: {str(e)}")
-    except Exception as e:
-        print(f"\n❌ 커스텀 카드뉴스 생성 실패: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"카드뉴스 생성 중 오류: {str(e)}"
-        )

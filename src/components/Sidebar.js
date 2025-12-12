@@ -37,7 +37,7 @@ const BOTTOM_MENU = [
 ];
 
 // 콘텐츠 생성 관련 경로
-const CONTENT_PATHS = ['/content', '/create', '/ai-video'];
+const CONTENT_PATHS = ['/content', '/create'];
 
 function Sidebar({ onHoverChange }) {
   const location = useLocation();
