@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { MdDashboard, MdAdd, MdFolder, MdStyle, MdSettings, MdHome, MdShare } from 'react-icons/md';
+import { MdDashboard, MdAdd, MdFolder, MdStyle, MdSettings, MdHome } from 'react-icons/md';
 import { FaYoutube, FaFacebook, FaInstagram, FaXTwitter } from 'react-icons/fa6';
 import { SiThreads } from 'react-icons/si';
 import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI } from '../services/api';
@@ -27,7 +27,6 @@ const PLATFORMS = [
 const MAIN_MENU = [
   { path: '/dashboard', label: '대시보드', icon: MdDashboard },
   { path: '/contents', label: '콘텐츠 관리', icon: MdFolder },
-  { path: '/sns-connections', label: 'SNS 연동', icon: MdShare },
   { path: '/templates', label: '템플릿', icon: MdStyle },
 ];
 

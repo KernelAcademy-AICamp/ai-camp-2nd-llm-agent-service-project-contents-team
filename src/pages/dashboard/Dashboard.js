@@ -1,233 +1,297 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI } from '../../services/api';
+import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI } from '../../services/api';
+import { FaYoutube, FaFacebookF, FaInstagram, FaThreads } from 'react-icons/fa6';
+import { RiTwitterXFill } from 'react-icons/ri';
+import { FiCheck, FiPlus, FiRefreshCw } from 'react-icons/fi';
 import './Dashboard.css';
+
+// 플랫폼 설정 (상수)
+const PLATFORM_CONFIG = {
+  youtube: {
+    key: 'youtube',
+    name: 'YouTube',
+    icon: FaYoutube,
+    color: '#FF0000',
+    bgGradient: 'linear-gradient(135deg, #FF0000 0%, #CC0000 100%)',
+    path: '/youtube',
+    getConnected: (data) => !!data,
+    getFollowers: (data) => data?.subscriber_count || 0,
+    getViews: (data) => data?.view_count || 0,
+  },
+  instagram: {
+    key: 'instagram',
+    name: 'Instagram',
+    icon: FaInstagram,
+    color: '#E4405F',
+    bgGradient: 'linear-gradient(135deg, #E4405F 0%, #FFDC80 100%)',
+    path: '/instagram',
+    getConnected: (data) => !!data?.instagram_account_id,
+    getFollowers: (data) => data?.followers_count || 0,
+    getViews: (data) => data?.impressions || 0,
+  },
+  facebook: {
+    key: 'facebook',
+    name: 'Facebook',
+    icon: FaFacebookF,
+    color: '#1877F2',
+    bgGradient: 'linear-gradient(135deg, #1877F2 0%, #0D5BC4 100%)',
+    path: '/facebook',
+    getConnected: (data) => !!data?.page_id,
+    getFollowers: (data) => data?.page_followers_count || 0,
+    getViews: (data) => data?.page_views || 0,
+  },
+  threads: {
+    key: 'threads',
+    name: 'Threads',
+    icon: FaThreads,
+    color: '#000000',
+    bgGradient: 'linear-gradient(135deg, #000000 0%, #333333 100%)',
+    path: '/threads',
+    getConnected: (data) => !!data,
+    getFollowers: (data) => data?.followers_count || 0,
+    getViews: (data) => data?.views || 0,
+  },
+  x: {
+    key: 'x',
+    name: 'X',
+    icon: RiTwitterXFill,
+    color: '#000000',
+    bgGradient: 'linear-gradient(135deg, #000000 0%, #333333 100%)',
+    path: '/x',
+    getConnected: (data) => !!data?.x_user_id,
+    getFollowers: (data) => data?.followers_count || 0,
+    getViews: (data) => data?.impression_count || 0,
+  },
+};
+
+const PLATFORM_ORDER = ['youtube', 'instagram', 'facebook', 'threads', 'x'];
+
+// 숫자 포맷팅 유틸
+const formatNumber = (num) => {
+  if (!num) return '0';
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toLocaleString();
+};
+
+// 시간대별 인사말
+const getGreeting = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return '좋은 아침이에요';
+  if (hour < 18) return '좋은 오후예요';
+  return '좋은 저녁이에요';
+};
+
+// 통계 바 컴포넌트
+const StatBar = ({ platform, value, total }) => {
+  const config = PLATFORM_CONFIG[platform.id];
+  const Icon = config.icon;
+  const percentage = total > 0 ? (value / total) * 100 : 0;
+
+  return (
+    <div className="reach-bar-row">
+      <div className="reach-bar-info">
+        <span className="reach-bar-icon" style={{ color: config.color }}><Icon /></span>
+        <span className="reach-bar-name">{config.name}</span>
+        <span className="reach-bar-count">{formatNumber(value)}</span>
+      </div>
+      <div className="reach-bar-track">
+        <div
+          className="reach-bar-fill"
+          style={{ width: `${percentage}%`, background: config.bgGradient }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// 통계 카드 컴포넌트
+const StatsCard = ({ title, subtitle, data, total, valueKey }) => {
+  if (data.length === 0) return null;
+
+  return (
+    <div className="reach-dashboard">
+      <div className="reach-dashboard-header">
+        <div className="reach-title-section">
+          <h3>{title}</h3>
+          <span className="reach-total-value">{formatNumber(total)}</span>
+        </div>
+        <span className="reach-subtitle">{subtitle}</span>
+      </div>
+      <div className="reach-bars-container">
+        {data.map((p) => (
+          <StatBar key={p.id} platform={p} value={p[valueKey]} total={total} valueKey={valueKey} />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// 섹션 헤더 컴포넌트
+const SectionHeader = ({ title, description, children }) => (
+  <div className="section-title">
+    <div className="section-title-left">
+      <h3>{title}</h3>
+      <p className="section-description">{description}</p>
+    </div>
+    {children}
+  </div>
+);
+
+// 플랫폼 카드 컴포넌트
+const PlatformCard = ({ platform, status }) => {
+  const Icon = platform.icon;
+  const { connected, loading } = status;
+
+  return (
+    <div className={`sns-platform-card ${connected ? 'connected' : 'disconnected'}`}>
+      <div className="platform-card-header">
+        <div className="platform-icon-wrapper">
+          <div className="platform-icon" style={{ color: platform.color }}>
+            <Icon />
+          </div>
+          {connected && (
+            <div className="connected-badge"><FiCheck /></div>
+          )}
+        </div>
+      </div>
+      <div className="platform-card-body">
+        <h4 className="platform-name">{platform.name}</h4>
+        <span className={`platform-status ${loading ? 'loading' : connected ? 'connected' : 'disconnected'}`}>
+          {loading ? '확인 중...' : connected ? '연동됨' : '미연동'}
+        </span>
+      </div>
+      <div className="platform-card-footer">
+        <Link to={platform.path} className={`platform-btn ${connected ? 'secondary' : 'connect'}`}>
+          {connected ? '관리' : <><FiPlus /> 연동하기</>}
+        </Link>
+      </div>
+    </div>
+  );
+};
 
 function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [snsStatus, setSnsStatus] = useState({
-    youtube: { loading: true, connected: false, data: null, videos: [], analytics: null },
-    facebook: { loading: true, connected: false, data: null, posts: [] },
-    instagram: { loading: true, connected: false, data: null, posts: [] },
-    twitter: { loading: true, connected: false, data: null, tweets: [] },
-  });
-  const [statsLoading, setStatsLoading] = useState(true);
-
-  const recentContents = [
-    { id: 1, title: '신제품 런칭 홍보 콘텐츠', type: '소셜 미디어', status: '발행됨', date: '2025-11-10' },
-    { id: 2, title: '할인 이벤트 안내', type: '블로그', status: '예약됨', date: '2025-11-15' },
-    { id: 3, title: '고객 리뷰 소개 영상', type: '비디오', status: '작성 중', date: '2025-11-12' },
-  ];
+  const [snsStatus, setSnsStatus] = useState(
+    Object.fromEntries(PLATFORM_ORDER.map(key => [
+      key === 'x' ? 'twitter' : key,
+      { loading: true, connected: false, data: null, posts: [], ...(key === 'youtube' ? { videos: [], analytics: null } : {}) }
+    ]))
+  );
+  const [refreshing, setRefreshing] = useState(false);
 
   const quickActions = [
     { label: '콘텐츠 생성', path: '/create', desc: 'AI로 블로그/SNS 콘텐츠 생성' },
     { label: '생성 내역', path: '/history', desc: '이전에 생성한 콘텐츠 보기' },
     { label: '콘텐츠 관리', path: '/contents', desc: '임시저장/발행 콘텐츠 관리' },
-    { label: 'SNS 연동', path: '/sns-connections', desc: 'Facebook, YouTube 등 연결' },
   ];
 
-  // SNS 연동 상태 및 데이터 조회
-  useEffect(() => {
-    const fetchSNSData = async () => {
-      setStatsLoading(true);
+  // SNS 데이터 fetch 헬퍼
+  const fetchPlatformData = async (api, connectedCheck, extraFetch) => {
+    try {
+      const data = await api.getStatus();
+      const isConnected = connectedCheck(data);
+      let extra = {};
 
-      // YouTube 데이터 조회
-      try {
-        const ytData = await youtubeAPI.getStatus();
-        let videos = [];
-        let analytics = null;
-
-        if (ytData) {
-          try {
-            videos = await youtubeAPI.getVideos(0, 100) || [];
-          } catch (e) {
-            console.error('YouTube videos fetch error:', e);
-          }
-          try {
-            analytics = await youtubeAPI.getAnalyticsSummary();
-          } catch (e) {
-            console.error('YouTube analytics fetch error:', e);
-          }
-        }
-
-        setSnsStatus(prev => ({
-          ...prev,
-          youtube: { loading: false, connected: !!ytData, data: ytData, videos, analytics }
-        }));
-      } catch {
-        setSnsStatus(prev => ({
-          ...prev,
-          youtube: { loading: false, connected: false, data: null, videos: [], analytics: null }
-        }));
+      if (isConnected && extraFetch) {
+        extra = await extraFetch(api, data);
       }
 
-      // Facebook 데이터 조회
-      try {
-        const fbData = await facebookAPI.getStatus();
+      return { loading: false, connected: isConnected, data, ...extra };
+    } catch {
+      return { loading: false, connected: false, data: null, posts: [] };
+    }
+  };
+
+  const fetchSNSData = useCallback(async () => {
+    setRefreshing(true);
+
+    const results = await Promise.all([
+      // YouTube
+      fetchPlatformData(youtubeAPI, d => !!d, async (api) => {
+        let videos = [], analytics = null;
+        try { videos = await api.getVideos(0, 100) || []; } catch {}
+        try { analytics = await api.getAnalyticsSummary(); } catch {}
+        return { videos, analytics };
+      }),
+      // Facebook
+      fetchPlatformData(facebookAPI, d => !!d?.page_id, async (api) => {
         let posts = [];
-
-        if (fbData?.page_id) {
-          try {
-            posts = await facebookAPI.getPosts(0, 100) || [];
-          } catch (e) {
-            console.error('Facebook posts fetch error:', e);
-          }
-        }
-
-        setSnsStatus(prev => ({
-          ...prev,
-          facebook: { loading: false, connected: !!fbData?.page_id, data: fbData, posts }
-        }));
-      } catch {
-        setSnsStatus(prev => ({
-          ...prev,
-          facebook: { loading: false, connected: false, data: null, posts: [] }
-        }));
-      }
-
-      // Instagram 데이터 조회
-      try {
-        const igData = await instagramAPI.getStatus();
+        try { posts = await api.getPosts(0, 100) || []; } catch {}
+        return { posts };
+      }),
+      // Instagram
+      fetchPlatformData(instagramAPI, d => !!d?.instagram_account_id, async (api) => {
         let posts = [];
+        try { posts = await api.getPosts(0, 100) || []; } catch {}
+        return { posts };
+      }),
+      // X (Twitter)
+      fetchPlatformData(twitterAPI, d => !!d?.x_user_id, async (api) => {
+        let posts = [];
+        try { posts = await api.getPosts(0, 100) || []; } catch {}
+        return { posts };
+      }),
+      // Threads
+      fetchPlatformData(threadsAPI, d => !!d, async (api) => {
+        let posts = [];
+        try { posts = await api.getPosts(0, 100) || []; } catch {}
+        return { posts };
+      }),
+    ]);
 
-        if (igData?.instagram_account_id) {
-          try {
-            posts = await instagramAPI.getPosts(0, 100) || [];
-          } catch (e) {
-            console.error('Instagram posts fetch error:', e);
-          }
-        }
+    setSnsStatus({
+      youtube: results[0],
+      facebook: results[1],
+      instagram: results[2],
+      twitter: results[3],
+      threads: results[4],
+    });
 
-        setSnsStatus(prev => ({
-          ...prev,
-          instagram: { loading: false, connected: !!igData?.instagram_account_id, data: igData, posts }
-        }));
-      } catch {
-        setSnsStatus(prev => ({
-          ...prev,
-          instagram: { loading: false, connected: false, data: null, posts: [] }
-        }));
-      }
-
-      // Twitter 데이터 조회
-      try {
-        const twData = await twitterAPI.getStatus();
-        let tweets = [];
-
-        if (twData?.twitter_user_id) {
-          try {
-            tweets = await twitterAPI.getTweets(0, 100) || [];
-          } catch (e) {
-            console.error('Twitter tweets fetch error:', e);
-          }
-        }
-
-        setSnsStatus(prev => ({
-          ...prev,
-          twitter: { loading: false, connected: !!twData?.twitter_user_id, data: twData, tweets }
-        }));
-      } catch {
-        setSnsStatus(prev => ({
-          ...prev,
-          twitter: { loading: false, connected: false, data: null, tweets: [] }
-        }));
-      }
-
-      setStatsLoading(false);
-    };
-
-    fetchSNSData();
+    setRefreshing(false);
   }, []);
 
-  // 숫자 포맷팅
-  const formatNumber = (num) => {
-    if (!num) return '0';
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return num.toLocaleString();
+  useEffect(() => {
+    fetchSNSData();
+  }, [fetchSNSData]);
+
+  // 통계 데이터 계산
+  const getStatsData = (valueGetter, valueKey) => {
+    return PLATFORM_ORDER
+      .map(key => {
+        const stateKey = key === 'x' ? 'twitter' : key;
+        const status = snsStatus[stateKey];
+        const config = PLATFORM_CONFIG[key];
+        return {
+          id: key,
+          [valueKey]: valueGetter(config, status),
+          connected: status.connected,
+        };
+      })
+      .filter(p => p.connected);
   };
 
-  // 통계 계산
-  const calculateStats = () => {
-    const { youtube, facebook, instagram, twitter } = snsStatus;
+  const platformFollowers = getStatsData((config, status) => config.getFollowers(status.data), 'followers');
+  const platformContents = getStatsData((config) => {
+    const stateKey = config.key === 'x' ? 'twitter' : config.key;
+    return config.key === 'youtube'
+      ? snsStatus[stateKey].videos?.length || 0
+      : snsStatus[stateKey].posts?.length || 0;
+  }, 'contents');
+  const platformViews = getStatsData((config, status) => config.getViews(status.data), 'views');
 
-    // 총 콘텐츠 수 (YouTube 동영상 + Facebook 게시물 + Instagram 게시물 + X 트윗)
-    const totalContents =
-      (youtube.videos?.length || 0) +
-      (facebook.posts?.length || 0) +
-      (instagram.posts?.length || 0) +
-      (twitter.tweets?.length || 0);
+  const totalFollowers = platformFollowers.reduce((sum, p) => sum + p.followers, 0);
+  const totalContents = platformContents.reduce((sum, p) => sum + p.contents, 0);
+  const totalViews = platformViews.reduce((sum, p) => sum + p.views, 0);
 
-    // 이번 주 생성 콘텐츠 (최근 7일 내 생성된 콘텐츠)
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-    const thisWeekContents = [
-      ...(youtube.videos || []).filter(v => new Date(v.published_at) >= oneWeekAgo),
-      ...(facebook.posts || []).filter(p => new Date(p.created_time) >= oneWeekAgo),
-      ...(instagram.posts || []).filter(p => new Date(p.timestamp) >= oneWeekAgo),
-      ...(twitter.tweets || []).filter(t => new Date(t.created_at) >= oneWeekAgo),
-    ].length;
-
-    // 총 팔로워/구독자 수
-    const totalFollowers =
-      (youtube.data?.subscriber_count || 0) +
-      (facebook.data?.page_followers_count || 0) +
-      (instagram.data?.followers_count || 0) +
-      (twitter.data?.followers_count || 0);
-
-    // 총 조회수/노출수
-    const totalViews = youtube.data?.view_count || 0;
-
-    // 연동된 SNS 수
-    const connectedCount = [youtube, facebook, instagram, twitter].filter(s => s.connected).length;
-
-    return {
-      totalContents,
-      thisWeekContents,
-      totalFollowers,
-      totalViews,
-      connectedCount,
-    };
-  };
-
-  const calculatedStats = calculateStats();
-
-  const stats = [
-    {
-      label: '총 콘텐츠',
-      value: statsLoading ? '-' : formatNumber(calculatedStats.totalContents),
-      subLabel: 'YouTube + Facebook + Instagram + X'
-    },
-    {
-      label: '이번 주 생성',
-      value: statsLoading ? '-' : formatNumber(calculatedStats.thisWeekContents),
-      subLabel: '최근 7일'
-    },
-    {
-      label: '총 팔로워',
-      value: statsLoading ? '-' : formatNumber(calculatedStats.totalFollowers),
-      subLabel: '전체 채널 합계'
-    },
-    {
-      label: '총 조회수',
-      value: statsLoading ? '-' : formatNumber(calculatedStats.totalViews),
-      subLabel: 'YouTube 채널'
-    },
-  ];
-
-  // 연동된 SNS가 없는 경우 안내 메시지
-  const hasNoConnections = !statsLoading && calculatedStats.connectedCount === 0;
-
-  // 시간대별 인사말
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return '좋은 아침이에요';
-    if (hour < 18) return '좋은 오후예요';
-    return '좋은 저녁이에요';
-  };
+  // 플랫폼 목록 (카드용)
+  const platforms = PLATFORM_ORDER.map(key => ({
+    ...PLATFORM_CONFIG[key],
+    status: snsStatus[key === 'x' ? 'twitter' : key],
+  }));
 
   return (
     <div className="dashboard">
@@ -238,76 +302,62 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="stats-grid">
-        {stats.map((stat, index) => (
-          <div key={index} className="stat-card">
-            <div className="stat-content">
-              <div className="stat-label">{stat.label}</div>
-              <div className="stat-value">
-                {statsLoading ? (
-                  <span className="stat-loading"></span>
-                ) : (
-                  stat.value
-                )}
-              </div>
-              {stat.subLabel && (
-                <div className="stat-sub-label">{stat.subLabel}</div>
-              )}
-            </div>
-          </div>
-        ))}
+      {/* 플랫폼별 통계 그래프 */}
+      <div className="dashboard-charts">
+        <StatsCard
+          title="총 팔로워"
+          subtitle="연동된 플랫폼의 총 팔로워"
+          data={platformFollowers}
+          total={totalFollowers}
+          valueKey="followers"
+        />
+        <StatsCard
+          title="총 콘텐츠"
+          subtitle="연동된 플랫폼의 총 콘텐츠"
+          data={platformContents}
+          total={totalContents}
+          valueKey="contents"
+        />
+        <StatsCard
+          title="총 조회수"
+          subtitle="연동된 플랫폼의 총 조회/노출"
+          data={platformViews}
+          total={totalViews}
+          valueKey="views"
+        />
       </div>
 
-      {hasNoConnections && (
-        <div className="no-connection-notice">
-          <p>SNS 계정을 연동하면 실제 통계를 확인할 수 있습니다.</p>
-        </div>
-      )}
-
       <div className="dashboard-content">
-        <div className="content-section">
-          <div className="section-title">
-            <h3>최근 콘텐츠</h3>
-            <button className="view-all-btn" onClick={() => navigate('/content/list')}>
-              전체보기 →
+        {/* SNS 연동 상태 섹션 */}
+        <div className="sns-connection-section">
+          <SectionHeader
+            title="SNS 연동 상태"
+            description="각 플랫폼을 클릭하여 상세 정보를 확인하거나 연동하세요"
+          >
+            <button
+              className={`sns-refresh-btn ${refreshing ? 'spinning' : ''}`}
+              onClick={fetchSNSData}
+              disabled={refreshing}
+            >
+              <FiRefreshCw />
             </button>
-          </div>
-          <div className="content-list">
-            {recentContents.map((content) => (
-              <div key={content.id} className="content-item">
-                <div className="content-info">
-                  <h4>{content.title}</h4>
-                  <div className="content-meta">
-                    <span className="content-type">{content.type}</span>
-                    <span className="meta-divider">•</span>
-                    <span className="content-date">{content.date}</span>
-                  </div>
-                </div>
-                <span className={`content-status status-${content.status}`}>
-                  {content.status}
-                </span>
-              </div>
+          </SectionHeader>
+          <div className="sns-platform-grid">
+            {platforms.map((platform) => (
+              <PlatformCard key={platform.key} platform={platform} status={platform.status} />
             ))}
           </div>
-          {recentContents.length === 0 && (
-            <div className="empty-state">
-              <p>아직 생성된 콘텐츠가 없어요</p>
-              <button className="create-first-btn" onClick={() => navigate('/content/ai-generator')}>
-                첫 콘텐츠 만들기
-              </button>
-            </div>
-          )}
         </div>
 
+        {/* 빠른 작업 */}
         <div className="quick-actions">
-          <h3>빠른 작업</h3>
+          <SectionHeader
+            title="빠른 작업"
+            description="자주 사용하는 기능에 빠르게 접근하세요"
+          />
           <div className="action-buttons">
             {quickActions.map((action, index) => (
-              <button
-                key={index}
-                className="action-btn"
-                onClick={() => navigate(action.path)}
-              >
+              <button key={index} className="action-btn" onClick={() => navigate(action.path)}>
                 <div className="action-text">
                   <span className="action-label">{action.label}</span>
                   <span className="action-desc">{action.desc}</span>
