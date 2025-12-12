@@ -47,18 +47,8 @@
 }
 
 .dashboard .sns-platform-card {
-  background: var(--bg-primary);
-  border: none;
-  border-radius: 5px;
-  padding: var(--space-md) var(--space-lg);
-  transition: all 0.25s ease;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-lg);
-  position: relative;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  flex-direction: row;
 }
 
 /* 연동됨 상태 */
@@ -345,7 +335,11 @@
   align-items: center;
 }
 
-/* Quick Actions */
+/* ==========================================
+   공통 섹션 스타일 (SNS Connection & Quick Actions)
+   ========================================== */
+
+.sns-connection-section,
 .quick-actions {
   background: var(--bg-primary);
   border: var(--border-thin) solid var(--border-color);
@@ -356,19 +350,35 @@
   flex-direction: column;
 }
 
-.quick-actions h3 {
+.sns-connection-section .section-title,
+.quick-actions .section-title {
+  margin-bottom: var(--space-sm);
+}
+
+.sns-connection-section .section-title h3,
+.quick-actions .section-title h3 {
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 var(--space-sm) 0;
+  margin: 0;
 }
 
-.action-buttons {
+.sns-connection-section .section-title-left,
+.quick-actions .section-title-left {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 2px;
 }
 
+.sns-connection-section .section-description,
+.quick-actions .section-description {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* 공통 카드 아이템 스타일 (SNS Card & Action Button) */
+.dashboard .sns-platform-card,
 .action-btn {
   display: flex;
   align-items: center;
@@ -379,9 +389,18 @@
   background: var(--bg-secondary);
   cursor: pointer;
   transition: all 0.25s ease;
-  text-align: left;
   position: relative;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.action-btn {
+  text-align: left;
 }
 
 .action-btn:hover {
@@ -406,40 +425,7 @@
   color: var(--text-tertiary);
 }
 
-/* SNS Connection Section */
-.sns-connection-section {
-  background: var(--bg-primary);
-  border: var(--border-thin) solid var(--border-color);
-  border-radius: var(--radius-lg);
-  padding: var(--space-md);
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-}
-
-.sns-connection-section .section-title {
-  margin-bottom: var(--space-sm);
-}
-
-.sns-connection-section .section-title h3 {
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.sns-connection-section .section-title-left {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sns-connection-section .section-description {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin: 0;
-}
-
+/* SNS Connection Section - 고유 스타일 */
 .sns-refresh-btn {
   background: var(--bg-secondary);
   border: var(--border-thin) solid var(--border-color);
@@ -500,12 +486,14 @@
     font-size: var(--text-xl);
   }
 
+  /* 공통 섹션 반응형 */
   .sns-connection-section,
   .quick-actions {
     padding: var(--space-sm);
     border-radius: var(--radius-md);
   }
 
+  /* 공통 카드 아이템 반응형 */
   .dashboard .sns-platform-card,
   .action-btn {
     padding: var(--space-sm) var(--space-md);
