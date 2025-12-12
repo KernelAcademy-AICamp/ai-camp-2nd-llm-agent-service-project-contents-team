@@ -428,6 +428,132 @@ export const threadsAPI = {
 };
 
 // ==========================================
+// TikTok API
+// ==========================================
+export const tiktokAPI = {
+  // 연동 상태 확인
+  getStatus: async () => {
+    const response = await api.get('/api/tiktok/status');
+    return response.data;
+  },
+
+  // 연동 해제
+  disconnect: async () => {
+    const response = await api.delete('/api/tiktok/disconnect');
+    return response.data;
+  },
+
+  // 계정 정보 새로고침
+  refresh: async () => {
+    const response = await api.post('/api/tiktok/refresh');
+    return response.data;
+  },
+
+  // 동영상 목록 조회
+  getVideos: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/tiktok/videos?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 동영상 동기화
+  syncVideos: async () => {
+    const response = await api.post('/api/tiktok/videos/sync');
+    return response.data;
+  },
+
+  // 동영상 업로드
+  uploadVideo: async (data) => {
+    const response = await api.post('/api/tiktok/videos/upload', data);
+    return response.data;
+  },
+
+  // 분석 데이터
+  getAnalytics: async () => {
+    const response = await api.get('/api/tiktok/analytics');
+    return response.data;
+  },
+};
+
+// ==========================================
+// WordPress API
+// ==========================================
+export const wordpressAPI = {
+  // 연동
+  connect: async (data) => {
+    const response = await api.post('/api/wordpress/connect', data);
+    return response.data;
+  },
+
+  // 연동 상태 확인
+  getStatus: async () => {
+    const response = await api.get('/api/wordpress/status');
+    return response.data;
+  },
+
+  // 연동 해제
+  disconnect: async () => {
+    const response = await api.delete('/api/wordpress/disconnect');
+    return response.data;
+  },
+
+  // 사이트 정보 새로고침
+  refresh: async () => {
+    const response = await api.post('/api/wordpress/refresh');
+    return response.data;
+  },
+
+  // 카테고리 목록
+  getCategories: async () => {
+    const response = await api.get('/api/wordpress/categories');
+    return response.data;
+  },
+
+  // 글 목록 조회
+  getPosts: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/wordpress/posts?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 글 동기화
+  syncPosts: async () => {
+    const response = await api.post('/api/wordpress/posts/sync');
+    return response.data;
+  },
+
+  // 글 작성
+  createPost: async (data) => {
+    const response = await api.post('/api/wordpress/posts/create', data);
+    return response.data;
+  },
+
+  // 글 수정
+  updatePost: async (postId, data) => {
+    const response = await api.put(`/api/wordpress/posts/${postId}`, data);
+    return response.data;
+  },
+
+  // 글 삭제
+  deletePost: async (postId) => {
+    const response = await api.delete(`/api/wordpress/posts/${postId}`);
+    return response.data;
+  },
+
+  // 미디어 업로드
+  uploadMedia: async (formData) => {
+    const response = await api.post('/api/wordpress/media/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // 분석 데이터
+  getAnalytics: async () => {
+    const response = await api.get('/api/wordpress/analytics');
+    return response.data;
+  },
+};
+
+// ==========================================
 // AI 콘텐츠 API (레거시)
 // ==========================================
 export const aiContentAPI = {
@@ -592,6 +718,17 @@ export const publishedContentAPI = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data;
+  },
+};
+
+// ==========================================
+// Dashboard API (통합 상태 조회)
+// ==========================================
+export const dashboardAPI = {
+  // 모든 플랫폼 상태 한 번에 조회
+  getAllStatus: async () => {
+    const response = await api.get('/api/dashboard/status');
     return response.data;
   },
 };

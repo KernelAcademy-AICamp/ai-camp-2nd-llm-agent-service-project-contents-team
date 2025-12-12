@@ -116,10 +116,9 @@ def test_connection():
         print()
         print("💡 Troubleshooting tips:")
         print("   1. Check DATABASE_URL in .env file")
-        print("   2. Verify Cloud SQL instance is running")
-        print("   3. Check firewall rules (authorized networks)")
-        print("   4. Confirm database name exists")
-        print("   5. Verify username and password")
+        print("   2. Verify Supabase project is running")
+        print("   3. Confirm database name exists")
+        print("   4. Verify username and password")
         print()
         sys.exit(1)
     finally:

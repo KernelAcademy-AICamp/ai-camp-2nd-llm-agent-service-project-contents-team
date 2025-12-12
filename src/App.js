@@ -24,6 +24,8 @@ import Facebook from './pages/connection_SNS/facebook/Facebook';
 import Instagram from './pages/connection_SNS/instagram/Instagram';
 import X from './pages/connection_SNS/x/X';
 import Threads from './pages/connection_SNS/threads/Threads';
+import TikTok from './pages/connection_SNS/tiktok/TikTok';
+import WordPress from './pages/connection_SNS/wordpress/WordPress';
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import DeleteData from './pages/legal/DeleteData';
 import './App.css';
@@ -216,6 +218,26 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Threads />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tiktok"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TikTok />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wordpress"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <WordPress />
                 </Layout>
               </ProtectedRoute>
             }

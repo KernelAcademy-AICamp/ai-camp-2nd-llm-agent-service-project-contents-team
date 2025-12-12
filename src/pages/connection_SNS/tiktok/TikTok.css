@@ -1,0 +1,252 @@
+/* TikTok 페이지 스타일 */
+.tiktok-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* TikTok 연동 버튼 */
+.btn-connect-tiktok {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #000000;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-connect-tiktok:hover {
+  background: #333333;
+}
+
+/* 동영상 그리드 */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* 동영상 카드 */
+.video-card {
+  background: var(--card-bg, #ffffff);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-color, #e5e7eb);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.video-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* 동영상 썸네일 */
+.video-thumbnail {
+  position: relative;
+  aspect-ratio: 9/16;
+  background: #000;
+  overflow: hidden;
+}
+
+.video-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #25f4ee, #fe2c55);
+  color: white;
+}
+
+.video-duration {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 동영상 정보 */
+.video-info {
+  padding: 16px;
+}
+
+.video-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--text-primary, #1f2937);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.video-description {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0 0 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.video-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 12px;
+}
+
+.video-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.video-date {
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+}
+
+.view-on-tiktok {
+  font-size: 12px;
+  color: #fe2c55;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.view-on-tiktok:hover {
+  text-decoration: underline;
+}
+
+/* 업로드 섹션 */
+.upload-section {
+  background: var(--card-bg, #ffffff);
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.upload-section h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: var(--text-primary, #1f2937);
+}
+
+.upload-notice {
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0 0 20px;
+  padding: 12px;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 8px;
+}
+
+.upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.upload-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.upload-form label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1f2937);
+}
+
+.upload-form input,
+.upload-form textarea {
+  padding: 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.upload-form input:focus,
+.upload-form textarea:focus {
+  outline: none;
+  border-color: #fe2c55;
+}
+
+.upload-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+.btn-upload {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #25f4ee, #fe2c55);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-upload:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btn-upload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* TikTok 탭 색상 */
+.tab-navigation.tiktok .tab-btn.active {
+  color: #fe2c55;
+  border-bottom-color: #fe2c55;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .tiktok-page {
+    padding: 16px;
+  }
+
+  .video-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+  }
+
+  .video-info {
+    padding: 12px;
+  }
+
+  .video-stats {
+    gap: 8px;
+    font-size: 11px;
+  }
+}

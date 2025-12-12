@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { MdDashboard, MdAdd, MdFolder, MdStyle, MdSettings, MdHome } from 'react-icons/md';
-import { FaYoutube, FaFacebook, FaInstagram, FaXTwitter } from 'react-icons/fa6';
+import { FaYoutube, FaFacebook, FaInstagram, FaXTwitter, FaTiktok, FaWordpress } from 'react-icons/fa6';
 import { SiThreads } from 'react-icons/si';
-import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI } from '../services/api';
+import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI, tiktokAPI, wordpressAPI } from '../services/api';
 import './Sidebar.css';
 
 // 메뉴 아이템 렌더링 컴포넌트
@@ -21,6 +21,8 @@ const PLATFORMS = [
   { key: 'instagram', path: '/instagram', label: 'Instagram', icon: FaInstagram },
   { key: 'threads', path: '/threads', label: 'Threads', icon: SiThreads },
   { key: 'x', path: '/x', label: 'X', icon: FaXTwitter },
+  { key: 'tiktok', path: '/tiktok', label: 'TikTok', icon: FaTiktok },
+  { key: 'wordpress', path: '/wordpress', label: 'WordPress', icon: FaWordpress },
 ];
 
 // 메뉴 설정
@@ -53,12 +55,14 @@ function Sidebar({ onHoverChange }) {
   useEffect(() => {
     const fetchPlatformStatus = async () => {
       try {
-        const [youtube, facebook, instagram, threads, x] = await Promise.all([
+        const [youtube, facebook, instagram, threads, x, tiktok, wordpress] = await Promise.all([
           youtubeAPI.getStatus().catch(() => null),
           facebookAPI.getStatus().catch(() => null),
           instagramAPI.getStatus().catch(() => null),
           threadsAPI.getStatus().catch(() => null),
           twitterAPI.getStatus().catch(() => null),
+          tiktokAPI.getStatus().catch(() => null),
+          wordpressAPI.getStatus().catch(() => null),
         ]);
 
         setConnectedPlatforms({
@@ -67,6 +71,8 @@ function Sidebar({ onHoverChange }) {
           instagram: !!(instagram?.instagram_account_id),
           threads: !!threads,
           x: !!x,
+          tiktok: !!tiktok,
+          wordpress: !!wordpress,
         });
       } catch (error) {
         console.error('Failed to fetch platform status:', error);

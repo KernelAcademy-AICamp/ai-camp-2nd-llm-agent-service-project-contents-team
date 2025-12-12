@@ -47,6 +47,8 @@ class User(Base):
     instagram_connection = relationship("InstagramConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     x_connection = relationship("XConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     threads_connection = relationship("ThreadsConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    tiktok_connection = relationship("TikTokConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    wordpress_connection = relationship("WordPressConnection", back_populates="user", uselist=False, cascade="all, delete-orphan")
     content_sessions = relationship("ContentGenerationSession", back_populates="user", cascade="all, delete-orphan")
 
 
@@ -980,3 +982,172 @@ class PublishedContent(Base):
     # Relationships
     user = relationship("User")
     session = relationship("ContentGenerationSession")
+
+
+class TikTokConnection(Base):
+    """
+    TikTok 비즈니스 계정 연동 정보 모델
+    - TikTok for Business API를 사용한 OAuth 2.0 연동
+    """
+    __tablename__ = "tiktok_connections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+
+    # TikTok 사용자 정보
+    tiktok_user_id = Column(String, nullable=False, index=True)  # TikTok 사용자 ID (open_id)
+    union_id = Column(String, nullable=True)  # TikTok Union ID
+    username = Column(String, nullable=True)  # @username (display_name)
+    avatar_url = Column(String, nullable=True)  # 프로필 이미지 URL
+    bio_description = Column(Text, nullable=True)  # 자기소개
+    profile_deep_link = Column(String, nullable=True)  # 프로필 딥링크
+
+    # 계정 통계
+    follower_count = Column(Integer, default=0)
+    following_count = Column(Integer, default=0)
+    likes_count = Column(Integer, default=0)  # 받은 좋아요 수
+    video_count = Column(Integer, default=0)
+
+    # OAuth 2.0 토큰 정보
+    access_token = Column(Text, nullable=False)
+    refresh_token = Column(Text, nullable=True)
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    # 연동 상태
+    is_active = Column(Boolean, default=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="tiktok_connection")
+    videos = relationship("TikTokVideo", back_populates="connection", cascade="all, delete-orphan")
+
+
+class TikTokVideo(Base):
+    """
+    TikTok 동영상 모델
+    - 연동된 계정의 동영상 목록 및 통계
+    """
+    __tablename__ = "tiktok_videos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    connection_id = Column(Integer, ForeignKey("tiktok_connections.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # 동영상 기본 정보
+    video_id = Column(String, nullable=False, unique=True, index=True)  # TikTok 동영상 ID
+    title = Column(String, nullable=True)  # 동영상 제목
+    description = Column(Text, nullable=True)  # 동영상 설명
+    cover_image_url = Column(String, nullable=True)  # 커버 이미지 URL
+    share_url = Column(String, nullable=True)  # 공유 URL
+    embed_link = Column(String, nullable=True)  # 임베드 링크
+    duration = Column(Integer, nullable=True)  # 동영상 길이 (초)
+    create_time = Column(DateTime(timezone=True), nullable=True)  # 업로드 시간
+
+    # 동영상 통계
+    view_count = Column(Integer, default=0)
+    like_count = Column(Integer, default=0)
+    comment_count = Column(Integer, default=0)
+    share_count = Column(Integer, default=0)
+
+    # 동기화 정보
+    last_stats_updated_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    connection = relationship("TikTokConnection", back_populates="videos")
+
+
+class WordPressConnection(Base):
+    """
+    WordPress 사이트 연동 정보 모델
+    - WordPress REST API를 사용한 Application Password 또는 OAuth 연동
+    """
+    __tablename__ = "wordpress_connections"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+
+    # WordPress 사이트 정보
+    site_url = Column(String, nullable=False)  # WordPress 사이트 URL
+    site_name = Column(String, nullable=True)  # 사이트 이름
+    site_description = Column(Text, nullable=True)  # 사이트 설명
+    site_icon_url = Column(String, nullable=True)  # 사이트 아이콘
+
+    # WordPress 사용자 정보
+    wp_user_id = Column(Integer, nullable=True)  # WordPress 사용자 ID
+    wp_username = Column(String, nullable=True)  # WordPress 사용자명
+    wp_display_name = Column(String, nullable=True)  # 표시 이름
+    wp_email = Column(String, nullable=True)  # 이메일
+    wp_avatar_url = Column(String, nullable=True)  # 아바타 URL
+
+    # 인증 정보 (Application Password 방식)
+    wp_app_password = Column(Text, nullable=True)  # Application Password (암호화 저장)
+
+    # 사이트 통계
+    post_count = Column(Integer, default=0)  # 게시물 수
+    page_count = Column(Integer, default=0)  # 페이지 수
+    category_count = Column(Integer, default=0)  # 카테고리 수
+
+    # 카테고리 캐싱
+    categories = Column(JSON, nullable=True)  # [{"id": 1, "name": "...", "slug": "..."}, ...]
+
+    # 연동 상태
+    is_active = Column(Boolean, default=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", back_populates="wordpress_connection")
+    posts = relationship("WordPressPost", back_populates="connection", cascade="all, delete-orphan")
+
+
+class WordPressPost(Base):
+    """
+    WordPress 게시물 모델
+    - 연동된 사이트의 게시물 목록 및 통계
+    """
+    __tablename__ = "wordpress_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    connection_id = Column(Integer, ForeignKey("wordpress_connections.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # 게시물 기본 정보
+    wp_post_id = Column(Integer, nullable=False, index=True)  # WordPress 게시물 ID
+    title = Column(String, nullable=False)  # 게시물 제목
+    content = Column(Text, nullable=True)  # 게시물 본문
+    excerpt = Column(Text, nullable=True)  # 요약
+    slug = Column(String, nullable=True)  # URL 슬러그
+    post_url = Column(String, nullable=True)  # 게시물 URL
+    featured_image_url = Column(String, nullable=True)  # 대표 이미지 URL
+
+    # 게시물 상태
+    status = Column(String, nullable=True)  # publish, draft, pending, private
+    post_type = Column(String, default="post")  # post, page
+
+    # 카테고리/태그
+    categories = Column(JSON, nullable=True)  # [{"id": 1, "name": "..."}]
+    tags = Column(JSON, nullable=True)  # [{"id": 1, "name": "..."}]
+
+    # 날짜 정보
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    modified_at = Column(DateTime(timezone=True), nullable=True)
+
+    # 통계 (있는 경우)
+    comment_count = Column(Integer, default=0)
+
+    # 동기화 정보
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    connection = relationship("WordPressConnection", back_populates="posts")
