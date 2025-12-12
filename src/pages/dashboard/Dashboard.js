@@ -189,74 +189,77 @@ function Dashboard() {
     { label: '콘텐츠 관리', path: '/contents', desc: '임시저장/발행 콘텐츠 관리' },
   ];
 
-  // SNS 데이터 fetch 헬퍼
-  const fetchPlatformData = async (api, connectedCheck, extraFetch) => {
-    try {
-      const data = await api.getStatus();
-      const isConnected = connectedCheck(data);
-      let extra = {};
-
-      if (isConnected && extraFetch) {
-        extra = await extraFetch(api, data);
-      }
-
-      return { loading: false, connected: isConnected, data, ...extra };
-    } catch {
-      return { loading: false, connected: false, data: null, posts: [] };
-    }
-  };
-
-  const fetchSNSData = useCallback(async () => {
+  // 1단계: 연동 상태만 빠르게 조회
+  const fetchConnectionStatus = useCallback(async () => {
     setRefreshing(true);
 
-    const results = await Promise.all([
-      // YouTube
-      fetchPlatformData(youtubeAPI, d => !!d, async (api) => {
-        let videos = [], analytics = null;
-        try { videos = await api.getVideos(0, 100) || []; } catch {}
-        try { analytics = await api.getAnalyticsSummary(); } catch {}
-        return { videos, analytics };
-      }),
-      // Facebook
-      fetchPlatformData(facebookAPI, d => !!d?.page_id, async (api) => {
-        let posts = [];
-        try { posts = await api.getPosts(0, 100) || []; } catch {}
-        return { posts };
-      }),
-      // Instagram
-      fetchPlatformData(instagramAPI, d => !!d?.instagram_account_id, async (api) => {
-        let posts = [];
-        try { posts = await api.getPosts(0, 100) || []; } catch {}
-        return { posts };
-      }),
-      // X (Twitter)
-      fetchPlatformData(twitterAPI, d => !!d?.x_user_id, async (api) => {
-        let posts = [];
-        try { posts = await api.getPosts(0, 100) || []; } catch {}
-        return { posts };
-      }),
-      // Threads
-      fetchPlatformData(threadsAPI, d => !!d, async (api) => {
-        let posts = [];
-        try { posts = await api.getPosts(0, 100) || []; } catch {}
-        return { posts };
-      }),
+    const statusResults = await Promise.all([
+      youtubeAPI.getStatus().catch(() => null),
+      facebookAPI.getStatus().catch(() => null),
+      instagramAPI.getStatus().catch(() => null),
+      twitterAPI.getStatus().catch(() => null),
+      threadsAPI.getStatus().catch(() => null),
     ]);
 
-    setSnsStatus({
-      youtube: results[0],
-      facebook: results[1],
-      instagram: results[2],
-      twitter: results[3],
-      threads: results[4],
-    });
+    const [youtube, facebook, instagram, twitter, threads] = statusResults;
+
+    setSnsStatus(prev => ({
+      youtube: { ...prev.youtube, loading: false, connected: !!youtube, data: youtube },
+      facebook: { ...prev.facebook, loading: false, connected: !!facebook?.page_id, data: facebook },
+      instagram: { ...prev.instagram, loading: false, connected: !!instagram?.instagram_account_id, data: instagram },
+      twitter: { ...prev.twitter, loading: false, connected: !!twitter?.x_user_id, data: twitter },
+      threads: { ...prev.threads, loading: false, connected: !!threads, data: threads },
+    }));
 
     setRefreshing(false);
+
+    // 2단계: 연동된 플랫폼의 추가 데이터를 백그라운드에서 조회
+    const connectedPlatforms = {
+      youtube: !!youtube,
+      facebook: !!facebook?.page_id,
+      instagram: !!instagram?.instagram_account_id,
+      twitter: !!twitter?.x_user_id,
+      threads: !!threads,
+    };
+
+    // 백그라운드에서 콘텐츠 개수 조회 (10개만 가져와서 개수 파악)
+    if (connectedPlatforms.youtube) {
+      Promise.all([
+        youtubeAPI.getVideos(0, 10).catch(() => []),
+        youtubeAPI.getAnalyticsSummary().catch(() => null),
+      ]).then(([videos, analytics]) => {
+        setSnsStatus(prev => ({ ...prev, youtube: { ...prev.youtube, videos, analytics } }));
+      });
+    }
+
+    if (connectedPlatforms.facebook) {
+      facebookAPI.getPosts(0, 10).catch(() => []).then(posts => {
+        setSnsStatus(prev => ({ ...prev, facebook: { ...prev.facebook, posts } }));
+      });
+    }
+
+    if (connectedPlatforms.instagram) {
+      instagramAPI.getPosts(0, 10).catch(() => []).then(posts => {
+        setSnsStatus(prev => ({ ...prev, instagram: { ...prev.instagram, posts } }));
+      });
+    }
+
+    if (connectedPlatforms.twitter) {
+      twitterAPI.getPosts(0, 10).catch(() => []).then(posts => {
+        setSnsStatus(prev => ({ ...prev, twitter: { ...prev.twitter, posts } }));
+      });
+    }
+
+    if (connectedPlatforms.threads) {
+      threadsAPI.getPosts(0, 10).catch(() => []).then(posts => {
+        setSnsStatus(prev => ({ ...prev, threads: { ...prev.threads, posts } }));
+      });
+    }
   }, []);
 
   useEffect(() => {
-    fetchSNSData();
-  }, [fetchSNSData]);
+    fetchConnectionStatus();
+  }, [fetchConnectionStatus]);
 
   // 통계 데이터 계산
   const getStatsData = (valueGetter, valueKey) => {
@@ -336,7 +339,7 @@ function Dashboard() {
           >
             <button
               className={`sns-refresh-btn ${refreshing ? 'spinning' : ''}`}
-              onClick={fetchSNSData}
+              onClick={fetchConnectionStatus}
               disabled={refreshing}
             >
               <FiRefreshCw />

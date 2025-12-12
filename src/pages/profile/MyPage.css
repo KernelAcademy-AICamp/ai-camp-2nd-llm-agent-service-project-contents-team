@@ -97,7 +97,7 @@
 }
 
 .info-card:nth-child(3) {
-  border-left-color: var(--bauhaus-blue);
+  border-left-color: var(--info-color);
 }
 
 .info-card:hover {

@@ -240,7 +240,7 @@
   margin-top: var(--space-lg);
   padding: var(--space-lg);
   background: var(--bg-secondary);
-  border-left: 3px solid var(--bauhaus-blue);
+  border-left: 3px solid var(--info-color);
 }
 
 .info-box h4 {

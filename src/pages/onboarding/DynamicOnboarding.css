@@ -369,7 +369,7 @@
   position: absolute;
   top: -10px;
   left: var(--space-md);
-  background: var(--bauhaus-blue);
+  background: var(--info-color);
   color: white;
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
@@ -466,7 +466,7 @@
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
-  background: var(--bauhaus-blue);
+  background: var(--info-color);
   color: white;
   font-size: 13px;
   font-weight: 600;
@@ -680,7 +680,7 @@
 }
 
 .no-button:hover {
-  border-color: var(--bauhaus-blue);
+  border-color: var(--info-color);
   background: linear-gradient(135deg, var(--bg-primary) 0%, var(--info-light) 100%);
 }
 

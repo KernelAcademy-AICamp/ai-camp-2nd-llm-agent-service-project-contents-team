@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api, { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI } from '../../services/api';
+import api from '../../services/api';
 import './Settings.css';
 
 function Settings() {
   const navigate = useNavigate();
-  const [youtubeConnection, setYoutubeConnection] = useState(null);
-  const [facebookConnection, setFacebookConnection] = useState(null);
-  const [instagramConnection, setInstagramConnection] = useState(null);
-  const [twitterConnection, setTwitterConnection] = useState(null);
-  const [threadsConnection, setThreadsConnection] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState({ open: false, type: null });
@@ -26,51 +21,6 @@ function Settings() {
   };
 
   useEffect(() => {
-    const fetchYoutubeStatus = async () => {
-      try {
-        const data = await youtubeAPI.getStatus();
-        setYoutubeConnection(data);
-      } catch (err) {
-        console.error('Failed to fetch YouTube status:', err);
-      }
-    };
-
-    const fetchFacebookStatus = async () => {
-      try {
-        const data = await facebookAPI.getStatus();
-        setFacebookConnection(data);
-      } catch (err) {
-        console.error('Failed to fetch Facebook status:', err);
-      }
-    };
-
-    const fetchInstagramStatus = async () => {
-      try {
-        const data = await instagramAPI.getStatus();
-        setInstagramConnection(data);
-      } catch (err) {
-        console.error('Failed to fetch Instagram status:', err);
-      }
-    };
-
-    const fetchTwitterStatus = async () => {
-      try {
-        const data = await twitterAPI.getStatus();
-        setTwitterConnection(data);
-      } catch (err) {
-        console.error('Failed to fetch X status:', err);
-      }
-    };
-
-    const fetchThreadsStatus = async () => {
-      try {
-        const data = await threadsAPI.getStatus();
-        setThreadsConnection(data);
-      } catch (err) {
-        console.error('Failed to fetch Threads status:', err);
-      }
-    };
-
     const fetchProfile = async () => {
       try {
         const response = await api.get('/api/user/profile');
@@ -82,11 +32,6 @@ function Settings() {
       }
     };
 
-    fetchYoutubeStatus();
-    fetchFacebookStatus();
-    fetchInstagramStatus();
-    fetchTwitterStatus();
-    fetchThreadsStatus();
     fetchProfile();
   }, []);
 
@@ -405,49 +350,6 @@ function Settings() {
           </div>
         </div>
       )}
-
-      {/* 소셜 미디어 플랫폼 */}
-      <div className="settings-section">
-        <div className="section-header">
-          <h3>소셜 미디어 플랫폼</h3>
-        </div>
-        <Link to="/sns-connections" className="account-link-card">
-          <div className="account-link-content">
-            <div className="account-link-title">SNS 연동 관리</div>
-            <div className="account-link-description">
-              {(() => {
-                const connectedCount = [
-                  youtubeConnection,
-                  facebookConnection?.page_id,
-                  instagramConnection?.instagram_account_id,
-                  twitterConnection?.twitter_user_id,
-                  threadsConnection?.threads_user_id,
-                ].filter(Boolean).length;
-                return connectedCount > 0
-                  ? `${connectedCount}개 플랫폼 연동됨 - YouTube, Facebook, Instagram, X, Threads`
-                  : '소셜 미디어 플랫폼을 연동하여 콘텐츠를 발행하세요';
-              })()}
-            </div>
-          </div>
-          <span className="account-link-arrow">→</span>
-        </Link>
-      </div>
-
-      {/* AI API 설정 */}
-      <div className="settings-section">
-        <div className="section-header">
-          <h3>AI 설정</h3>
-        </div>
-        <div className="api-info">
-          <p>현재 지원되는 AI 기능:</p>
-          <ul>
-            <li>AI 이미지 생성 (Google Gemini, Stable Diffusion)</li>
-            <li>프롬프트 최적화 (Claude, Gemini)</li>
-            <li>AI 동영상 제작 (개발 중)</li>
-          </ul>
-          <p className="mt-3">API 키는 <code>.env</code> 파일에서 관리됩니다.</p>
-        </div>
-      </div>
 
       {/* 수정 모달 */}
       {editModal.open && (

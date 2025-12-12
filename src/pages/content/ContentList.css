@@ -94,7 +94,7 @@
   max-width: 400px;
   padding: var(--space-md) var(--space-lg);
   border: var(--border-thin) solid var(--border-color);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   background: var(--bg-primary);
   font-size: var(--text-sm);
   color: var(--text-primary);
@@ -120,7 +120,7 @@
 .content-table-container {
   background: var(--bg-primary);
   border: var(--border-thin) solid var(--border-color);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-md);
   overflow: hidden;
   margin-bottom: var(--space-xl);
   box-shadow: var(--shadow-sm);
@@ -318,7 +318,7 @@
   text-align: center;
   padding: var(--space-4xl) var(--space-xl);
   background: var(--bg-primary);
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-md);
   border: 2px dashed var(--border-color);
 }
 
@@ -341,7 +341,7 @@
   background: var(--gradient-primary);
   color: var(--text-primary);
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
@@ -367,7 +367,7 @@
   padding: var(--space-sm) var(--space-lg);
   background: var(--bg-primary);
   border: var(--border-thin) solid var(--border-color);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-secondary);
@@ -445,7 +445,7 @@
 
   .content-table-container {
     overflow-x: auto;
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-sm);
   }
 
   .content-table {

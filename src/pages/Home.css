@@ -1,5 +1,5 @@
 /* ========================================
-   HOME PAGE (CHAT) - BAUHAUS STYLE
+   HOME PAGE (CHAT) - MODERN STYLE
    Geometric layout, bold typography
    ======================================== */
 
@@ -12,7 +12,7 @@
   overflow: hidden;
 }
 
-/* Chat History Sidebar - Bauhaus */
+/* Chat History Sidebar */
 .chat-sidebar {
   width: 260px;
   background: var(--bg-primary);
@@ -163,7 +163,7 @@
   background: rgba(231, 76, 60, 0.1);
 }
 
-/* Main Chat Area - Bauhaus */
+/* Main Chat Area */
 .chat-main {
   flex: 1;
   display: flex;
@@ -205,7 +205,7 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Welcome Screen - Bauhaus */
+/* Welcome Screen */
 .home-welcome {
   display: flex;
   flex-direction: column;
@@ -240,7 +240,7 @@
   margin: 0;
 }
 
-/* Guide Prompts - Bauhaus */
+/* Guide Prompts */
 .guide-prompts {
   width: 100%;
   max-width: 600px;
@@ -316,7 +316,7 @@
   }
 }
 
-/* Chat Messages - Bauhaus */
+/* Chat Messages */
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -370,7 +370,7 @@
   word-wrap: break-word;
 }
 
-/* Markdown Styling - Bauhaus */
+/* Markdown Styling */
 .message-text h1,
 .message-text h2,
 .message-text h3,
@@ -436,9 +436,9 @@
 }
 
 .message-text a {
-  color: var(--bauhaus-blue);
+  color: var(--info-color);
   text-decoration: none;
-  border-bottom: var(--border-thin) solid var(--bauhaus-blue);
+  border-bottom: var(--border-thin) solid var(--info-color);
   transition: border-color 0.15s ease;
 }
 
@@ -491,7 +491,7 @@
   border: var(--border-medium) solid var(--border-color);
 }
 
-/* Typing Indicator - Bauhaus */
+/* Typing Indicator */
 .typing-indicator {
   display: flex;
   gap: var(--space-xs);
@@ -617,7 +617,7 @@
   text-align: center;
 }
 
-/* Scrollbar Styling - Bauhaus minimal */
+/* Scrollbar Styling */
 .chat-messages::-webkit-scrollbar {
   width: 8px;
 }
@@ -634,7 +634,7 @@
   background: var(--secondary-color);
 }
 
-/* Content Tools Bar - Bauhaus */
+/* Content Tools Bar */
 .content-tools-bar {
   display: flex;
   align-items: center;
@@ -679,7 +679,7 @@
   text-transform: uppercase;
 }
 
-/* Follow-up Prompts - Bauhaus */
+/* Follow-up Prompts */
 .follow-up-prompts {
   margin-bottom: var(--space-md);
   padding: var(--space-md);
