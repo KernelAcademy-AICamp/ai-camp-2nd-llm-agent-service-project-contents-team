@@ -1151,3 +1151,89 @@ class WordPressPost(Base):
 
     # Relationships
     connection = relationship("WordPressConnection", back_populates="posts")
+
+
+# ============================================
+# 크레딧 시스템 테이블
+# ============================================
+
+class UserCredit(Base):
+    """
+    사용자 크레딧 잔액 모델
+    - 각 사용자의 현재 크레딧 잔액 관리
+    """
+    __tablename__ = "user_credits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+
+    # 크레딧 잔액
+    balance = Column(Integer, nullable=False, default=0)  # 현재 잔액
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", backref="credit")
+    transactions = relationship("CreditTransaction", back_populates="user_credit", cascade="all, delete-orphan")
+
+
+class CreditTransaction(Base):
+    """
+    크레딧 거래 내역 모델
+    - 모든 크레딧 충전/사용/보너스/환불 기록
+    """
+    __tablename__ = "credit_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_credit_id = Column(Integer, ForeignKey("user_credits.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # 거래 정보
+    amount = Column(Integer, nullable=False)  # +충전/보너스, -사용
+    type = Column(String(20), nullable=False)  # charge, use, bonus, refund
+    description = Column(String(255), nullable=True)  # 거래 설명 (예: '숏폼 영상 생성 (30초)', '회원가입 보너스')
+
+    # 잔액 스냅샷
+    balance_before = Column(Integer, nullable=False)  # 거래 전 잔액
+    balance_after = Column(Integer, nullable=False)  # 거래 후 잔액
+
+    # 참조 정보
+    reference_type = Column(String(50), nullable=True)  # video_generation, image_generation, cardnews, package_charge
+    reference_id = Column(String(100), nullable=True)  # 관련 콘텐츠/패키지 ID
+    package_id = Column(Integer, ForeignKey("credit_packages.id"), nullable=True)  # 충전 패키지 ID (충전 시)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    user_credit = relationship("UserCredit", back_populates="transactions")
+    user = relationship("User")
+    package = relationship("CreditPackage")
+
+
+class CreditPackage(Base):
+    """
+    크레딧 충전 패키지 모델
+    - 구매 가능한 크레딧 패키지 정의
+    """
+    __tablename__ = "credit_packages"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # 패키지 정보
+    name = Column(String(50), nullable=False)  # 패키지명 (스타터, 베이직, 프로, 엔터프라이즈)
+    description = Column(String(255), nullable=True)  # 패키지 설명
+    credits = Column(Integer, nullable=False)  # 기본 크레딧 수량
+    bonus_credits = Column(Integer, nullable=False, default=0)  # 보너스 크레딧
+    price = Column(Integer, nullable=False)  # 가격 (원화)
+
+    # 표시 정보
+    badge = Column(String(20), nullable=True)  # 뱃지 (인기, 추천, BEST 등)
+    is_popular = Column(Boolean, default=False)  # 인기 패키지 여부
+
+    # 상태
+    is_active = Column(Boolean, default=True)  # 활성화 여부
+    sort_order = Column(Integer, default=0)  # 정렬 순서
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

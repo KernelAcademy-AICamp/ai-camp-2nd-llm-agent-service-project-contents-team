@@ -733,6 +733,66 @@ export const dashboardAPI = {
   },
 };
 
+// ==========================================
+// 크레딧 API
+// ==========================================
+export const creditsAPI = {
+  // 잔액 조회
+  getBalance: async () => {
+    const response = await api.get('/api/credits/balance');
+    return response.data;
+  },
+
+  // 잔액 충분한지 확인
+  checkBalance: async (amount) => {
+    const response = await api.get(`/api/credits/check/${amount}`);
+    return response.data;
+  },
+
+  // 패키지 목록 조회
+  getPackages: async () => {
+    const response = await api.get('/api/credits/packages');
+    return response.data;
+  },
+
+  // 거래 내역 조회
+  getTransactions: async (limit = 50, offset = 0, type = null) => {
+    let url = `/api/credits/transactions?limit=${limit}&offset=${offset}`;
+    if (type) url += `&transaction_type=${type}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  // 크레딧 충전 (테스트용)
+  charge: async (packageId) => {
+    const response = await api.post('/api/credits/charge', { package_id: packageId });
+    return response.data;
+  },
+
+  // 크레딧 사용
+  use: async (amount, description, referenceType = null, referenceId = null) => {
+    const response = await api.post('/api/credits/use', {
+      amount,
+      description,
+      reference_type: referenceType,
+      reference_id: referenceId,
+    });
+    return response.data;
+  },
+
+  // 회원가입 보너스 받기
+  claimSignupBonus: async () => {
+    const response = await api.post('/api/credits/bonus/signup');
+    return response.data;
+  },
+
+  // 크레딧 비용 조회
+  getCosts: async () => {
+    const response = await api.get('/api/credits/costs');
+    return response.data;
+  },
+};
+
 // 호환성을 위한 별칭 (기존 코드에서 twitterAPI 사용하는 경우)
 export const twitterAPI = xAPI;
 

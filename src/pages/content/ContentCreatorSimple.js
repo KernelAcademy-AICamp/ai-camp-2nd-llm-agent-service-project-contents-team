@@ -3,22 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { FiCopy, FiArrowRight, FiEdit3 } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
-import api, { contentSessionAPI } from '../../services/api';
+import api, { contentSessionAPI, creditsAPI } from '../../services/api';
 import { generateAgenticContent } from '../../services/agenticService';
+import CreditChargeModal from '../../components/credits/CreditChargeModal';
 import './ContentCreatorSimple.css';
 
 // ========== 상수 정의 ==========
-const STYLES = [
-  { id: 'casual', label: '캐주얼', textTone: '친근하고 편안한 말투로, 이모지를 적절히 사용', imageStyle: 'casual lifestyle photography, warm natural lighting, relaxed atmosphere' },
-  { id: 'professional', label: '전문적', textTone: '전문적이고 신뢰감 있는 어조로, 정확한 정보 전달', imageStyle: 'professional corporate style, clean minimalist design, sophisticated lighting' },
-  { id: 'friendly', label: '친근한', textTone: '다정하고 따뜻한 말투로, 독자와 대화하듯', imageStyle: 'friendly warm tones, soft lighting, inviting and approachable mood' },
-  { id: 'formal', label: '격식체', textTone: '격식있고 품위있는 문체로, 존댓말 사용', imageStyle: 'formal elegant style, classic composition, refined and prestigious look' },
-  { id: 'trendy', label: '트렌디', textTone: 'MZ세대 감성으로, 신조어와 트렌디한 표현 사용', imageStyle: 'trendy modern aesthetic, vibrant colors, Gen-Z style, dynamic composition' },
-  { id: 'luxurious', label: '럭셔리', textTone: '고급스럽고 세련된 톤으로, 프리미엄 가치 강조', imageStyle: 'luxury premium style, rich dark tones, gold accents, elegant and exclusive' },
-  { id: 'cute', label: '귀여운', textTone: '귀엽고 발랄한 말투로, 이모지 많이 사용', imageStyle: 'cute kawaii style, pastel colors, soft rounded shapes, adorable and playful' },
-  { id: 'minimal', label: '미니멀', textTone: '간결하고 핵심만 담은 문체로, 군더더기 없이', imageStyle: 'minimalist clean design, white space, simple geometric shapes, modern simplicity' },
-];
-
 const PLATFORMS = [
   { id: 'blog', label: '블로그' },
   { id: 'sns', label: 'Instagram/Facebook' },
@@ -27,10 +17,16 @@ const PLATFORMS = [
 ];
 
 const VIDEO_DURATION_OPTIONS = [
-  { id: 'short', label: 'Short', duration: '15초', cuts: 3, description: '빠른 임팩트' },
-  { id: 'standard', label: 'Standard', duration: '30초', cuts: 5, description: '균형잡힌 구성' },
-  { id: 'premium', label: 'Premium', duration: '60초', cuts: 8, description: '상세한 스토리' },
+  { id: 'short', label: 'Short', duration: '15초', cuts: 3, description: '빠른 임팩트', credits: 10 },
+  { id: 'standard', label: 'Standard', duration: '30초', cuts: 5, description: '균형잡힌 구성', credits: 20 },
+  { id: 'premium', label: 'Premium', duration: '60초', cuts: 8, description: '상세한 스토리', credits: 35 },
 ];
+
+// 크레딧 비용 상수
+const CREDIT_COSTS = {
+  ai_image: 2,      // AI 이미지 1장당
+  cardnews: 5,      // 카드뉴스 생성
+};
 
 const CONTENT_TYPES = [
   { id: 'text', label: '글만', desc: '블로그, SNS 캡션', icon: '📝' },
@@ -151,7 +147,6 @@ function ContentCreatorSimple() {
   // 입력 상태
   const [contentType, setContentType] = useState(null);
   const [topic, setTopic] = useState('');
-  const [style, setStyle] = useState(null);
   const [selectedPlatforms, setSelectedPlatforms] = useState([]);
   const [imageCount, setImageCount] = useState(1);
   const [imageFormat, setImageFormat] = useState('ai-image'); // 'ai-image' | 'cardnews'
@@ -165,6 +160,10 @@ function ContentCreatorSimple() {
 
   // 팝업 상태
   const [popupImage, setPopupImage] = useState(null);
+
+  // 크레딧 관련 상태
+  const [creditBalance, setCreditBalance] = useState(0);
+  const [isChargeModalOpen, setIsChargeModalOpen] = useState(false);
 
   // 결과 컬럼 높이 동기화 ref
   const snsColumnRef = useRef(null);
@@ -183,6 +182,34 @@ function ContentCreatorSimple() {
       return () => window.removeEventListener('resize', updateHeight);
     }
   }, [result]);
+
+  // 크레딧 잔액 조회
+  useEffect(() => {
+    const fetchCreditBalance = async () => {
+      try {
+        const data = await creditsAPI.getBalance();
+        setCreditBalance(data.balance);
+      } catch (error) {
+        console.error('크레딧 잔액 조회 실패:', error);
+      }
+    };
+    fetchCreditBalance();
+  }, []);
+
+  // 필요한 크레딧 계산
+  const calculateRequiredCredits = () => {
+    if (contentType === 'shortform') {
+      const option = VIDEO_DURATION_OPTIONS.find(o => o.id === videoDuration);
+      return option?.credits || 0;
+    }
+    if (contentType === 'image' || contentType === 'both') {
+      if (imageFormat === 'cardnews') {
+        return CREDIT_COSTS.cardnews;
+      }
+      return CREDIT_COSTS.ai_image * imageCount;
+    }
+    return 0; // 텍스트만 생성은 무료
+  };
 
   // ========== 복사 함수 ==========
   const createCopyHandler = (getData, message) => (item) => {
@@ -256,6 +283,21 @@ function ContentCreatorSimple() {
       return;
     }
 
+    // 크레딧 필요량 계산 및 체크
+    const requiredCredits = calculateRequiredCredits();
+    if (requiredCredits > 0) {
+      if (creditBalance < requiredCredits) {
+        const shortage = requiredCredits - creditBalance;
+        const confirmCharge = window.confirm(
+          `크레딧이 부족합니다.\n\n필요: ${requiredCredits} 크레딧\n보유: ${creditBalance} 크레딧\n부족: ${shortage} 크레딧\n\n충전 페이지로 이동하시겠습니까?`
+        );
+        if (confirmCharge) {
+          setIsChargeModalOpen(true);
+        }
+        return;
+      }
+    }
+
     setIsGenerating(true);
     setResult(null);
     setProgress('콘텐츠 생성 준비 중...');
@@ -266,9 +308,8 @@ function ContentCreatorSimple() {
       // 글 생성
       if (contentType === 'text' || contentType === 'both') {
         setProgress('AI가 글을 작성하고 있습니다...');
-        const selectedStyle = STYLES.find(s => s.id === style);
         const agenticResult = await generateAgenticContent(
-          { textInput: topic, images: [], styleTone: selectedStyle?.textTone || '친근하고 편안한 말투로', selectedPlatforms },
+          { textInput: topic, images: [], styleTone: '친근하고 편안한 말투로', selectedPlatforms },
           (progress) => setProgress(progress.message)
         );
 
@@ -281,7 +322,6 @@ function ContentCreatorSimple() {
           analysis: agenticResult.analysis,
           critique: agenticResult.critique,
           platforms: selectedPlatforms,
-          style,
         };
       }
 
@@ -291,18 +331,7 @@ function ContentCreatorSimple() {
           // 카드뉴스 생성
           setProgress('AI가 카드뉴스를 생성하고 있습니다...');
           try {
-            // 스타일을 컬러 테마로 매핑
-            const styleToThemeMap = {
-              'casual': 'warm',
-              'professional': 'minimal',
-              'friendly': 'warm',
-              'formal': 'cool',
-              'trendy': 'vibrant',
-              'luxurious': 'purple',
-              'cute': 'pastel',
-              'minimal': 'minimal'
-            };
-            const colorTheme = styleToThemeMap[style] || 'warm';
+            const colorTheme = 'warm';
 
             // FormData 생성 (백엔드가 Form 데이터를 받음)
             const formData = new FormData();
@@ -335,14 +364,10 @@ function ContentCreatorSimple() {
           }
         } else {
           // AI 이미지 생성 (기존 로직)
-          const selectedStyleForImage = STYLES.find(s => s.id === style);
-          const imageStylePrompt = selectedStyleForImage?.imageStyle || '';
-
           for (let i = 0; i < imageCount; i++) {
             setProgress(`AI가 이미지를 생성하고 있습니다... (${i + 1}/${imageCount})`);
             try {
-              const enhancedPrompt = imageStylePrompt ? `${topic}. Style: ${imageStylePrompt}` : topic;
-              const imageResponse = await api.post('/api/generate-image', { prompt: enhancedPrompt, model: 'nanobanana' });
+              const imageResponse = await api.post('/api/generate-image', { prompt: topic, model: 'nanobanana' });
               if (imageResponse.data.imageUrl) {
                 generatedResult.images.push({ url: imageResponse.data.imageUrl, prompt: topic });
               }
@@ -367,7 +392,35 @@ function ContentCreatorSimple() {
           analysis: original.analysis || generatedResult.text?.analysis,
           critique: original.critique || generatedResult.text?.critique,
           metadata: { attempts: original.metadata?.attempts || 1 }
-        }, imageUrls, platforms, style, contentType, imageCount);
+        }, imageUrls, platforms, null, contentType, imageCount);
+      }
+
+      // 크레딧 차감 (이미지/카드뉴스 생성 성공 시)
+      if (requiredCredits > 0 && generatedResult.images?.length > 0) {
+        try {
+          let description = '';
+          let referenceType = '';
+
+          if (imageFormat === 'cardnews') {
+            description = `카드뉴스 생성 (${generatedResult.images.length}장)`;
+            referenceType = 'cardnews';
+          } else if (contentType === 'shortform') {
+            const option = VIDEO_DURATION_OPTIONS.find(o => o.id === videoDuration);
+            description = `숏폼 영상 생성 (${option?.duration || videoDuration})`;
+            referenceType = 'video_generation';
+          } else {
+            description = `AI 이미지 생성 (${generatedResult.images.length}장)`;
+            referenceType = 'image_generation';
+          }
+
+          await creditsAPI.use(requiredCredits, description, referenceType);
+          // 잔액 업데이트
+          setCreditBalance(prev => prev - requiredCredits);
+          console.log(`✅ 크레딧 ${requiredCredits} 차감 완료`);
+        } catch (creditError) {
+          console.error('크레딧 차감 실패:', creditError);
+          // 크레딧 차감 실패해도 생성은 완료된 것으로 처리
+        }
       }
 
       setResult(generatedResult);
@@ -413,8 +466,6 @@ function ContentCreatorSimple() {
 
   // ========== 생성 버튼 비활성화 조건 ==========
   const isGenerateDisabled = isGenerating || !topic.trim() || !contentType ||
-    // 스타일 필요: 글만, 글+이미지, 이미지만 (숏폼 제외)
-    (contentType !== 'shortform' && !style) ||
     // 플랫폼 필요: 글만, 글+이미지
     (contentType !== 'image' && contentType !== 'shortform' && selectedPlatforms.length === 0) ||
     // 숏폼 영상은 이미지 업로드 필수
@@ -472,7 +523,14 @@ function ContentCreatorSimple() {
                   {isGenerating ? (
                     <><span className="spinner"></span>{progress}</>
                   ) : (
-                    <>생성하기 <FiArrowRight className="btn-arrow" /></>
+                    <>
+                      생성하기 <FiArrowRight className="btn-arrow" />
+                      {calculateRequiredCredits() > 0 && (
+                        <span className="credit-cost-badge">
+                          {calculateRequiredCredits()} 크레딧
+                        </span>
+                      )}
+                    </>
                   )}
                 </button>
               </div>
@@ -510,24 +568,6 @@ function ContentCreatorSimple() {
                             onClick={() => setImageFormat(format.id)}
                           >
                             {format.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 스타일 선택 */}
-                  {contentType !== 'shortform' && (
-                    <div className="creator-option-section">
-                      <label className="creator-label">스타일</label>
-                      <div className="creator-chips">
-                        {STYLES.map(s => (
-                          <button
-                            key={s.id}
-                            className={`creator-chip ${style === s.id ? 'selected' : ''}`}
-                            onClick={() => setStyle(s.id)}
-                          >
-                            {s.label}
                           </button>
                         ))}
                       </div>
@@ -749,6 +789,16 @@ function ContentCreatorSimple() {
           </div>
         </div>
       )}
+
+      {/* 크레딧 충전 모달 */}
+      <CreditChargeModal
+        isOpen={isChargeModalOpen}
+        onClose={() => setIsChargeModalOpen(false)}
+        onChargeComplete={() => {
+          // 충전 완료 후 잔액 다시 조회
+          creditsAPI.getBalance().then(data => setCreditBalance(data.balance));
+        }}
+      />
 
     </div>
   );

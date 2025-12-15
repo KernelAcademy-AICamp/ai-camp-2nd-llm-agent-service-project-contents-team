@@ -314,6 +314,16 @@
   transform: translateX(4px);
 }
 
+/* 크레딧 비용 배지 */
+.credit-cost-badge {
+  margin-left: 8px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* ==========================================
    빠른 시작 칩
    ========================================== */

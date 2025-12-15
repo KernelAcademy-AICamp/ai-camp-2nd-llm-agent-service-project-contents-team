@@ -28,6 +28,7 @@ import TikTok from './pages/connection_SNS/tiktok/TikTok';
 import WordPress from './pages/connection_SNS/wordpress/WordPress';
 import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import DeleteData from './pages/legal/DeleteData';
+import CreditHistory from './pages/credits/CreditHistory';
 import './App.css';
 
 function App() {
@@ -238,6 +239,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <WordPress />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/credits"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <CreditHistory />
                 </Layout>
               </ProtectedRoute>
             }

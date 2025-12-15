@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { MdDashboard, MdAdd, MdFolder, MdStyle, MdSettings, MdHome } from 'react-icons/md';
+import { FiCreditCard } from 'react-icons/fi';
 import { FaYoutube, FaFacebook, FaInstagram, FaXTwitter, FaTiktok, FaWordpress } from 'react-icons/fa6';
 import { SiThreads } from 'react-icons/si';
-import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI, tiktokAPI, wordpressAPI } from '../services/api';
+import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI, tiktokAPI, wordpressAPI, creditsAPI } from '../services/api';
 import './Sidebar.css';
 
 // 메뉴 아이템 렌더링 컴포넌트
@@ -45,13 +46,14 @@ function Sidebar({ onHoverChange }) {
   const navigate = useNavigate();
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
   const [connectedPlatforms, setConnectedPlatforms] = useState({});
+  const [creditBalance, setCreditBalance] = useState(0);
 
   const handleSidebarHover = (hovered) => {
     setIsSidebarHovered(hovered);
     onHoverChange?.(hovered);
   };
 
-  // 플랫폼 연동 상태 조회
+  // 플랫폼 연동 상태 및 크레딧 조회
   useEffect(() => {
     const fetchPlatformStatus = async () => {
       try {
@@ -79,7 +81,17 @@ function Sidebar({ onHoverChange }) {
       }
     };
 
+    const fetchCreditBalance = async () => {
+      try {
+        const data = await creditsAPI.getBalance();
+        setCreditBalance(data.balance);
+      } catch (error) {
+        console.error('Failed to fetch credit balance:', error);
+      }
+    };
+
     fetchPlatformStatus();
+    fetchCreditBalance();
   }, []);
 
   const isActive = (path) => location.pathname === path;
@@ -124,6 +136,12 @@ function Sidebar({ onHoverChange }) {
 
       {/* 하단 메뉴 */}
       <div className="sidebar-bottom">
+        {/* 크레딧 표시 */}
+        <Link to="/credits" className={`sidebar-credit ${isActive('/credits') ? 'active' : ''}`}>
+          <FiCreditCard className="sidebar-icon" />
+          <span className="sidebar-label">{creditBalance.toLocaleString()} 크레딧</span>
+        </Link>
+
         <div className="sidebar-divider" />
         {BOTTOM_MENU.map(item => (
           <MenuItem key={item.path} item={item} isActive={isActive(item.path)} />

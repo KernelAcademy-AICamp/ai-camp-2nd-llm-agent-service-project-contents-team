@@ -7,6 +7,7 @@ import httpx
 from .. import models, auth
 from ..database import get_db
 from ..oauth import oauth
+from .credits import grant_signup_bonus
 
 router = APIRouter(
     prefix="/api/oauth",
@@ -64,6 +65,10 @@ async def get_or_create_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # 신규 사용자에게 회원가입 보너스 크레딧 지급
+    grant_signup_bonus(db, user.id)
+
     return user
 
 

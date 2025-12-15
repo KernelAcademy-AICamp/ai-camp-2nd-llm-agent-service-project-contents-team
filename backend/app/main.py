@@ -5,7 +5,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user, blog, chat, brand_analysis, youtube, facebook, instagram, x, threads, tiktok, wordpress, ai_video_generation, sns_publish, ai_content, published_content, dashboard
+from .routers import auth, oauth, image, video, cardnews, onboarding, ai_recommendations, user, blog, chat, brand_analysis, youtube, facebook, instagram, x, threads, tiktok, wordpress, ai_video_generation, sns_publish, ai_content, published_content, dashboard, credits
 from .database import engine, Base
 
 
@@ -75,6 +75,35 @@ setup_google_credentials()
 # 데이터베이스 테이블 생성
 Base.metadata.create_all(bind=engine)
 
+# 초기 크레딧 패키지 시딩 (앱 시작 시 한 번만)
+def seed_initial_credit_packages():
+    from .database import SessionLocal
+    from . import models
+
+    db = SessionLocal()
+    try:
+        # 이미 패키지가 있으면 스킵
+        if db.query(models.CreditPackage).first():
+            return
+
+        packages = [
+            models.CreditPackage(name="스타터", description="처음 시작하는 분들을 위한 패키지", credits=50, bonus_credits=0, price=5000, sort_order=1),
+            models.CreditPackage(name="베이직", description="가벼운 콘텐츠 제작에 적합", credits=120, bonus_credits=10, price=10000, sort_order=2),
+            models.CreditPackage(name="스탠다드", description="가장 많이 선택하는 인기 패키지", credits=300, bonus_credits=50, price=25000, badge="인기", is_popular=True, sort_order=3),
+            models.CreditPackage(name="프로", description="전문 크리에이터를 위한 패키지", credits=700, bonus_credits=150, price=50000, badge="추천", sort_order=4),
+            models.CreditPackage(name="엔터프라이즈", description="대량 콘텐츠 제작에 최적화", credits=1500, bonus_credits=500, price=100000, badge="BEST", sort_order=5),
+        ]
+        for pkg in packages:
+            db.add(pkg)
+        db.commit()
+        print("✅ 크레딧 패키지 초기 데이터 생성 완료")
+    except Exception as e:
+        print(f"⚠️ 크레딧 패키지 시딩 실패: {e}")
+    finally:
+        db.close()
+
+seed_initial_credit_packages()
+
 
 app = FastAPI(
     title="Contents Creator API",
@@ -121,6 +150,7 @@ app.include_router(sns_publish.router)
 app.include_router(ai_content.router)
 app.include_router(published_content.router)
 app.include_router(dashboard.router)
+app.include_router(credits.router)
 
 # Static files 설정 (업로드된 파일 서빙)
 uploads_dir = Path(__file__).parent.parent / "uploads"
