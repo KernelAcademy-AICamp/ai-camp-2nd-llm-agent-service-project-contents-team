@@ -1,5 +1,5 @@
 /* ========================================
-   LOGIN PAGE - BAUHAUS STYLE
+   LOGIN PAGE - MODERN STYLE
    Bold geometric design, high contrast
    ======================================== */
 
@@ -14,7 +14,7 @@
   overflow: hidden;
 }
 
-/* Bauhaus geometric background decorations */
+/* Geometric background decorations */
 .login-container::before {
   content: '';
   position: absolute;
@@ -49,7 +49,7 @@
   z-index: 1;
 }
 
-/* Bauhaus accent line */
+/* Accent line */
 .login-box::before {
   content: '';
   position: absolute;
@@ -93,7 +93,7 @@
   border: var(--border-medium) solid var(--error-color);
 }
 
-/* Social Login - Bauhaus */
+/* Social Login */
 .social-login {
   display: flex;
   flex-direction: column;
@@ -148,16 +148,16 @@
 }
 
 .social-btn.facebook {
-  color: var(--bauhaus-blue);
-  border-color: var(--bauhaus-blue);
+  color: var(--info-color);
+  border-color: var(--info-color);
 }
 
 .social-btn.facebook:hover {
-  background: var(--bauhaus-blue);
+  background: var(--info-color);
   color: var(--bg-primary);
 }
 
-/* Bauhaus geometric decoration at bottom */
+/* Geometric decoration at bottom */
 .login-box::after {
   content: '';
   position: absolute;

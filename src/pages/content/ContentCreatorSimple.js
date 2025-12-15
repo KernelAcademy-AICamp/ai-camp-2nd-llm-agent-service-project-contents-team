@@ -36,7 +36,7 @@ const CONTENT_TYPES = [
   { id: 'text', label: '글만', desc: '블로그, SNS 캡션', icon: '📝' },
   { id: 'image', label: '이미지만', desc: '썸네일, 배너', icon: '🖼️' },
   { id: 'both', label: '글 + 이미지', desc: '완성 콘텐츠', icon: '✨', recommended: true },
-  { id: 'shortform', label: '숏폼 영상', desc: '마케팅 비디오', icon: '🎬', isNew: true },
+  { id: 'shortform', label: '숏폼 영상', desc: '마케팅 비디오', icon: '🎬' },
 ];
 
 const IMAGE_COUNTS = [1, 2, 3, 4, 5, 6, 7, 8];

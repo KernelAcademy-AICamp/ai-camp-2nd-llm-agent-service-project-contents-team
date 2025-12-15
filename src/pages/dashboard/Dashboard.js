@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI } from '../../services/api';
-import { FaYoutube, FaFacebookF, FaInstagram, FaThreads } from 'react-icons/fa6';
+import { dashboardAPI, youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI, tiktokAPI, wordpressAPI } from '../../services/api';
+import { FaYoutube, FaFacebookF, FaInstagram, FaThreads, FaTiktok, FaWordpress } from 'react-icons/fa6';
 import { RiTwitterXFill } from 'react-icons/ri';
 import { FiCheck, FiPlus, FiRefreshCw } from 'react-icons/fi';
 import './Dashboard.css';
@@ -64,9 +64,31 @@ const PLATFORM_CONFIG = {
     getFollowers: (data) => data?.followers_count || 0,
     getViews: (data) => data?.impression_count || 0,
   },
+  tiktok: {
+    key: 'tiktok',
+    name: 'TikTok',
+    icon: FaTiktok,
+    color: '#000000',
+    bgGradient: 'linear-gradient(135deg, #25F4EE 0%, #FE2C55 100%)',
+    path: '/tiktok',
+    getConnected: (data) => !!data,
+    getFollowers: (data) => data?.follower_count || 0,
+    getViews: (data) => data?.likes_count || 0,
+  },
+  wordpress: {
+    key: 'wordpress',
+    name: 'WordPress',
+    icon: FaWordpress,
+    color: '#21759B',
+    bgGradient: 'linear-gradient(135deg, #21759B 0%, #1A5F7A 100%)',
+    path: '/wordpress',
+    getConnected: (data) => !!data,
+    getFollowers: (data) => 0,
+    getViews: (data) => data?.total_views || 0,
+  },
 };
 
-const PLATFORM_ORDER = ['youtube', 'instagram', 'facebook', 'threads', 'x'];
+const PLATFORM_ORDER = ['youtube', 'instagram', 'facebook', 'threads', 'x', 'tiktok', 'wordpress'];
 
 // 숫자 포맷팅 유틸
 const formatNumber = (num) => {
@@ -178,7 +200,7 @@ function Dashboard() {
   const [snsStatus, setSnsStatus] = useState(
     Object.fromEntries(PLATFORM_ORDER.map(key => [
       key === 'x' ? 'twitter' : key,
-      { loading: true, connected: false, data: null, posts: [], ...(key === 'youtube' ? { videos: [], analytics: null } : {}) }
+      { loading: true, connected: false, data: null, posts: [], videos: [], analytics: null }
     ]))
   );
   const [refreshing, setRefreshing] = useState(false);
@@ -189,74 +211,93 @@ function Dashboard() {
     { label: '콘텐츠 관리', path: '/contents', desc: '임시저장/발행 콘텐츠 관리' },
   ];
 
-  // SNS 데이터 fetch 헬퍼
-  const fetchPlatformData = async (api, connectedCheck, extraFetch) => {
-    try {
-      const data = await api.getStatus();
-      const isConnected = connectedCheck(data);
-      let extra = {};
-
-      if (isConnected && extraFetch) {
-        extra = await extraFetch(api, data);
-      }
-
-      return { loading: false, connected: isConnected, data, ...extra };
-    } catch {
-      return { loading: false, connected: false, data: null, posts: [] };
-    }
-  };
-
-  const fetchSNSData = useCallback(async () => {
+  // 1단계: 통합 API로 모든 플랫폼 상태를 한 번에 조회
+  const fetchConnectionStatus = useCallback(async () => {
     setRefreshing(true);
 
-    const results = await Promise.all([
-      // YouTube
-      fetchPlatformData(youtubeAPI, d => !!d, async (api) => {
-        let videos = [], analytics = null;
-        try { videos = await api.getVideos(0, 100) || []; } catch {}
-        try { analytics = await api.getAnalyticsSummary(); } catch {}
-        return { videos, analytics };
-      }),
-      // Facebook
-      fetchPlatformData(facebookAPI, d => !!d?.page_id, async (api) => {
-        let posts = [];
-        try { posts = await api.getPosts(0, 100) || []; } catch {}
-        return { posts };
-      }),
-      // Instagram
-      fetchPlatformData(instagramAPI, d => !!d?.instagram_account_id, async (api) => {
-        let posts = [];
-        try { posts = await api.getPosts(0, 100) || []; } catch {}
-        return { posts };
-      }),
-      // X (Twitter)
-      fetchPlatformData(twitterAPI, d => !!d?.x_user_id, async (api) => {
-        let posts = [];
-        try { posts = await api.getPosts(0, 100) || []; } catch {}
-        return { posts };
-      }),
-      // Threads
-      fetchPlatformData(threadsAPI, d => !!d, async (api) => {
-        let posts = [];
-        try { posts = await api.getPosts(0, 100) || []; } catch {}
-        return { posts };
-      }),
-    ]);
+    try {
+      // 통합 API로 한 번에 모든 상태 조회 (7번 호출 → 1번 호출)
+      const allStatus = await dashboardAPI.getAllStatus();
 
-    setSnsStatus({
-      youtube: results[0],
-      facebook: results[1],
-      instagram: results[2],
-      twitter: results[3],
-      threads: results[4],
-    });
+      const { youtube, facebook, instagram, x: twitter, threads, tiktok, wordpress } = allStatus;
 
-    setRefreshing(false);
+      setSnsStatus(prev => ({
+        youtube: { ...prev.youtube, loading: false, connected: !!youtube, data: youtube },
+        facebook: { ...prev.facebook, loading: false, connected: !!facebook?.page_id, data: facebook },
+        instagram: { ...prev.instagram, loading: false, connected: !!instagram?.instagram_account_id, data: instagram },
+        twitter: { ...prev.twitter, loading: false, connected: !!twitter?.x_user_id, data: twitter },
+        threads: { ...prev.threads, loading: false, connected: !!threads, data: threads },
+        tiktok: { ...prev.tiktok, loading: false, connected: !!tiktok, data: tiktok },
+        wordpress: { ...prev.wordpress, loading: false, connected: !!wordpress, data: wordpress },
+      }));
+
+      setRefreshing(false);
+
+      // 2단계: 연동된 플랫폼의 추가 데이터를 백그라운드에서 조회
+      const connectedPlatforms = {
+        youtube: !!youtube,
+        facebook: !!facebook?.page_id,
+        instagram: !!instagram?.instagram_account_id,
+        twitter: !!twitter?.x_user_id,
+        threads: !!threads,
+        tiktok: !!tiktok,
+        wordpress: !!wordpress,
+      };
+
+    // 백그라운드에서 콘텐츠 개수 조회 (10개만 가져와서 개수 파악)
+    if (connectedPlatforms.youtube) {
+      Promise.all([
+        youtubeAPI.getVideos(0, 10).catch(() => []),
+        youtubeAPI.getAnalyticsSummary().catch(() => null),
+      ]).then(([videos, analytics]) => {
+        setSnsStatus(prev => ({ ...prev, youtube: { ...prev.youtube, videos, analytics } }));
+      });
+    }
+
+    if (connectedPlatforms.facebook) {
+      facebookAPI.getPosts(0, 10).catch(() => []).then(posts => {
+        setSnsStatus(prev => ({ ...prev, facebook: { ...prev.facebook, posts } }));
+      });
+    }
+
+    if (connectedPlatforms.instagram) {
+      instagramAPI.getPosts(0, 10).catch(() => []).then(posts => {
+        setSnsStatus(prev => ({ ...prev, instagram: { ...prev.instagram, posts } }));
+      });
+    }
+
+    if (connectedPlatforms.twitter) {
+      twitterAPI.getPosts(0, 10).catch(() => []).then(posts => {
+        setSnsStatus(prev => ({ ...prev, twitter: { ...prev.twitter, posts } }));
+      });
+    }
+
+    if (connectedPlatforms.threads) {
+      threadsAPI.getPosts(0, 10).catch(() => []).then(posts => {
+        setSnsStatus(prev => ({ ...prev, threads: { ...prev.threads, posts } }));
+      });
+    }
+
+    if (connectedPlatforms.tiktok) {
+      tiktokAPI.getVideos(0, 10).catch(() => []).then(videos => {
+        setSnsStatus(prev => ({ ...prev, tiktok: { ...prev.tiktok, videos } }));
+      });
+    }
+
+    if (connectedPlatforms.wordpress) {
+      wordpressAPI.getPosts(0, 10).catch(() => []).then(posts => {
+        setSnsStatus(prev => ({ ...prev, wordpress: { ...prev.wordpress, posts } }));
+      });
+    }
+    } catch (error) {
+      console.error('Failed to fetch platform status:', error);
+      setRefreshing(false);
+    }
   }, []);
 
   useEffect(() => {
-    fetchSNSData();
-  }, [fetchSNSData]);
+    fetchConnectionStatus();
+  }, [fetchConnectionStatus]);
 
   // 통계 데이터 계산
   const getStatsData = (valueGetter, valueKey) => {
@@ -277,7 +318,7 @@ function Dashboard() {
   const platformFollowers = getStatsData((config, status) => config.getFollowers(status.data), 'followers');
   const platformContents = getStatsData((config) => {
     const stateKey = config.key === 'x' ? 'twitter' : config.key;
-    return config.key === 'youtube'
+    return (config.key === 'youtube' || config.key === 'tiktok')
       ? snsStatus[stateKey].videos?.length || 0
       : snsStatus[stateKey].posts?.length || 0;
   }, 'contents');
@@ -336,7 +377,7 @@ function Dashboard() {
           >
             <button
               className={`sns-refresh-btn ${refreshing ? 'spinning' : ''}`}
-              onClick={fetchSNSData}
+              onClick={fetchConnectionStatus}
               disabled={refreshing}
             >
               <FiRefreshCw />

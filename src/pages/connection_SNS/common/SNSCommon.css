@@ -200,7 +200,7 @@
 .account-name,
 .account-category {
   font-size: 13px;
-  color: var(--bauhaus-blue);
+  color: var(--info-color);
   text-decoration: none;
 }
 
@@ -520,7 +520,7 @@
 .post-link,
 .view-on-threads {
   font-size: 13px;
-  color: var(--bauhaus-blue);
+  color: var(--info-color);
   text-decoration: none;
 }
 

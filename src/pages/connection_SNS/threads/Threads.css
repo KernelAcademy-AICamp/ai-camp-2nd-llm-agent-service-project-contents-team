@@ -50,7 +50,7 @@
 /* Threads에서 보기 링크 */
 .threads-page .view-on-threads {
   font-size: 12px;
-  color: var(--bauhaus-blue);
+  color: var(--info-color);
   text-decoration: none;
 }
 

@@ -40,15 +40,21 @@
    ========================================== */
 
 .dashboard .sns-platform-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
   gap: var(--space-sm);
   margin-bottom: var(--space-lg);
+  width: 100%;
 }
 
 .dashboard .sns-platform-card {
   overflow: hidden;
-  flex-direction: row;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 140px;
 }
 
 /* 연동됨 상태 */
@@ -322,7 +328,7 @@
 /* Dashboard Content Grid */
 .dashboard-content {
   display: grid;
-  grid-template-columns: 1.5fr 1fr;
+  grid-template-columns: 2fr 1fr;
   gap: var(--space-md);
   flex: 1;
   min-height: 0;
@@ -502,6 +508,10 @@
 }
 
 @media (max-width: 480px) {
+  .dashboard .sns-platform-grid {
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  }
+
   .dashboard .sns-platform-card,
   .action-btn {
     flex-wrap: wrap;
