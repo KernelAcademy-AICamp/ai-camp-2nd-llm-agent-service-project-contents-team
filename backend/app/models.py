@@ -564,6 +564,7 @@ class VideoGenerationJob(Base):
     __tablename__ = "video_generation_jobs"
 
     id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, unique=True, nullable=False, index=True)  # 작업 추적용 고유 세션 ID (UUID)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # 제품 정보
@@ -575,14 +576,12 @@ class VideoGenerationJob(Base):
     tier = Column(String, nullable=False)  # short, standard, premium
     cut_count = Column(Integer, nullable=False)  # 4, 6, 8
     duration_seconds = Column(Integer, nullable=False)  # 15, 25, 40
-    cost = Column(Float, nullable=False)  # 3.90, 5.90, 7.90
 
     # 생성 단계별 데이터
     storyboard = Column(JSON, nullable=True)  # [{"cut": 1, "scene": "...", "image_prompt": "...", "duration": 5}, ...]
     generated_image_urls = Column(JSON, nullable=True)  # [{"cut": 1, "url": "..."}, ...]
     generated_video_urls = Column(JSON, nullable=True)  # [{"transition": "1-2", "url": "..."}, ...]
     final_video_url = Column(String, nullable=True)  # 최종 합성된 비디오 URL
-    thumbnail_url = Column(String, nullable=True)  # 썸네일 이미지 URL
 
     # 상태 추적
     status = Column(String, nullable=False, default="pending")
@@ -597,14 +596,32 @@ class VideoGenerationJob(Base):
     current_step = Column(String, nullable=True)  # 현재 진행 중인 단계 상세 설명
     error_message = Column(Text, nullable=True)  # 에러 메시지
 
-    # AI 모델 사용 정보
-    planning_model = Column(String, default="gemini-2.5-flash")  # 스토리보드 생성 모델 (Vertex AI)
-    image_model = Column(String, default="gemini-2.5-flash-image")  # 이미지 생성 모델 (Vertex AI)
-    video_model = Column(String, default="veo-3.1-fast-generate-001")  # 비디오 생성 모델 (Vertex AI)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    user = relationship("User")
+
+
+class GeneratedVideo(Base):
+    """
+    생성된 비디오 (완료된 결과물만 저장)
+    - VideoGenerationJob과 session_id로 1:1 연결
+    - 최종 비디오 URL만 저장 (Supabase Storage)
+    """
+    __tablename__ = "generated_videos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, ForeignKey("video_generation_jobs.session_id"), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # 비디오 정보
+    final_video_url = Column(String, nullable=False)  # Supabase Storage URL
+    product_name = Column(String, nullable=False)  # 제품명 (검색/표시용)
+    tier = Column(String, nullable=False)  # short, standard, premium
+    duration_seconds = Column(Integer, nullable=False)  # 15, 25, 40
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    completed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     user = relationship("User")

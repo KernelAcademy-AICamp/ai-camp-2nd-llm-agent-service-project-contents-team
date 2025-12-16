@@ -733,6 +733,23 @@ export const dashboardAPI = {
   },
 };
 
+// ==========================================
+// Generated Videos API
+// ==========================================
+export const generatedVideoAPI = {
+  // 생성된 비디오 목록 조회
+  list: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/generated-videos?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 특정 세션의 비디오 조회
+  get: async (sessionId) => {
+    const response = await api.get(`/api/generated-videos/${sessionId}`);
+    return response.data;
+  },
+};
+
 // 호환성을 위한 별칭 (기존 코드에서 twitterAPI 사용하는 경우)
 export const twitterAPI = xAPI;
 
