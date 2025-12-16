@@ -1,6 +1,8 @@
 """
 AI Agentic 카드뉴스 생성 시스템
 멀티 에이전트 워크플로우: 정보 확장 → 분석 → 기획 → 디자인 → 품질검증
+
+Vertex AI API 사용 (Google Cloud Platform)
 """
 
 import os
@@ -8,7 +10,47 @@ import json
 import re
 from typing import List, Dict, Optional, Tuple
 import httpx
-import google.generativeai as genai
+
+# Vertex AI 임포트
+import vertexai
+from vertexai.generative_models import GenerativeModel, Part, Tool
+from google.cloud import aiplatform
+
+# Vertex AI 초기화 함수
+def init_vertex_ai():
+    """Vertex AI 초기화 - 프로젝트 및 인증 설정"""
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "bubbly-solution-480805-b5")
+    location = "us-central1"  # Gemini 모델 지원 리전
+
+    # 서비스 계정 키 파일 경로 설정
+    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if credentials_path and os.path.exists(credentials_path):
+        print(f"🔑 [Vertex AI] 서비스 계정 인증: {credentials_path}")
+    else:
+        print(f"⚠️ [Vertex AI] GOOGLE_APPLICATION_CREDENTIALS 경로 확인 필요")
+
+    try:
+        vertexai.init(project=project_id, location=location)
+        print(f"✅ [Vertex AI] 초기화 완료 - 프로젝트: {project_id}, 리전: {location}")
+        return True
+    except Exception as e:
+        print(f"❌ [Vertex AI] 초기화 실패: {e}")
+        return False
+
+# 앱 시작 시 Vertex AI 초기화
+_vertex_ai_initialized = False
+
+# 프롬프트 모듈 임포트
+from .prompts import (
+    get_content_enricher_prompt,
+    get_orchestrator_prompt,
+    get_content_planner_prompt,
+    get_visual_designer_prompt,
+    get_quality_assurance_prompt,
+    TONE_MAPPING,
+    STYLE_GUIDELINES,
+    PAGE_STRUCTURE_GUIDE,
+)
 
 
 # ==================== 폰트 설정 ====================
@@ -35,15 +77,72 @@ FONT_PAIRS = {
 }
 
 
-# ==================== Agent 0: Content Enricher (정보 확장) ====================
+# ==================== Agent 0: Content Enricher (정보 확장 + 웹 검색) ====================
 
 class ContentEnricherAgent:
-    """사용자의 간단한 입력을 풍부한 콘텐츠로 확장하는 에이전트"""
+    """사용자의 간단한 입력을 웹 검색을 통해 실제 정보로 확장하는 에이전트"""
+
+    @staticmethod
+    def _ensure_vertex_ai():
+        """Vertex AI 초기화 확인"""
+        global _vertex_ai_initialized
+        if not _vertex_ai_initialized:
+            _vertex_ai_initialized = init_vertex_ai()
+        return _vertex_ai_initialized
+
+    @staticmethod
+    async def _search_web_info(query: str) -> str:
+        """
+        Google Search를 통해 주제에 대한 실제 정보를 검색
+        Vertex AI Gemini + Google Search Grounding 사용
+        """
+        try:
+            if not ContentEnricherAgent._ensure_vertex_ai():
+                print("⚠️ [Web Search] Vertex AI 초기화 실패")
+                return ""
+
+            # Vertex AI Gemini 모델 (Google Search Grounding 지원)
+            from vertexai.generative_models import GenerativeModel, Tool, grounding
+
+            # Google Search 도구 설정
+            google_search_tool = Tool.from_google_search_retrieval(
+                grounding.GoogleSearchRetrieval()
+            )
+
+            search_model = GenerativeModel(
+                "gemini-2.0-flash-001",
+                tools=[google_search_tool]
+            )
+
+            search_prompt = f"""다음 주제에 대해 최신 정보를 검색하고 정리해주세요.
+주제: {query}
+
+검색해서 찾아야 할 정보:
+1. 정확한 날짜, 시간, 장소
+2. 관련된 주요 인물/기관
+3. 구체적인 숫자나 통계
+4. 주요 사건의 경과나 과정
+5. 의미와 중요성
+
+검색 결과를 바탕으로 사실에 기반한 정보를 정리해주세요.
+만약 검색 결과가 없다면 "검색 결과 없음"이라고 답하세요."""
+
+            response = search_model.generate_content(search_prompt)
+            search_result = response.text.strip()
+
+            print(f"🔍 [Web Search] 검색 완료: {query[:30]}...")
+            print(f"   📄 결과 길이: {len(search_result)}자")
+
+            return search_result
+
+        except Exception as e:
+            print(f"⚠️ [Web Search] 검색 실패: {e}")
+            return ""
 
     @staticmethod
     async def enrich_content(user_input: str, purpose: str, user_context: Dict = None) -> Dict:
         """
-        사용자 입력을 분석하고 추가 정보를 덧붙여 풍부하게 만듦
+        사용자 입력을 분석하고 웹 검색을 통해 실제 정보로 확장
 
         Returns:
             {
@@ -51,17 +150,21 @@ class ContentEnricherAgent:
                 "enriched_content": "확장된 콘텐츠",
                 "added_elements": ["계절감", "구체적 예시", ...],
                 "context_suggestions": ["추가 맥락 정보"],
-                "recommended_page_count": 3-5
+                "recommended_page_count": 3-5,
+                "researched_facts": ["검색으로 찾은 사실들"]
             }
         """
         try:
-            google_api_key = os.getenv("GOOGLE_API_KEY")
-            if not google_api_key:
-                print("❌ GOOGLE_API_KEY가 설정되지 않았습니다!")
-                return ContentEnricherAgent._get_fallback_enrichment(user_input)
+            if not ContentEnricherAgent._ensure_vertex_ai():
+                print("❌ Vertex AI 초기화 실패!")
+                return ContentEnricherAgent._get_fallback_enrichment(user_input, purpose)
 
-            genai.configure(api_key=google_api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            # Step 1: 웹 검색으로 실제 정보 수집
+            print(f"🌐 [Content Enricher] 웹 검색 시작: {user_input}")
+            web_info = await ContentEnricherAgent._search_web_info(user_input)
+
+            # Step 2: 검색 결과를 바탕으로 콘텐츠 생성
+            model = GenerativeModel("gemini-2.0-flash-001")
 
             # 사용자 컨텍스트 정보 구성
             user_context_info = ""
@@ -115,48 +218,35 @@ class ContentEnricherAgent:
 ═══════════════════════════════════════
 """
 
-            prompt = f"""당신은 콘텐츠 기획 전문가입니다. 사용자의 간단한 입력을 풍부하고 매력적인 콘텐츠로 확장해주세요.
-{user_context_info}
-사용자 입력: "{user_input}"
-목적: {purpose}
+            # 웹 검색 결과가 있으면 프롬프트에 포함
+            web_search_section = ""
+            if web_info and "검색 결과 없음" not in web_info:
+                web_search_section = f"""
+═══════════════════════════════════════
+🔍 웹 검색으로 찾은 실제 정보
+═══════════════════════════════════════
+{web_info}
+**중요**: 위 검색 결과의 구체적인 사실(날짜, 장소, 숫자, 과정 등)을 반드시 콘텐츠에 포함하세요!
+═══════════════════════════════════════
+"""
 
-당신의 역할:
-1. **적극적인 정보 추가**: 사용자가 언급하지 않았지만 콘텐츠를 더 풍성하게 만들 요소를 추가하세요.
-   - 계절감이 어울린다면 계절 언급 추가
-   - 정보 전달 콘텐츠라면 객관적인 예시나 통계 추가
-   - 감성적 콘텐츠라면 공감 포인트 추가
-   - 홍보 콘텐츠라면 구체적인 혜택이나 차별점 추가
+            # 새 프롬프트 모듈 사용 + 웹 검색 결과 추가
+            base_prompt = get_content_enricher_prompt(
+                user_input=user_input,
+                purpose=purpose,
+                user_context=user_context_info
+            )
 
-2. **페이지 수 판단**: 정보량에 맞는 최소한의 페이지 수를 추천하세요.
-   - 간단한 정보: 3장 (무리하게 늘리지 마세요)
-   - 중간 분량: 4장
-   - 복잡한 내용: 5장 (정말 필요한 경우만)
+            # 웹 검색 섹션을 프롬프트에 추가
+            if web_search_section:
+                enhanced_prompt = base_prompt.replace(
+                    "## 당신의 역할",
+                    f"{web_search_section}\n## 당신의 역할"
+                )
+            else:
+                enhanced_prompt = base_prompt
 
-3. **핵심 포인트 정리**: 확장된 정보를 구조화하세요.
-
-JSON으로만 응답하세요:
-{{
-    "original_input": "{user_input}",
-    "enriched_content": "확장된 전체 콘텐츠 (200-400자)",
-    "key_points": [
-        "핵심 포인트 1",
-        "핵심 포인트 2",
-        "핵심 포인트 3"
-    ],
-    "added_elements": [
-        "추가된 요소 설명 (예: 계절감, 통계, 예시 등)"
-    ],
-    "tone_suggestion": "추천 톤앤매너",
-    "recommended_page_count": 3,
-    "page_count_reason": "페이지 수 결정 이유"
-}}
-
-중요:
-- 원본 정보의 본질은 유지하면서 살을 붙이세요
-- 과도하게 부풀리지 말고, 자연스럽게 보강하세요
-- 페이지 수는 정보량에 맞게 최소화하세요"""
-
-            response = model.generate_content(prompt)
+            response = model.generate_content(enhanced_prompt)
             response_text = response.text.strip()
 
             print("🔍 Raw Enrichment Response:\n", response_text)
@@ -165,23 +255,39 @@ JSON으로만 응답하세요:
 
             if json_match:
                 enrichment = json.loads(json_match.group(0))
+                # 웹 검색 결과 추가
+                if web_info and "검색 결과 없음" not in web_info:
+                    enrichment['web_search_used'] = True
+                    enrichment['researched_info'] = web_info[:500]  # 요약본 저장
+                else:
+                    enrichment['web_search_used'] = False
+
                 print(f"✅ [Content Enricher] 정보 확장 완료")
                 print(f"   📝 원본: {user_input[:50]}...")
                 print(f"   ✨ 확장: {enrichment.get('enriched_content', '')[:80]}...")
                 print(f"   📊 추천 페이지: {enrichment.get('recommended_page_count', 3)}장")
+                print(f"   🌐 웹 검색 사용: {enrichment.get('web_search_used', False)}")
                 return enrichment
 
-            return ContentEnricherAgent._get_fallback_enrichment(user_input)
+            return ContentEnricherAgent._get_fallback_enrichment(user_input, purpose)
 
         except Exception as e:
             print(f"⚠️ [Content Enricher] 확장 실패: {e}")
             import traceback
             traceback.print_exc()
-            return ContentEnricherAgent._get_fallback_enrichment(user_input)
+            return ContentEnricherAgent._get_fallback_enrichment(user_input, purpose)
 
     @staticmethod
-    def _get_fallback_enrichment(user_input: str) -> Dict:
-        """폴백 확장 결과"""
+    def _get_fallback_enrichment(user_input: str, purpose: str = "info") -> Dict:
+        """
+        폴백 확장 결과 - 목적(purpose)에 맞는 홍보/이벤트/정보 콘텐츠 생성
+
+        purpose 종류:
+        - promotion: 제품/서비스 홍보
+        - event: 이벤트/행사 안내
+        - menu: 메뉴/가격 소개
+        - info: 정보 전달
+        """
         input_length = len(user_input)
         if input_length < 30:
             page_count = 3
@@ -190,14 +296,54 @@ JSON으로만 응답하세요:
         else:
             page_count = 5
 
+        # 목적별 콘텐츠 템플릿
+        if purpose == "promotion":
+            # 홍보용 - 매력적인 마케팅 문구
+            enriched = f"✨ 새롭게 선보이는 특별한 기회! {user_input}을(를) 지금 바로 만나보세요. 놓치면 후회할 특별한 혜택이 기다리고 있습니다."
+            key_points = [
+                "지금이 바로 구매/참여 적기",
+                "한정 기간 특별 혜택",
+                "다른 곳에서 찾기 힘든 특별함"
+            ]
+            tone = "exciting"
+        elif purpose == "event":
+            # 이벤트용 - 참여 유도
+            enriched = f"🎉 놓치지 마세요! {user_input}! 특별한 순간을 함께 하세요. 다양한 혜택과 즐거움이 기다립니다."
+            key_points = [
+                "이벤트 참여 방법",
+                "특별 혜택 및 경품",
+                "참여 기간 및 조건"
+            ]
+            tone = "exciting"
+        elif purpose == "menu":
+            # 메뉴용 - 맛있는 설명
+            enriched = f"🍽️ 입맛을 사로잡는 특별한 메뉴! {user_input}. 정성껏 준비한 메뉴를 만나보세요."
+            key_points = [
+                "엄선된 재료로 만든 특별함",
+                "합리적인 가격",
+                "지금 바로 주문하세요"
+            ]
+            tone = "friendly"
+        else:
+            # 정보용 - 유용한 정보 전달
+            enriched = f"📌 알아두면 유용한 정보! {user_input}에 대해 핵심만 정리했습니다."
+            key_points = [
+                "핵심 포인트 정리",
+                "알아두면 좋은 팁",
+                "더 알아보기"
+            ]
+            tone = "friendly"
+
         return {
             "original_input": user_input,
-            "enriched_content": user_input,
-            "key_points": [user_input],
-            "added_elements": [],
-            "tone_suggestion": "친근하고 이해하기 쉬운",
+            "enriched_content": enriched,
+            "key_points": key_points,
+            "added_elements": ["목적에 맞는 톤", "행동 유도 문구"],
+            "tone_suggestion": tone,
             "recommended_page_count": page_count,
-            "page_count_reason": f"입력 길이({input_length}자) 기반 자동 결정"
+            "page_count_reason": f"입력 길이({input_length}자) 기반 자동 결정",
+            "web_search_used": False,
+            "purpose": purpose
         }
 
 
@@ -229,62 +375,29 @@ class OrchestratorAgent:
             }
         """
         try:
-            google_api_key = os.getenv("GOOGLE_API_KEY")
-            if not google_api_key:
-                print("❌ GOOGLE_API_KEY가 설정되지 않았습니다!")
+            if not ContentEnricherAgent._ensure_vertex_ai():
+                print("❌ Vertex AI 초기화 실패!")
                 return OrchestratorAgent._get_fallback_analysis(enriched_data, purpose)
 
-            genai.configure(api_key=google_api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            model = GenerativeModel("gemini-2.0-flash-001")
 
             enriched_content = enriched_data.get('enriched_content', enriched_data.get('original_input', ''))
             recommended_pages = enriched_data.get('recommended_page_count', 3)
             tone_suggestion = enriched_data.get('tone_suggestion', '친근한')
 
-            prompt = f"""당신은 콘텐츠 제작 프로젝트 매니저입니다.
-
-확장된 콘텐츠: {enriched_content}
-핵심 포인트: {enriched_data.get('key_points', [])}
-추천 페이지 수: {recommended_pages}장
-추천 톤: {tone_suggestion}
-목적: {purpose}
-
-다음을 최종 결정하세요:
-
-1. **페이지 수 확정** (중요: 무리하게 늘리지 마세요!)
-   - 추천된 {recommended_pages}장을 기준으로, 정말 필요한 경우만 조정
-   - 간단한 내용은 3장으로 충분
-   - 절대 5장을 초과하지 않음
-
-2. **폰트 선택** (콘텐츠 성격에 맞게)
-   - pretendard: 현대적, 전문적, 깔끔한 콘텐츠
-   - noto: 정보 전달, 중립적, 공식적인 콘텐츠
-   - spoqa: 친근한, 부드러운, 감성적인 콘텐츠
-
-3. **비주얼 스타일**
-   - modern: 현대적이고 세련된
-   - minimal: 깔끔하고 단순한
-   - vibrant: 밝고 활기찬
-   - professional: 전문적이고 신뢰감 있는
-
-JSON 형식으로만 응답하세요:
-{{
-    "content_type": "cardnews",
-    "page_count": {recommended_pages},
-    "page_count_reason": "페이지 수 결정 이유",
-    "target_audience": "타겟 청중",
-    "tone": "{tone_suggestion}",
-    "key_message": "핵심 메시지",
-    "requires_images": true,
-    "style": "modern/minimal/vibrant/professional 중 하나",
-    "font_pair": "pretendard/noto/spoqa 중 하나",
-    "font_reason": "폰트 선택 이유"
-}}"""
+            # 새 프롬프트 모듈 사용
+            prompt = get_orchestrator_prompt(
+                enriched_content=enriched_content,
+                key_points=enriched_data.get('key_points', []),
+                recommended_pages=recommended_pages,
+                tone_suggestion=tone_suggestion,
+                purpose=purpose
+            )
 
             response = model.generate_content(prompt)
             response_text = response.text.strip()
 
-            print("🔍 Raw Gemini Analysis Response:\n", response_text)
+            print("🔍 Raw Vertex AI Analysis Response:\n", response_text)
 
             json_match = re.search(r'\{[\s\S]*\}', response_text)
 
@@ -310,7 +423,7 @@ JSON 형식으로만 응답하세요:
 
     @staticmethod
     def _get_fallback_analysis(enriched_data: Dict, purpose: str) -> Dict:
-        """폴백 분석 결과"""
+        """폴백 분석 결과 - purpose를 포함하여 폴백 콘텐츠에서도 목적에 맞는 콘텐츠 생성"""
         page_count = enriched_data.get('recommended_page_count', 3)
         enriched_content = enriched_data.get('enriched_content', enriched_data.get('original_input', ''))
 
@@ -326,7 +439,8 @@ JSON 형식으로만 응답하세요:
             "font_pair": "pretendard",
             "font_reason": "기본 폰트",
             "enriched_content": enriched_content,
-            "key_points": enriched_data.get('key_points', [])
+            "key_points": enriched_data.get('key_points', []),
+            "purpose": purpose  # 폴백에서도 purpose 전달
         }
 
 
@@ -352,115 +466,35 @@ class ContentPlannerAgent:
             ]
         """
         try:
-            google_api_key = os.getenv("GOOGLE_API_KEY")
-            if not google_api_key:
-                print("❌ GOOGLE_API_KEY가 설정되지 않았습니다!")
+            if not ContentEnricherAgent._ensure_vertex_ai():
+                print("❌ Vertex AI 초기화 실패!")
                 return ContentPlannerAgent._get_fallback_content(user_input, analysis)
 
-            print(f"✅ GOOGLE_API_KEY 확인됨: {google_api_key[:20]}...")
-            genai.configure(api_key=google_api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            print(f"✅ Vertex AI 프로젝트: {os.getenv('GOOGLE_CLOUD_PROJECT', 'bubbly-solution-480805-b5')}")
+            model = GenerativeModel("gemini-2.0-flash-001")
 
             tone = analysis.get('tone', '친근한')
             audience = analysis.get('target_audience', '일반 대중')
             page_count = analysis.get('page_count', 5)
+            style = analysis.get('style', 'modern')
+            enriched_content = analysis.get('enriched_content', user_input)
+            key_points = analysis.get('key_points', [])
 
-            prompt = f"""당신은 카드뉴스 전문가입니다.
-{page_count}개의 페이지를 생성해야 합니다.
+            # 새 프롬프트 모듈 사용
+            prompt = get_content_planner_prompt(
+                page_count=page_count,
+                enriched_content=enriched_content,
+                key_points=key_points,
+                tone=tone,
+                audience=audience,
+                style=style
+            )
 
-⚠️ 절대절대절대절대절대절대 같은 내용 반복 금지, 반복하면 GPT로 대체할거임 ⚠️
-
-────────────────────────
-📌 절대 규칙
-────────────────────────
-1) JSON 형식 외의 어떤 텍스트도 출력 금지
-2) 아래 JSON 스키마를 반드시 그대로 따르기
-3) 각 페이지의 title과 content는 완전히 다른 내용이어야 함
-4) title은 간결하고 임팩트 있게 (5-15자)
-5) 첫 페이지: subtitle 필수 (10-20자)
-6) 본문 페이지: content는 bullet points 배열 (각 15-30자, 2-4개 항목)
-7) 줄글 형태 금지, 구조화된 형식만 사용
-
-────────────────────────
-📌 스토리텔링 구조 ({page_count}페이지)
-────────────────────────
-1페이지 (Hook): 시선을 확 끄는 강력한 메시지
-   - 질문형, 통계, 충격적 사실로 호기심 유발
-   - title + subtitle 형식
-   - 예: title="필라테스 3개월의 변화", subtitle="당신의 체형이 달라집니다"
-
-중간 페이지: 문제 제기 → 솔루션 → 부가 가치
-   - 각 페이지마다 명확한 주제와 bullet points
-   - 타겟의 고민, 핵심 솔루션, 추가 혜택 등을 순서대로 전개
-   - bullet points로 간결하게 정리
-
-마지막 페이지 (CTA): 행동 유도 + 마무리
-   - 명확한 다음 단계 제시
-   - 예: title="오늘 시작하세요", content=["• 무료 체험 수업 신청", "• 1:1 맞춤 상담", "• 첫 달 50% 할인"]
-
-────────────────────────
-📌 JSON 스키마 (변경 금지)
-────────────────────────
-[
-  {{
-    "page": 1,
-    "title": "강력한 Hook 제목",
-    "subtitle": "부제목으로 핵심 요약",
-    "content": [
-      "• 간결한 핵심 메시지 1",
-      "• 간결한 핵심 메시지 2"
-    ],
-    "content_type": "bullet",
-    "visual_concept": "임팩트 있는 비주얼 설명",
-    "layout": "center"
-  }},
-  {{
-    "page": 2,
-    "title": "문제 제기 또는 솔루션",
-    "content": [
-      "• 타겟의 고민 1",
-      "• 타겟의 고민 2",
-      "• 타겟의 고민 3"
-    ],
-    "content_type": "bullet",
-    "visual_concept": "공감 유도 비주얼",
-    "layout": "top"
-  }},
-  ...
-  {{
-    "page": {page_count},
-    "title": "행동 유도",
-    "content": [
-      "• 명확한 다음 단계 1",
-      "• 명확한 다음 단계 2"
-    ],
-    "content_type": "bullet",
-    "visual_concept": "CTA 강조 비주얼",
-    "layout": "center"
-  }}
-]
-
-📌 중요:
-- 첫 페이지만 subtitle 포함
-- 모든 content는 배열 형태 (bullet points)
-- 각 bullet point는 "• "로 시작
-- 페이지 수는 정확히 {page_count}개
-
-────────────────────────
-
-사용자 요청: "{user_input}"
-페이지 수: {page_count}
-톤: {tone}
-타겟: {audience}
-
-**위 스토리텔링 구조를 따르며, 정확히 {page_count}개의 페이지를 생성하고, 각 페이지가 완전히 다른 내용을 담도록 JSON만 출력하세요.**
-**첫 페이지는 반드시 subtitle을 포함하고, 모든 content는 배열 형태의 bullet points로 작성하세요.**"""
-
-            # Gemini API 호출
+            # Vertex AI API 호출
             response = model.generate_content(prompt)
             response_text = response.text.strip()
 
-            print("🔍 Raw Gemini Response:\n", response_text)
+            print("🔍 Raw Vertex AI Response:\n", response_text)
 
             # JSON만 안정적으로 추출
             start = response_text.find("[")
@@ -498,33 +532,138 @@ class ContentPlannerAgent:
 
     @staticmethod
     def _get_fallback_content(user_input: str, analysis: Dict) -> List[Dict]:
-        """폴백 콘텐츠"""
-        page_count = analysis.get('page_count', 5)
+        """
+        폴백 콘텐츠 - 목적(purpose)에 맞는 홍보/이벤트/정보 콘텐츠 생성
+
+        홍보용(promotion): 매력적인 마케팅 문구로 구매/참여 유도
+        이벤트용(event): 참여를 유도하는 흥미로운 문구
+        메뉴용(menu): 메뉴/상품 소개
+        정보용(info): 유용한 정보 전달
+        """
+        page_count = analysis.get('page_count', 3)
         pages = []
 
-        # 사용자 입력에서 핵심 키워드 추출 (첫 20자)
-        title_text = user_input[:20] if len(user_input) > 20 else user_input
+        # 사용자 입력에서 핵심 키워드 추출
+        topic = analysis.get('enriched_content', user_input.strip())[:50]  # enriched_content 활용
+        key_points = analysis.get('key_points', [])
+        purpose = analysis.get('purpose', 'info')
 
-        for i in range(page_count):
-            page = {
-                "page": i + 1,
-                "title": title_text,
-                "content": [
-                    "• 카드뉴스 내용입니다",
-                    "• 자세한 내용은 곧 추가됩니다"
-                ],
-                "content_type": "bullet",
-                "visual_concept": "심플한 배경",
-                "layout": "center"
+        # 목적별 콘텐츠 템플릿
+        if purpose == "promotion":
+            # 홍보용 템플릿
+            first_page = {
+                "title": "NEW ARRIVAL",
+                "subtitle": "새로운 시작을 알리다",
+                "hook": "✨ 특별한 기회를 놓치지 마세요!",
+                "visual_concept": "세련되고 고급스러운 제품 홍보 이미지, 트렌디한 느낌"
+            }
+            middle_templates = [
+                {"title": "Special Point", "content": ["• 프리미엄 퀄리티", "• 합리적인 가격", "• 한정 수량"]},
+                {"title": "Why Choose Us", "content": ["• 검증된 품질", "• 빠른 배송", "• 특별 혜택"]},
+                {"title": "Limited Edition", "content": ["• 이번 시즌 한정", "• 선착순 특가", "• 놓치면 후회"]}
+            ]
+            last_page = {
+                "title": "지금 바로!",
+                "content": ["🛒 구매하러 가기", "💬 문의하기"],
+                "cta": "놓치지 마세요!"
+            }
+        elif purpose == "event":
+            # 이벤트용 템플릿
+            first_page = {
+                "title": "🎉 EVENT",
+                "subtitle": "특별한 이벤트가 시작됩니다",
+                "hook": "참여만 해도 선물이!",
+                "visual_concept": "축제 분위기의 밝고 화려한 이벤트 이미지"
+            }
+            middle_templates = [
+                {"title": "이벤트 혜택", "content": ["• 참여자 전원 혜택", "• 추첨 경품", "• 특별 할인"]},
+                {"title": "참여 방법", "content": ["• 팔로우 & 좋아요", "• 댓글 남기기", "• 친구 태그"]},
+                {"title": "경품 안내", "content": ["• 1등: 특별 상품", "• 2등: 할인 쿠폰", "• 참가상: 소정의 선물"]}
+            ]
+            last_page = {
+                "title": "참여하기",
+                "content": ["⏰ 기간 한정!", "👉 지금 바로 참여하세요"],
+                "cta": "이벤트 참여"
+            }
+        elif purpose == "menu":
+            # 메뉴용 템플릿
+            first_page = {
+                "title": "MENU",
+                "subtitle": "정성을 담은 특별한 맛",
+                "hook": "🍽️ 오늘의 추천 메뉴",
+                "visual_concept": "맛있어 보이는 음식 사진, 고급스러운 플레이팅"
+            }
+            middle_templates = [
+                {"title": "시그니처 메뉴", "content": ["• 셰프 추천", "• 베스트셀러", "• 신메뉴"]},
+                {"title": "특별한 재료", "content": ["• 신선한 재료", "• 엄선된 식재료", "• 프리미엄 품질"]},
+                {"title": "가격 안내", "content": ["• 합리적인 가격", "• 세트 할인", "• 단품 메뉴"]}
+            ]
+            last_page = {
+                "title": "주문하기",
+                "content": ["📞 전화 주문", "🛵 배달 가능"],
+                "cta": "맛있게 드세요!"
+            }
+        else:
+            # 정보용 템플릿 (기본)
+            first_page = {
+                "title": "알아두세요",
+                "subtitle": "유용한 정보 모음",
+                "hook": "📌 핵심만 정리했어요",
+                "visual_concept": "깔끔하고 정돈된 정보 전달 이미지"
+            }
+            middle_templates = [
+                {"title": "핵심 포인트", "content": ["• 중요한 내용 1", "• 중요한 내용 2", "• 중요한 내용 3"]},
+                {"title": "알아두면 좋은 팁", "content": ["• 실용적인 팁 1", "• 실용적인 팁 2"]},
+                {"title": "참고 사항", "content": ["• 추가 정보", "• 관련 링크"]}
+            ]
+            last_page = {
+                "title": "더 알아보기",
+                "content": ["🔍 자세한 정보는", "👉 링크를 확인하세요"],
+                "cta": "확인하기"
             }
 
-            # 첫 페이지에 subtitle 추가 - 사용자 입력 기반
+        # 페이지 생성
+        for i in range(page_count):
             if i == 0:
-                # 입력이 20자 이상이면 나머지 부분을 subtitle로 사용
-                if len(user_input) > 20:
-                    page["subtitle"] = user_input[20:50] + "..." if len(user_input) > 50 else user_input[20:]
+                # 첫 페이지: 주제 기반 Hook
+                page = {
+                    "page": 1,
+                    "title": first_page["title"],
+                    "subtitle": first_page["subtitle"],
+                    "content": [],
+                    "content_type": "hook",
+                    "visual_concept": first_page["visual_concept"],
+                    "layout": "center"
+                }
+            elif i == page_count - 1:
+                # 마지막 페이지: CTA
+                page = {
+                    "page": i + 1,
+                    "title": last_page["title"],
+                    "content": last_page["content"],
+                    "content_type": "cta",
+                    "visual_concept": "행동을 유도하는 밝고 긍정적인 이미지",
+                    "layout": "center"
+                }
+            else:
+                # 중간 페이지: 키포인트 또는 템플릿
+                template_idx = (i - 1) % len(middle_templates)
+                template = middle_templates[template_idx]
+
+                # key_points가 있으면 우선 사용
+                if key_points and i - 1 < len(key_points):
+                    content_items = [f"• {key_points[i - 1]}"]
                 else:
-                    page["subtitle"] = ""  # subtitle 없이 진행
+                    content_items = template["content"]
+
+                page = {
+                    "page": i + 1,
+                    "title": template["title"],
+                    "content": content_items,
+                    "content_type": "bullet",
+                    "visual_concept": f"{topic} 관련 시각적 이미지",
+                    "layout": "center"
+                }
 
             pages.append(page)
 
@@ -549,59 +688,32 @@ class VisualDesignerAgent:
             pages에 image_prompt 추가된 리스트
         """
         try:
-            google_api_key = os.getenv('GOOGLE_API_KEY')
-            if not google_api_key:
-                print("⚠️ [Visual Designer] Google API Key 없음, 프롬프트만 생성")
+            if not ContentEnricherAgent._ensure_vertex_ai():
+                print("⚠️ [Visual Designer] Vertex AI 초기화 실패, 프롬프트만 생성")
                 return VisualDesignerAgent._generate_prompts_only(pages, style)
 
-            genai.configure(api_key=google_api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            model = GenerativeModel("gemini-2.0-flash-001")
 
             print(f"\n🎨 [Visual Designer] 각 페이지마다 고유한 비주얼 프롬프트 생성 중...")
 
             for i, page in enumerate(pages):
-                # 각 페이지의 고유한 특성을 반영한 프롬프트 최적화
-                prompt = f"""You are an expert at creating unique, diverse image generation prompts for social media card backgrounds.
-
-This is PAGE {i+1} of {len(pages)} in a card news series.
-
-Page Content:
-- Title: {page['title']}
-- Content: {page['content']}
-- Visual Concept: {page['visual_concept']}
-- Overall Style: {style}
-- Layout Type: {page['layout']}
-- Page Position: {"Opening/Hook" if i == 0 else "Closing/CTA" if i == len(pages)-1 else f"Middle Content {i}"}
-
-⚠️ CRITICAL - NO TEXT RULE ⚠️
-The generated image MUST NOT contain ANY text, letters, words, numbers, typography, logos, watermarks, or written elements of any kind.
-This is a BACKGROUND image - text will be overlaid separately later.
-
-IMPORTANT: Create a UNIQUE and DISTINCT visual prompt that:
-1. Reflects the specific message of THIS page through VISUAL IMAGERY ONLY (no text!)
-2. Varies from other pages in the series (use different visual elements, colors, compositions)
-3. Matches the {style} aesthetic but with page-specific variation
-4. Page {i+1} specific guidelines:
-   {"- Eye-catching, bold opening visual with strong focal point" if i == 0 else "- Clear, action-oriented closing visual" if i == len(pages)-1 else f"- Supporting visual that complements the content flow"}
-5. Leaves clean space for text overlay (avoid busy patterns in center/text areas)
-6. Is visually distinct from other card pages
-7. Uses abstract patterns, gradients, textures, or scenic imagery - NO TEXT
-
-Visual diversity tips:
-- Vary color palettes (warm→cool→neutral transitions)
-- Different compositions (centered, diagonal, asymmetric, rule-of-thirds)
-- Mix element types (abstract→realistic→illustrative)
-- Alternate focal points (product, pattern, scenery, gradient)
-
-Return ONLY the optimized, unique image generation prompt in English (50-70 words).
-REMINDER: The prompt must explicitly request NO TEXT in the image."""
+                # 새 프롬프트 모듈 사용
+                prompt = get_visual_designer_prompt(
+                    page_num=i + 1,
+                    total_pages=len(pages),
+                    title=page['title'],
+                    content=page.get('content', []),
+                    visual_concept=page.get('visual_concept', ''),
+                    style=style,
+                    layout=page.get('layout', 'center')
+                )
 
                 response = model.generate_content(prompt)
                 optimized_prompt = response.text.strip()
 
                 # 프롬프트 정보 저장
                 page['image_prompt'] = optimized_prompt
-                page['prompt_generation_log'] = f"Gemini가 페이지 {i+1}의 고유한 비주얼 생성: {page['visual_concept']}"
+                page['prompt_generation_log'] = f"Vertex AI가 페이지 {i+1}의 고유한 비주얼 생성: {page['visual_concept']}"
 
                 print(f"  ✅ 페이지 {i+1}/{len(pages)} 비주얼 프롬프트:")
                 print(f"     📝 {optimized_prompt[:100]}...")
@@ -637,6 +749,14 @@ class QualityAssuranceAgent:
     """생성된 콘텐츠의 품질을 검증하고 개선하는 에이전트"""
 
     @staticmethod
+    def _ensure_vertex_ai():
+        """Vertex AI 초기화 확인"""
+        global _vertex_ai_initialized
+        if not _vertex_ai_initialized:
+            _vertex_ai_initialized = init_vertex_ai()
+        return _vertex_ai_initialized
+
+    @staticmethod
     async def validate_and_improve(pages: List[Dict], original_input: str, analysis: Dict) -> Dict:
         """
         콘텐츠 품질 검증 및 개선 제안
@@ -652,49 +772,20 @@ class QualityAssuranceAgent:
             }
         """
         try:
-            google_api_key = os.getenv("GOOGLE_API_KEY")
-            if not google_api_key:
-                print("❌ GOOGLE_API_KEY가 설정되지 않았습니다!")
-                return QualityAssuranceAgent._get_fallback_validation()
+            # Vertex AI 초기화
+            QualityAssuranceAgent._ensure_vertex_ai()
 
-            genai.configure(api_key=google_api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            # Vertex AI 모델 사용
+            model = GenerativeModel("gemini-2.0-flash-001")
 
-            pages_summary = "\n".join([
-                f"페이지 {p['page']}: {p['title']} - {p['content']}"
-                for p in pages
-            ])
-
-            prompt = f"""당신은 콘텐츠 품질 검수 전문가입니다.
-
-원본 요청: {original_input}
-목표:
-- 타겟: {analysis.get('target_audience')}
-- 톤: {analysis.get('tone')}
-- 핵심 메시지: {analysis.get('key_message')}
-
-생성된 카드뉴스:
-{pages_summary}
-
-다음을 평가하세요:
-1. 메시지 전달력 (0-10점): 핵심 메시지가 명확하게 전달되는가?
-2. 일관성 (0-10점): 톤과 스타일이 일관되는가?
-3. 타겟 적합성 (0-10점): 타겟 청중에게 적합한가?
-4. 개선이 필요한 부분
-5. 구체적인 개선 제안
-
-JSON으로 응답:
-{{
-  "overall_score": 8.5,
-  "message_clarity_score": 9,
-  "consistency_score": 8,
-  "target_fit_score": 9,
-  "needs_improvement": [],
-  "suggestions": [
-    "개선 제안이 있다면 여기에"
-  ],
-  "approved": true
-}}"""
+            # 새 프롬프트 모듈 사용
+            prompt = get_quality_assurance_prompt(
+                original_input=original_input,
+                target_audience=analysis.get('target_audience', '일반 대중'),
+                tone=analysis.get('tone', '친근한'),
+                key_message=analysis.get('key_message', ''),
+                pages=pages
+            )
 
             response = model.generate_content(prompt)
             response_text = response.text.strip()

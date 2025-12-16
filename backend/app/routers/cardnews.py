@@ -46,9 +46,12 @@ cardnews_logger.addHandler(file_handler)
 FONT_DIR = Path(__file__).parent.parent.parent / "fonts"
 FONT_DIR.mkdir(exist_ok=True)
 
-# 카드 크기
+# 카드 크기 (고해상도 렌더링용)
+RENDER_SCALE = 2  # 2x 해상도로 렌더링 후 다운스케일
 CARD_WIDTH = 1080
 CARD_HEIGHT = 1080
+RENDER_WIDTH = CARD_WIDTH * RENDER_SCALE  # 2160px
+RENDER_HEIGHT = CARD_HEIGHT * RENDER_SCALE  # 2160px
 
 # 색상 테마 (확장됨)
 COLOR_THEMES = {
@@ -294,10 +297,10 @@ class FontManager:
         except:
             return ImageFont.load_default()
 
-# ==================== 텍스트 렌더링 ====================
+# ==================== 텍스트 렌더링 (고품질) ====================
 
 class TextRenderer:
-    """텍스트를 이미지에 렌더링"""
+    """고품질 텍스트 렌더링 (Gaussian Blur 그림자, 외곽선 지원)"""
 
     @staticmethod
     def wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int, draw: ImageDraw.Draw) -> List[str]:
@@ -324,6 +327,63 @@ class TextRenderer:
         return lines if lines else [text]
 
     @staticmethod
+    def create_gaussian_shadow(
+        text: str,
+        font: ImageFont.FreeTypeFont,
+        shadow_color: tuple = (0, 0, 0, 180),
+        blur_radius: int = 8,
+        offset: tuple = (4, 4)
+    ) -> tuple:
+        """Gaussian Blur 그림자 생성 (별도 레이어)"""
+        # 텍스트 크기 계산
+        temp_img = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+        temp_draw = ImageDraw.Draw(temp_img)
+        bbox = temp_draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+
+        # 여유 공간 포함한 그림자 레이어 생성
+        padding = blur_radius * 3
+        shadow_width = text_width + padding * 2
+        shadow_height = text_height + padding * 2
+
+        shadow_layer = Image.new('RGBA', (shadow_width, shadow_height), (0, 0, 0, 0))
+        shadow_draw = ImageDraw.Draw(shadow_layer)
+
+        # 그림자 텍스트 그리기
+        shadow_draw.text((padding, padding), text, font=font, fill=shadow_color)
+
+        # Gaussian Blur 적용
+        shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+
+        return shadow_layer, (padding - offset[0], padding - offset[1])
+
+    @staticmethod
+    def draw_text_with_stroke(
+        image: Image.Image,
+        text: str,
+        position: tuple,
+        font: ImageFont.FreeTypeFont,
+        color: str = "white",
+        stroke_color: tuple = (0, 0, 0),
+        stroke_width: int = 2
+    ):
+        """외곽선이 있는 텍스트 그리기"""
+        draw = ImageDraw.Draw(image, 'RGBA')
+        x, y = position
+
+        # 외곽선 그리기 (8방향)
+        if stroke_width > 0:
+            for dx in range(-stroke_width, stroke_width + 1):
+                for dy in range(-stroke_width, stroke_width + 1):
+                    if dx == 0 and dy == 0:
+                        continue
+                    draw.text((x + dx, y + dy), text, font=font, fill=stroke_color)
+
+        # 메인 텍스트
+        draw.text((x, y), text, font=font, fill=color)
+
+    @staticmethod
     def draw_text_with_shadow(
         image: Image.Image,
         text: str,
@@ -334,9 +394,15 @@ class TextRenderer:
         shadow: bool = True,
         shadow_color: tuple = (0, 0, 0, 120),
         align: str = "left",
-        line_spacing: int = 10
+        line_spacing: int = 10,
+        use_gaussian_shadow: bool = True,  # 새 옵션: Gaussian blur 그림자
+        blur_radius: int = 6,  # 블러 강도
+        shadow_offset: tuple = (4, 4),  # 그림자 오프셋
+        stroke_width: int = 0,  # 외곽선 두께 (0이면 없음)
+        stroke_color: tuple = (0, 0, 0),  # 외곽선 색상
+        letter_spacing: int = 0  # 자간 조절
     ):
-        """그림자가 있는 텍스트 그리기"""
+        """고품질 그림자가 있는 텍스트 그리기 (Gaussian Blur 지원)"""
         draw = ImageDraw.Draw(image, 'RGBA')
 
         # 텍스트 줄바꿈
@@ -348,6 +414,10 @@ class TextRenderer:
         # 각 줄 그리기
         y = position[1]
         for line in lines:
+            # 자간 적용된 텍스트 처리
+            if letter_spacing > 0:
+                line = ''.join([c + ' ' * (letter_spacing // 10) for c in line]).strip()
+
             bbox = draw.textbbox((0, 0), line, font=font)
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
@@ -359,19 +429,39 @@ class TextRenderer:
             elif align == "right" and max_width:
                 x = position[0] + max_width - text_width
 
-            # 그림자 효과
+            # 그림자 효과 (Gaussian Blur 또는 기존 방식)
             if shadow:
-                shadow_offset = 3
-                for offset_x in range(-shadow_offset, shadow_offset + 1):
-                    for offset_y in range(-shadow_offset, shadow_offset + 1):
-                        if offset_x == 0 and offset_y == 0:
+                if use_gaussian_shadow:
+                    # Gaussian Blur 그림자 (고품질)
+                    shadow_layer, offset = TextRenderer.create_gaussian_shadow(
+                        line, font, shadow_color, blur_radius, shadow_offset
+                    )
+                    # 그림자 위치 계산
+                    shadow_x = x - offset[0] + shadow_offset[0]
+                    shadow_y = y - offset[1] + shadow_offset[1]
+                    # 그림자 합성
+                    image.paste(shadow_layer, (int(shadow_x), int(shadow_y)), shadow_layer)
+                else:
+                    # 기존 방식 (빠르지만 품질 낮음)
+                    old_shadow_offset = 3
+                    for offset_x in range(-old_shadow_offset, old_shadow_offset + 1):
+                        for offset_y in range(-old_shadow_offset, old_shadow_offset + 1):
+                            if offset_x == 0 and offset_y == 0:
+                                continue
+                            draw.text(
+                                (x + offset_x, y + offset_y),
+                                line,
+                                fill=shadow_color,
+                                font=font
+                            )
+
+            # 외곽선 (옵션)
+            if stroke_width > 0:
+                for dx in range(-stroke_width, stroke_width + 1):
+                    for dy in range(-stroke_width, stroke_width + 1):
+                        if dx == 0 and dy == 0:
                             continue
-                        draw.text(
-                            (x + offset_x, y + offset_y),
-                            line,
-                            fill=shadow_color,
-                            font=font
-                        )
+                        draw.text((x + dx, y + dy), line, font=font, fill=stroke_color)
 
             # 메인 텍스트
             draw.text((x, y), line, fill=color, font=font)
@@ -386,7 +476,9 @@ class TextRenderer:
         position: tuple,
         font: ImageFont.FreeTypeFont,
         color: str = "white",
-        bullet_symbol: str = "•"
+        bullet_symbol: str = "•",
+        use_shadow: bool = False,
+        shadow_color: tuple = (0, 0, 0, 100)
     ):
         """Bullet point 렌더링 (• 기호 처리 + 들여쓰기)"""
         draw = ImageDraw.Draw(image, 'RGBA')
@@ -395,11 +487,18 @@ class TextRenderer:
         # "• " 또는 "- " 제거 후 텍스트 추출
         clean_text = text.lstrip('•- ').strip()
 
+        # 그림자 효과 (옵션)
+        if use_shadow:
+            shadow_offset = 2
+            draw.text((x + shadow_offset, y + shadow_offset), bullet_symbol, font=font, fill=shadow_color)
+            draw.text((x + 35 + shadow_offset, y + shadow_offset), clean_text, font=font, fill=shadow_color)
+
         # Bullet 기호 그리기
         draw.text((x, y), bullet_symbol, font=font, fill=color)
 
-        # 텍스트 그리기 (들여쓰기 30px)
-        draw.text((x + 35, y), clean_text, font=font, fill=color)
+        # 텍스트 그리기 (들여쓰기 - 2x 스케일에 맞게 조정)
+        indent = 35 * RENDER_SCALE // 2  # 스케일에 맞게 조정
+        draw.text((x + indent, y), clean_text, font=font, fill=color)
 
     @staticmethod
     def draw_structured_content(
@@ -409,7 +508,8 @@ class TextRenderer:
         font: ImageFont.FreeTypeFont,
         color: str = "white",
         line_spacing: int = 50,
-        start_x: int = 100
+        start_x: int = 100,
+        use_shadow: bool = False
     ) -> int:
         """
         구조화된 콘텐츠 렌더링 (bullet points 배열)
@@ -421,16 +521,203 @@ class TextRenderer:
 
         for line in content:
             TextRenderer.draw_bullet_point(
-                image, line, (start_x, current_y), font, color
+                image, line, (start_x, current_y), font, color,
+                use_shadow=use_shadow
             )
             current_y += line_spacing
 
         return current_y
 
-# ==================== 카드 빌더 ====================
+# ==================== 배경 처리 유틸리티 ====================
+
+class BackgroundProcessor:
+    """고급 배경 이미지 처리 (blur, overlay, vignette, gradient)"""
+
+    @staticmethod
+    def apply_gaussian_blur(image: Image.Image, radius: int = 3) -> Image.Image:
+        """Gaussian Blur 적용"""
+        return image.filter(ImageFilter.GaussianBlur(radius=radius))
+
+    @staticmethod
+    def apply_overlay(image: Image.Image, color: tuple = (0, 0, 0), opacity: float = 0.4) -> Image.Image:
+        """반투명 오버레이 적용"""
+        overlay = Image.new('RGBA', image.size, (*color, int(255 * opacity)))
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+        return Image.alpha_composite(image, overlay)
+
+    @staticmethod
+    def apply_vignette(image: Image.Image, strength: float = 0.5) -> Image.Image:
+        """비네트 효과 (가장자리 어둡게)"""
+        import math
+
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+
+        width, height = image.size
+        vignette = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+
+        # 중심점에서 거리에 따라 어두워지는 그라데이션
+        center_x, center_y = width // 2, height // 2
+        max_distance = math.sqrt(center_x ** 2 + center_y ** 2)
+
+        for y in range(height):
+            for x in range(width):
+                distance = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+                # 거리에 따른 어둡기 계산 (중심은 투명, 가장자리는 어둡게)
+                factor = min(1.0, (distance / max_distance) ** 1.5 * strength)
+                alpha = int(255 * factor * 0.7)
+                vignette.putpixel((x, y), (0, 0, 0, alpha))
+
+        return Image.alpha_composite(image, vignette)
+
+    @staticmethod
+    def apply_fast_vignette(image: Image.Image, strength: float = 0.5) -> Image.Image:
+        """빠른 비네트 효과 (radial gradient 근사)"""
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+
+        width, height = image.size
+
+        # 간단한 4-corner 어둡게 처리
+        vignette = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(vignette, 'RGBA')
+
+        # 외곽 테두리에 반투명 검정 적용 (점진적)
+        for i in range(int(min(width, height) * 0.3)):
+            alpha = int((1 - i / (min(width, height) * 0.3)) * strength * 100)
+            draw.rectangle(
+                [i, i, width - i - 1, height - i - 1],
+                outline=(0, 0, 0, alpha)
+            )
+
+        return Image.alpha_composite(image, vignette)
+
+    @staticmethod
+    def create_linear_gradient(
+        width: int,
+        height: int,
+        start_color: tuple,
+        end_color: tuple,
+        direction: str = "vertical"  # vertical, horizontal, diagonal
+    ) -> Image.Image:
+        """선형 그라데이션 생성"""
+        gradient = Image.new('RGB', (width, height))
+
+        for y in range(height):
+            for x in range(width):
+                if direction == "vertical":
+                    ratio = y / height
+                elif direction == "horizontal":
+                    ratio = x / width
+                else:  # diagonal
+                    ratio = (x + y) / (width + height)
+
+                r = int(start_color[0] + (end_color[0] - start_color[0]) * ratio)
+                g = int(start_color[1] + (end_color[1] - start_color[1]) * ratio)
+                b = int(start_color[2] + (end_color[2] - start_color[2]) * ratio)
+
+                gradient.putpixel((x, y), (r, g, b))
+
+        return gradient
+
+    @staticmethod
+    def create_fast_gradient(
+        width: int,
+        height: int,
+        start_color: tuple,
+        end_color: tuple,
+        direction: str = "vertical"
+    ) -> Image.Image:
+        """빠른 그라데이션 생성 (numpy 없이)"""
+        gradient = Image.new('RGB', (width, height))
+        draw = ImageDraw.Draw(gradient)
+
+        if direction == "vertical":
+            for y in range(height):
+                ratio = y / height
+                r = int(start_color[0] + (end_color[0] - start_color[0]) * ratio)
+                g = int(start_color[1] + (end_color[1] - start_color[1]) * ratio)
+                b = int(start_color[2] + (end_color[2] - start_color[2]) * ratio)
+                draw.line([(0, y), (width, y)], fill=(r, g, b))
+        elif direction == "horizontal":
+            for x in range(width):
+                ratio = x / width
+                r = int(start_color[0] + (end_color[0] - start_color[0]) * ratio)
+                g = int(start_color[1] + (end_color[1] - start_color[1]) * ratio)
+                b = int(start_color[2] + (end_color[2] - start_color[2]) * ratio)
+                draw.line([(x, 0), (x, height)], fill=(r, g, b))
+        else:  # diagonal
+            for i in range(width + height):
+                ratio = i / (width + height)
+                r = int(start_color[0] + (end_color[0] - start_color[0]) * ratio)
+                g = int(start_color[1] + (end_color[1] - start_color[1]) * ratio)
+                b = int(start_color[2] + (end_color[2] - start_color[2]) * ratio)
+                # 대각선 그리기
+                draw.line([(0, i), (i, 0)], fill=(r, g, b))
+
+        return gradient
+
+    @staticmethod
+    def create_radial_gradient(
+        width: int,
+        height: int,
+        center_color: tuple,
+        edge_color: tuple
+    ) -> Image.Image:
+        """원형 그라데이션 생성 (빠른 버전)"""
+        import math
+
+        gradient = Image.new('RGB', (width, height))
+        center_x, center_y = width // 2, height // 2
+        max_distance = math.sqrt(center_x ** 2 + center_y ** 2)
+
+        # 최적화: 매 10픽셀마다만 계산하고 나머지는 보간
+        step = 5
+        for y in range(0, height, step):
+            for x in range(0, width, step):
+                distance = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
+                ratio = min(1.0, distance / max_distance)
+
+                r = int(center_color[0] + (edge_color[0] - center_color[0]) * ratio)
+                g = int(center_color[1] + (edge_color[1] - center_color[1]) * ratio)
+                b = int(center_color[2] + (edge_color[2] - center_color[2]) * ratio)
+
+                # step x step 블록 채우기
+                for dy in range(step):
+                    for dx in range(step):
+                        if y + dy < height and x + dx < width:
+                            gradient.putpixel((x + dx, y + dy), (r, g, b))
+
+        return gradient
+
+    @staticmethod
+    def enhance_image(
+        image: Image.Image,
+        brightness: float = 1.0,
+        contrast: float = 1.0,
+        saturation: float = 1.0
+    ) -> Image.Image:
+        """이미지 보정 (밝기, 대비, 채도)"""
+        if brightness != 1.0:
+            enhancer = ImageEnhance.Brightness(image)
+            image = enhancer.enhance(brightness)
+
+        if contrast != 1.0:
+            enhancer = ImageEnhance.Contrast(image)
+            image = enhancer.enhance(contrast)
+
+        if saturation != 1.0:
+            enhancer = ImageEnhance.Color(image)
+            image = enhancer.enhance(saturation)
+
+        return image
+
+
+# ==================== 카드 빌더 (고품질 2x 렌더링) ====================
 
 class CardNewsBuilder:
-    """카드뉴스 이미지 생성"""
+    """고품질 카드뉴스 이미지 생성 (2x 해상도 렌더링 + 다운스케일)"""
 
     def __init__(self, theme: dict, font_style: str, purpose: str, layout_type: str = "bottom", font_weight: str = "light"):
         self.theme = theme
@@ -439,25 +726,63 @@ class CardNewsBuilder:
         self.layout_type = layout_type  # 하위 호환성 유지, 실제로는 미사용 (페이지별 layout 사용)
         self.font_weight = font_weight  # light, medium, bold
         self.badge_text = BADGE_TEXT_MAP.get(purpose, '정보')
+        self.scale = RENDER_SCALE  # 2x 렌더링
 
-    def prepare_background(self, background_image: Image.Image) -> Image.Image:
-        """배경 이미지 준비"""
+    def prepare_background(
+        self,
+        background_image: Image.Image,
+        apply_blur: bool = False,
+        blur_radius: int = 3,
+        apply_overlay: bool = True,
+        overlay_opacity: float = 0.35,
+        apply_vignette: bool = True,
+        vignette_strength: float = 0.4,
+        brightness: float = 0.65,
+        contrast: float = 1.1,
+        saturation: float = 1.1
+    ) -> Image.Image:
+        """고급 배경 이미지 준비 (2x 해상도)"""
         # RGB 변환
         if background_image.mode != 'RGB':
             background_image = background_image.convert('RGB')
 
-        # 크기 조정
-        img = background_image.resize((CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS)
+        # 2x 크기로 조정 (고품질 리샘플링)
+        img = background_image.resize((RENDER_WIDTH, RENDER_HEIGHT), Image.Resampling.LANCZOS)
 
-        # 어둡게 처리
-        enhancer = ImageEnhance.Brightness(img)
-        img = enhancer.enhance(0.6)
+        # 이미지 보정 (밝기, 대비, 채도)
+        img = BackgroundProcessor.enhance_image(img, brightness, contrast, saturation)
+
+        # Gaussian Blur (옵션)
+        if apply_blur:
+            img = BackgroundProcessor.apply_gaussian_blur(img, blur_radius * self.scale)
+
+        # 반투명 오버레이 (텍스트 가독성 향상)
+        if apply_overlay:
+            img = BackgroundProcessor.apply_overlay(img, (0, 0, 0), overlay_opacity)
+
+        # 비네트 효과
+        if apply_vignette:
+            img = BackgroundProcessor.apply_fast_vignette(img, vignette_strength)
+
+        # RGB로 다시 변환 (alpha 제거)
+        if img.mode == 'RGBA':
+            rgb_img = Image.new('RGB', img.size, (0, 0, 0))
+            rgb_img.paste(img, mask=img.split()[3])
+            img = rgb_img
 
         return img
 
+    def _downscale_to_final(self, image: Image.Image) -> Image.Image:
+        """2x 이미지를 1x로 다운스케일 (고품질 안티앨리어싱)"""
+        return image.resize((CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS)
+
     def add_logo(self, image: Image.Image):
-        """로고 배지 추가 (상단 중앙)"""
+        """로고 배지 추가 (상단 중앙) - 2x 스케일 대응"""
         import os
+
+        # 현재 이미지 크기에 따라 스케일 결정
+        current_width = image.size[0]
+        is_2x = current_width == RENDER_WIDTH
 
         # 로고 파일 경로 (ddukddak_white.png 사용)
         logo_path = os.path.join(os.path.dirname(__file__), "../../../public/ddukddak_white.png")
@@ -474,15 +799,18 @@ class CardNewsBuilder:
             # 로고 이미지 로드
             logo = Image.open(logo_path).convert("RGBA")
 
-            # 로고 크기 조정 (가로 비율 유지, 높이 50px 기준)
-            logo_height = 50
+            # 로고 크기 조정 (2x 스케일 적용)
+            base_logo_height = 50
+            logo_height = base_logo_height * self.scale if is_2x else base_logo_height
             aspect_ratio = logo.width / logo.height
             logo_width = int(logo_height * aspect_ratio)
             logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
 
-            # 로고 위치 (상단 중앙)
-            logo_x = (CARD_WIDTH - logo_width) // 2
-            logo_y = 30
+            # 로고 위치 (상단 중앙) - 2x 스케일 적용
+            target_width = RENDER_WIDTH if is_2x else CARD_WIDTH
+            base_y = 30
+            logo_x = (target_width - logo_width) // 2
+            logo_y = base_y * self.scale if is_2x else base_y
 
             # 로고 붙이기 (투명도 유지)
             image.paste(logo, (logo_x, logo_y), logo)
@@ -588,11 +916,12 @@ class CardNewsBuilder:
         """
         첫 페이지 전용 렌더링 (제목 + 소제목 + AI 배경)
         Agent가 판단한 layout에 따라 텍스트 위치 조정
+        2x 고해상도 렌더링 후 다운스케일
         """
-        # 배경 준비
+        # 배경 준비 (2x 해상도)
         card = self.prepare_background(background_image)
 
-        # 로고 추가
+        # 로고 추가 (2x 스케일)
         self.add_logo(card)
 
         # 텍스트 색상 결정
@@ -601,53 +930,70 @@ class CardNewsBuilder:
         else:
             actual_text_color = self.theme.get("text", "white")
 
-        # 폰트 설정 (2배 크기)
-        title_font = FontManager.get_font(self.font_style, 96, weight='bold')
-        subtitle_font = FontManager.get_font(self.font_style, 56, weight='medium')
+        # 폰트 설정 (2x 스케일 적용)
+        title_font = FontManager.get_font(self.font_style, 96 * self.scale, weight='bold')
+        subtitle_font = FontManager.get_font(self.font_style, 56 * self.scale, weight='medium')
+
+        # 2x 스케일 기준 치수
+        max_width = RENDER_WIDTH - 120 * self.scale
+        margin_x = 60 * self.scale
 
         # 텍스트 총 높이 계산
         draw = ImageDraw.Draw(card)
-        title_lines = TextRenderer.wrap_text(title, title_font, CARD_WIDTH - 120, draw)
-        subtitle_lines = TextRenderer.wrap_text(subtitle, subtitle_font, CARD_WIDTH - 120, draw)
+        title_lines = TextRenderer.wrap_text(title, title_font, max_width, draw)
+        subtitle_lines = TextRenderer.wrap_text(subtitle, subtitle_font, max_width, draw)
 
-        title_height = len(title_lines) * 60  # 폰트 크기 + 여백
-        subtitle_height = len(subtitle_lines) * 36
-        total_height = title_height + subtitle_height + 20  # 제목-부제목 간격
+        title_line_height = 120 * self.scale  # 폰트 크기 + 여백 (2x)
+        subtitle_line_height = 72 * self.scale
+        title_height = len(title_lines) * title_line_height
+        subtitle_height = len(subtitle_lines) * subtitle_line_height
+        gap = 40 * self.scale  # 제목-부제목 간격
+        total_height = title_height + subtitle_height + gap
 
-        # Agent가 판단한 layout에 따라 시작 위치 결정
+        # Agent가 판단한 layout에 따라 시작 위치 결정 (2x 스케일)
         if layout == "top":
-            title_y = CARD_HEIGHT // 3  # 1/3 지점 (360px)
+            title_y = RENDER_HEIGHT // 3  # 1/3 지점
         elif layout == "bottom":
-            title_y = CARD_HEIGHT - total_height - 150  # 하단
+            title_y = RENDER_HEIGHT - total_height - 150 * self.scale  # 하단
         else:  # center (기본값)
-            title_y = (CARD_HEIGHT - total_height) // 2  # 중앙
+            title_y = (RENDER_HEIGHT - total_height) // 2  # 중앙
 
-        # 제목 렌더링 (중앙 정렬 수정: x 시작점을 60으로)
+        # 제목 렌더링 (Gaussian Blur 그림자)
         TextRenderer.draw_text_with_shadow(
-            card, title, (60, title_y),
+            card, title, (margin_x, title_y),
             title_font, color=actual_text_color,
-            max_width=CARD_WIDTH - 120,
+            max_width=max_width,
             align="center", shadow=True,
-            line_spacing=24
+            use_gaussian_shadow=True,
+            blur_radius=12 * self.scale,
+            shadow_offset=(6 * self.scale, 6 * self.scale),
+            shadow_color=(0, 0, 0, 160),
+            line_spacing=24 * self.scale
         )
 
         # 소제목 렌더링 (제목 아래)
-        subtitle_y = title_y + title_height + 40
+        subtitle_y = title_y + title_height + gap
         TextRenderer.draw_text_with_shadow(
-            card, subtitle, (60, subtitle_y),
+            card, subtitle, (margin_x, subtitle_y),
             subtitle_font, color=actual_text_color,
-            max_width=CARD_WIDTH - 120,
-            align="center", shadow=False,
-            line_spacing=16
+            max_width=max_width,
+            align="center", shadow=True,
+            use_gaussian_shadow=True,
+            blur_radius=8 * self.scale,
+            shadow_offset=(4 * self.scale, 4 * self.scale),
+            shadow_color=(0, 0, 0, 100),
+            line_spacing=16 * self.scale
         )
 
         # 페이지 번호
         self._add_page_number(card, page_num)
 
+        # 다운스케일 (2x → 1x)
+        final_card = self._downscale_to_final(card)
+
         # Base64 변환
-        import io
         buffer = io.BytesIO()
-        card.save(buffer, format="PNG")
+        final_card.save(buffer, format="PNG", optimize=True)
         return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
     def build_content_page(
@@ -656,16 +1002,27 @@ class CardNewsBuilder:
         title: str,
         content_lines: List[str],
         page_num: int,
-        text_color: str = None  # "white" 또는 "black"
+        text_color: str = None,  # "white" 또는 "black"
+        use_gradient: bool = True  # 그라데이션 배경 사용 여부
     ) -> str:
         """
-        본문 페이지 렌더링 (섹션 제목 + bullet points + 컬러 배경)
-        모든 본문 페이지는 상단(1/3 지점)에서 시작
+        본문 페이지 렌더링 (섹션 제목 + bullet points + 컬러/그라데이션 배경)
+        2x 고해상도 렌더링 후 다운스케일
         """
-        # 컬러 배경 생성
-        card = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), bg_color)
+        # 배경 생성 (2x 해상도)
+        if use_gradient:
+            # 그라데이션 배경 (primary → 약간 어두운 색)
+            end_color = tuple(max(0, c - 40) for c in bg_color)
+            card = BackgroundProcessor.create_fast_gradient(
+                RENDER_WIDTH, RENDER_HEIGHT,
+                bg_color, end_color,
+                direction=self.theme.get("gradient_type", "vertical")
+            )
+        else:
+            # 단색 배경
+            card = Image.new('RGB', (RENDER_WIDTH, RENDER_HEIGHT), bg_color)
 
-        # 로고 추가
+        # 로고 추가 (2x 스케일)
         self.add_logo(card)
 
         # 텍스트 색상 결정
@@ -674,44 +1031,62 @@ class CardNewsBuilder:
         else:
             actual_text_color = self.theme.get("text", "white")
 
-        # 폰트 설정 (2배 크기)
-        title_font = FontManager.get_font(self.font_style, 72, weight='bold')
-        bullet_font = FontManager.get_font(self.font_style, 48, weight='regular')
+        # 폰트 설정 (2x 스케일 적용)
+        title_font = FontManager.get_font(self.font_style, 72 * self.scale, weight='bold')
+        bullet_font = FontManager.get_font(self.font_style, 48 * self.scale, weight='regular')
 
-        # 섹션 제목 (1/3 지점에서 시작, 중앙 정렬 수정)
-        title_y = CARD_HEIGHT // 3  # 360px (1/3 지점)
+        # 2x 스케일 기준 치수
+        margin_x = 60 * self.scale
+        max_width = RENDER_WIDTH - 120 * self.scale
+
+        # 섹션 제목 (1/3 지점에서 시작)
+        title_y = RENDER_HEIGHT // 3
         TextRenderer.draw_text_with_shadow(
-            card, title, (60, title_y),
+            card, title, (margin_x, title_y),
             title_font, color=actual_text_color,
-            max_width=CARD_WIDTH - 120,
-            align="center", shadow=False
+            max_width=max_width,
+            align="center", shadow=False,
+            use_gaussian_shadow=False
         )
 
         # Bullet points 렌더링 (제목 아래)
-        bullet_y = title_y + 120  # 제목 아래 120px 간격
+        bullet_y = title_y + 120 * self.scale
+        bullet_start_x = 100 * self.scale
+        bullet_line_spacing = 120 * self.scale
         TextRenderer.draw_structured_content(
             card, content_lines, bullet_y,
             bullet_font, color=actual_text_color,
-            line_spacing=120, start_x=100
+            line_spacing=bullet_line_spacing, start_x=bullet_start_x,
+            use_shadow=False
         )
 
         # 페이지 번호
         self._add_page_number(card, page_num)
 
+        # 다운스케일 (2x → 1x)
+        final_card = self._downscale_to_final(card)
+
         # Base64 변환
-        import io
         buffer = io.BytesIO()
-        card.save(buffer, format="PNG")
+        final_card.save(buffer, format="PNG", optimize=True)
         return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
     def _add_page_number(self, image: Image.Image, page_num: int):
-        """페이지 번호 추가"""
+        """페이지 번호 추가 (2x 스케일 대응)"""
+        # 현재 이미지 크기에 따라 스케일 결정
+        current_width = image.size[0]
+        is_2x = current_width == RENDER_WIDTH
+        scale = self.scale if is_2x else 1
+
         draw = ImageDraw.Draw(image, 'RGBA')
-        page_font = FontManager.get_font(self.font_style, 20, weight='regular')
+        page_font = FontManager.get_font(self.font_style, 20 * scale, weight='regular')
 
         page_text = f"{page_num}"
+        target_width = RENDER_WIDTH if is_2x else CARD_WIDTH
+        target_height = RENDER_HEIGHT if is_2x else CARD_HEIGHT
+
         draw.text(
-            (CARD_WIDTH - 50, CARD_HEIGHT - 40),
+            (target_width - 50 * scale, target_height - 40 * scale),
             page_text,
             fill=self.theme.get("text", "white"),
             font=page_font
@@ -854,7 +1229,7 @@ async def generate_agentic_cardnews(
     prompt: str = Form(...),
     purpose: str = Form(default="info"),
     fontStyle: str = Form(default="pretendard"),  # AI가 자동 선택하므로 기본값만 유지
-    colorTheme: str = Form(default="auto"),  # "auto"면 썸네일에서 추출
+    colorTheme: str = Form(default="warm"),  # 사용자가 선택한 테마 사용 (기본: warm)
     generateImages: bool = Form(default=True),
     layoutType: str = Form(default="bottom"),
     userContext: str = Form(default=None)  # 사용자 컨텍스트 (JSON 문자열)
@@ -922,7 +1297,12 @@ async def generate_agentic_cardnews(
         print("\n🖼️ 배경 이미지 생성 및 색상 추출 중...")
         background_images = []
         dominant_color = None
+        adjusted_color = None  # 색상 추출 성공 시에만 설정됨
         text_color = "white"
+
+        # 사용자가 선택한 테마 로드
+        user_selected_theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
+        cardnews_logger.info(f"🎨 사용자 선택 테마: {colorTheme} -> RGB{user_selected_theme['primary']}")
 
         if generateImages:
             google_api_key = os.getenv('GOOGLE_API_KEY')
@@ -966,45 +1346,47 @@ async def generate_agentic_cardnews(
                 except Exception as e:
                     cardnews_logger.warning(f"⚠️ 이미지 생성/색상 추출 실패: {e}")
                     print(f"  ⚠️ 이미지 생성/색상 추출 실패: {e}")
-                    # 폴백: 기본 테마 사용
-                    fallback_theme = colorTheme if colorTheme != "auto" else "warm"
+                    # 폴백: 사용자가 선택한 테마 사용
                     for _ in pages:
-                        background_images.append(create_fallback_background(fallback_theme))
-                    dominant_color = COLOR_THEMES.get(fallback_theme, COLOR_THEMES["warm"])["primary"]
+                        background_images.append(create_fallback_background(colorTheme))
+                    dominant_color = user_selected_theme["primary"]
+                    cardnews_logger.info(f"  🎨 사용자 선택 테마 적용: {colorTheme}")
             else:
-                cardnews_logger.warning("⚠️ Google API Key 없음, 기본 테마 사용")
-                print("  ⚠️ Google API Key 없음, 기본 테마 사용")
-                fallback_theme = colorTheme if colorTheme != "auto" else "warm"
+                cardnews_logger.warning("⚠️ Google API Key 없음, 사용자 테마 사용")
+                print("  ⚠️ Google API Key 없음, 사용자 테마 사용")
                 for _ in pages:
-                    background_images.append(create_fallback_background(fallback_theme))
-                dominant_color = COLOR_THEMES.get(fallback_theme, COLOR_THEMES["warm"])["primary"]
+                    background_images.append(create_fallback_background(colorTheme))
+                dominant_color = user_selected_theme["primary"]
+                cardnews_logger.info(f"  🎨 사용자 선택 테마 적용: {colorTheme}")
         else:
-            # 이미지 생성 비활성화
-            cardnews_logger.info("ℹ️ 이미지 생성 비활성화, 기본 테마 사용")
-            print("  ℹ️ 이미지 생성 비활성화, 기본 테마 사용")
-            fallback_theme = colorTheme if colorTheme != "auto" else "warm"
+            # 이미지 생성 비활성화 - 사용자 선택 테마 사용
+            cardnews_logger.info(f"ℹ️ 이미지 생성 비활성화, 사용자 테마 사용: {colorTheme}")
+            print(f"  ℹ️ 이미지 생성 비활성화, 사용자 테마 사용: {colorTheme}")
             for _ in pages:
-                background_images.append(create_fallback_background(fallback_theme))
-            dominant_color = COLOR_THEMES.get(fallback_theme, COLOR_THEMES["warm"])["primary"]
+                background_images.append(create_fallback_background(colorTheme))
+            dominant_color = user_selected_theme["primary"]
 
-        # 최종 배경색 결정
-        if dominant_color and colorTheme == "auto":
-            final_bg_color = adjust_color_for_harmony(dominant_color, selected_style)
+        # 최종 배경색 결정 - 사용자 선택 테마 우선
+        if dominant_color and adjusted_color:
+            # 색상 추출 성공 시 추출된 색상 사용
+            final_bg_color = adjusted_color
+            cardnews_logger.info(f"✅ 추출된 색상 사용: RGB{final_bg_color}")
         else:
-            final_theme = colorTheme if colorTheme != "auto" else "warm"
-            final_bg_color = COLOR_THEMES.get(final_theme, COLOR_THEMES["warm"])["primary"]
+            # 색상 추출 실패 시 사용자 선택 테마 사용
+            final_bg_color = user_selected_theme["primary"]
+            cardnews_logger.info(f"✅ 사용자 선택 테마 색상 사용: RGB{final_bg_color} ({colorTheme})")
 
         # 텍스트 색상 최종 결정
         text_color = get_text_color_for_background(final_bg_color)
 
-        # Step 3: 동적 테마 생성
+        # Step 3: 동적 테마 생성 (사용자 선택 테마의 그라데이션 타입 유지)
         dynamic_theme = {
             "primary": final_bg_color,
             "secondary": tuple(min(255, c + 30) for c in final_bg_color),
             "accent": tuple(max(0, c - 20) for c in final_bg_color),
             "text": text_color,
-            "shadow": (0, 0, 0, 120),
-            "gradient_type": "vertical"
+            "shadow": user_selected_theme.get("shadow", (0, 0, 0, 120)),
+            "gradient_type": user_selected_theme.get("gradient_type", "vertical")
         }
 
         # Step 4: 최종 카드뉴스 생성
@@ -1145,27 +1527,67 @@ async def generate_background_image_with_gemini(prompt: str) -> str:
     raise Exception("Gemini에서 이미지를 추출할 수 없습니다")
 
 
-def create_fallback_background(color_theme: str) -> str:
-    """폴백용 단색 배경 생성"""
+def create_fallback_background(color_theme: str, use_gradient: bool = True) -> str:
+    """폴백용 배경 생성 (그라데이션 또는 단색)"""
     theme = COLOR_THEMES.get(color_theme, COLOR_THEMES["warm"])
-
-    # 단색 배경 생성 (그라데이션 제거)
     primary = theme["primary"]
-    img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color=primary)
+
+    if use_gradient:
+        # 그라데이션 배경 (primary → 약간 어두운 색)
+        end_color = tuple(max(0, c - 40) for c in primary)
+        direction = theme.get("gradient_type", "vertical")
+        img = BackgroundProcessor.create_fast_gradient(
+            CARD_WIDTH, CARD_HEIGHT,
+            primary, end_color,
+            direction=direction
+        )
+    else:
+        # 단색 배경
+        img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color=primary)
 
     # Base64 변환
     buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
+    img.save(buffer, format="PNG", optimize=True)
     return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
 
-def create_solid_color_background(color: tuple) -> str:
-    """RGB 튜플로 단색 배경 생성"""
-    img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color=color)
+def create_solid_color_background(color: tuple, use_gradient: bool = True, gradient_type: str = "vertical") -> str:
+    """RGB 튜플로 배경 생성 (그라데이션 또는 단색)"""
+    if use_gradient:
+        # 그라데이션 배경 (primary → 약간 어두운 색)
+        end_color = tuple(max(0, c - 40) for c in color)
+        img = BackgroundProcessor.create_fast_gradient(
+            CARD_WIDTH, CARD_HEIGHT,
+            color, end_color,
+            direction=gradient_type
+        )
+    else:
+        # 단색 배경
+        img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color=color)
 
     # Base64 변환
     buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
+    img.save(buffer, format="PNG", optimize=True)
+    return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+
+
+def create_gradient_background(
+    start_color: tuple,
+    end_color: tuple,
+    direction: str = "vertical",
+    width: int = CARD_WIDTH,
+    height: int = CARD_HEIGHT
+) -> str:
+    """그라데이션 배경 생성"""
+    img = BackgroundProcessor.create_fast_gradient(
+        width, height,
+        start_color, end_color,
+        direction=direction
+    )
+
+    # Base64 변환
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG", optimize=True)
     return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
 
