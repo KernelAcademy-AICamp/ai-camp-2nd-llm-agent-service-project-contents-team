@@ -13,9 +13,9 @@ import httpx
 import base64
 import os
 
-from ..database import get_db
-from ..models import User, WordPressConnection, WordPressPost
-from .. import auth
+from ...database import get_db
+from ...models import User, WordPressConnection, WordPressPost
+from ... import auth
 
 router = APIRouter(prefix="/api/wordpress", tags=["WordPress"])
 

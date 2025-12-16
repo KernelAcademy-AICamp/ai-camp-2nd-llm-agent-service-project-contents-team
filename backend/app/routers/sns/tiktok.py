@@ -12,9 +12,9 @@ from typing import Optional
 import httpx
 import os
 
-from ..database import get_db
-from ..models import User, TikTokConnection, TikTokVideo
-from .. import auth
+from ...database import get_db
+from ...models import User, TikTokConnection, TikTokVideo
+from ... import auth
 
 router = APIRouter(prefix="/api/tiktok", tags=["TikTok"])
 

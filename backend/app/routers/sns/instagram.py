@@ -12,12 +12,12 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import os
 
-from .. import models, auth
-from ..database import get_db
-from ..oauth import oauth
-from ..services.instagram_service import InstagramService, sync_instagram_posts
-from ..services.facebook_service import FacebookService
-from ..logger import get_logger
+from ... import models, auth
+from ...database import get_db
+from ...oauth import oauth
+from ...services.instagram_service import InstagramService, sync_instagram_posts
+from ...services.facebook_service import FacebookService
+from ...logger import get_logger
 
 logger = get_logger(__name__)
 

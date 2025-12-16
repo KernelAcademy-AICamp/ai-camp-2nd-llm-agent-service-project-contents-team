@@ -13,11 +13,11 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-from ..database import get_db
-from ..auth import get_current_user
-from ..models import User, XConnection, XPost
-from ..services.x_service import XService, sync_x_user_info, sync_x_posts, XTokenExpiredError
-from ..logger import get_logger
+from ...database import get_db
+from ...auth import get_current_user
+from ...models import User, XConnection, XPost
+from ...services.x_service import XService, sync_x_user_info, sync_x_posts, XTokenExpiredError
+from ...logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/x", tags=["x"])

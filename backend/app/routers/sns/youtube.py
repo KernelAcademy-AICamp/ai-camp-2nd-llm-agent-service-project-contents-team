@@ -13,11 +13,11 @@ from pydantic import BaseModel
 import os
 import tempfile
 
-from .. import models, auth
-from ..database import get_db
-from ..oauth import oauth
-from ..services.youtube_service import YouTubeService, sync_youtube_videos, parse_duration
-from ..logger import get_logger
+from ... import models, auth
+from ...database import get_db
+from ...oauth import oauth
+from ...services.youtube_service import YouTubeService, sync_youtube_videos, parse_duration
+from ...logger import get_logger
 
 logger = get_logger(__name__)
 

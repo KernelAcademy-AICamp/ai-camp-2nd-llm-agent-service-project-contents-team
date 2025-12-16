@@ -11,15 +11,15 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-from ..database import get_db
-from ..auth import get_current_user
-from ..models import User, ThreadsConnection, ThreadsPost
-from ..services.threads_service import (
+from ...database import get_db
+from ...auth import get_current_user
+from ...models import User, ThreadsConnection, ThreadsPost
+from ...services.threads_service import (
     ThreadsService,
     sync_threads_user_info,
     sync_threads_posts
 )
-from ..logger import get_logger
+from ...logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/threads", tags=["threads"])

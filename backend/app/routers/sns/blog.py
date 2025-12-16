@@ -9,11 +9,11 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 import logging
 
-from ..database import get_db
-from ..models import User, BrandAnalysis
-from ..auth import get_current_user
-from ..services.naver_blog_service import NaverBlogService
-from ..services.brand_analyzer_service import BrandAnalyzerService
+from ...database import get_db
+from ...models import User, BrandAnalysis
+from ...auth import get_current_user
+from ...services.naver_blog_service import NaverBlogService
+from ...services.brand_analyzer_service import BrandAnalyzerService
 
 router = APIRouter(prefix="/api/blog", tags=["blog"])
 logger = logging.getLogger(__name__)
