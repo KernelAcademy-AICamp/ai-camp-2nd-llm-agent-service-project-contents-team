@@ -12,8 +12,6 @@ import Dashboard from './pages/dashboard/Dashboard';
 import ContentList from './pages/content/ContentList';
 import Templates from './pages/content/Templates';
 import Settings from './pages/settings/Settings';
-import CardNews from './pages/content/CardNews';
-import ImageStudio from './pages/content/ImageStudio';
 import MyPage from './pages/profile/MyPage';
 import ContentHub from './pages/content/ContentHub';
 import ContentCreatorSimple from './pages/content/ContentCreatorSimple';
@@ -109,26 +107,6 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ContentEditor />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/image-studio"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <ImageStudio />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cardnews"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <CardNews />
                 </Layout>
               </ProtectedRoute>
             }

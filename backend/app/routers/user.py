@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from typing import Optional
 from .. import models, schemas, auth
 from ..database import get_db
 
@@ -7,6 +8,35 @@ router = APIRouter(
     prefix="/api/user",
     tags=["user"]
 )
+
+
+def build_user_context(
+    user: models.User,
+    preference: Optional[models.UserPreference],
+    brand_analysis: Optional[models.BrandAnalysis]
+) -> schemas.UserContext:
+    """사용자 정보를 콘텐츠 생성용 컨텍스트로 통합"""
+    return schemas.UserContext(
+        # 기본 정보 (User 테이블)
+        brand_name=user.brand_name,
+        business_type=user.business_type,
+        business_description=user.business_description,
+        target_audience=user.target_audience,
+
+        # 스타일 선호도 (UserPreference 테이블)
+        text_tone=preference.text_tone if preference else None,
+        text_style_sample=preference.text_style_sample if preference else None,
+        image_style_description=preference.image_style_description if preference else None,
+        image_color_palette=preference.image_color_palette if preference else None,
+
+        # 브랜드 분석 결과 (BrandAnalysis 테이블)
+        brand_tone=brand_analysis.brand_tone if brand_analysis else None,
+        brand_personality=brand_analysis.brand_personality if brand_analysis else None,
+        key_themes=brand_analysis.key_themes if brand_analysis else None,
+        emotional_tone=brand_analysis.emotional_tone if brand_analysis else None,
+        blog_writing_style=brand_analysis.blog_writing_style if brand_analysis else None,
+        instagram_caption_style=brand_analysis.instagram_caption_style if brand_analysis else None,
+    )
 
 
 @router.get("/profile", response_model=schemas.UserProfile)
@@ -27,6 +57,39 @@ async def get_user_profile(
     return schemas.UserProfile(
         user=current_user,
         preferences=user_preference
+    )
+
+
+@router.get("/context", response_model=schemas.UserProfileWithBrand)
+async def get_user_context_for_content(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    콘텐츠 생성용 사용자 컨텍스트 조회
+    - 사용자 기본 정보
+    - 스타일 선호도
+    - 브랜드 분석 결과
+    - 통합된 컨텍스트 (AI 프롬프트용)
+    """
+    # 사용자 선호도 조회
+    user_preference = db.query(models.UserPreference).filter(
+        models.UserPreference.user_id == current_user.id
+    ).first()
+
+    # 브랜드 분석 결과 조회
+    brand_analysis = db.query(models.BrandAnalysis).filter(
+        models.BrandAnalysis.user_id == current_user.id
+    ).first()
+
+    # 콘텐츠 생성용 컨텍스트 빌드
+    context = build_user_context(current_user, user_preference, brand_analysis)
+
+    return schemas.UserProfileWithBrand(
+        user=current_user,
+        preferences=user_preference,
+        brand_analysis=brand_analysis,
+        context=context
     )
 
 

@@ -793,6 +793,29 @@ export const creditsAPI = {
   },
 };
 
+// ==========================================
+// 사용자 API
+// ==========================================
+export const userAPI = {
+  // 프로필 조회 (기본)
+  getProfile: async () => {
+    const response = await api.get('/api/user/profile');
+    return response.data;
+  },
+
+  // 콘텐츠 생성용 컨텍스트 조회 (브랜드 분석 포함)
+  getContext: async () => {
+    const response = await api.get('/api/user/context');
+    return response.data;
+  },
+
+  // 프로필 업데이트
+  updateProfile: async (data) => {
+    const response = await api.put('/api/user/profile', data);
+    return response.data;
+  },
+};
+
 // 호환성을 위한 별칭 (기존 코드에서 twitterAPI 사용하는 경우)
 export const twitterAPI = xAPI;
 

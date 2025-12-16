@@ -3,6 +3,169 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import './Settings.css';
 
+// ==================== 상수 정의 ====================
+const BUSINESS_TYPES = [
+  { value: 'food', label: '음식점/카페' },
+  { value: 'fashion', label: '패션/의류' },
+  { value: 'health', label: '헬스/피트니스' },
+  { value: 'education', label: '교육' },
+  { value: 'tech', label: '기술/IT' },
+  { value: 'retail', label: '소매/유통' },
+  { value: 'service', label: '서비스업' },
+];
+
+const AGE_RANGES = ['10대', '20대', '30대', '40대', '50대 이상', '전체'];
+
+const GENDERS = [
+  { value: 'all', label: '전체' },
+  { value: 'male', label: '남성' },
+  { value: 'female', label: '여성' },
+];
+
+const TEXT_TONES = [
+  { value: 'casual', label: '캐주얼' },
+  { value: 'professional', label: '전문적' },
+  { value: 'friendly', label: '친근한' },
+  { value: 'formal', label: '격식체' },
+  { value: 'trendy', label: '트렌디' },
+  { value: 'luxurious', label: '럭셔리' },
+  { value: 'cute', label: '귀여운' },
+  { value: 'minimal', label: '미니멀' },
+];
+
+const VIDEO_DURATIONS = [
+  { value: 'short', label: '짧게 (15-30초)' },
+  { value: 'medium', label: '중간 (30-60초)' },
+  { value: 'long', label: '길게 (1분 이상)' },
+];
+
+const MODAL_TITLES = {
+  business: '비즈니스 정보 수정',
+  target: '타겟 고객 수정',
+  style: '스타일 선호도 수정',
+};
+
+// ==================== 헬퍼 함수 ====================
+const parseBusinessDescription = (description) => {
+  const [mainDescription] = description.split('추가 정보:');
+  return { mainDescription: mainDescription.trim() };
+};
+
+const getLabel = (options, value) =>
+  options.find(opt => opt.value === value)?.label || value;
+
+// ==================== 서브 컴포넌트 ====================
+const InfoCard = ({ label, value, className = '' }) => (
+  <div className={`info-card ${className}`}>
+    <div className="info-label">{label}</div>
+    <div className="info-value">{value}</div>
+  </div>
+);
+
+const FormGroup = ({ label, children }) => (
+  <div className="form-group">
+    <label>{label}</label>
+    {children}
+  </div>
+);
+
+const SelectField = ({ name, value, options, onChange, placeholder = '선택하세요' }) => (
+  <select name={name} value={value || ''} onChange={onChange}>
+    <option value="">{placeholder}</option>
+    {options.map(opt => (
+      <option key={opt.value || opt} value={opt.value || opt}>
+        {opt.label || opt}
+      </option>
+    ))}
+  </select>
+);
+
+const TextareaField = ({ name, value, onChange, placeholder, rows = 3 }) => (
+  <textarea
+    name={name}
+    value={value || ''}
+    onChange={onChange}
+    placeholder={placeholder}
+    rows={rows}
+  />
+);
+
+// 비즈니스 정보 수정 폼
+const BusinessForm = ({ editData, onChange }) => (
+  <>
+    <FormGroup label="브랜드명">
+      <input
+        type="text"
+        name="brand_name"
+        value={editData.brand_name || ''}
+        onChange={onChange}
+        placeholder="브랜드명을 입력하세요"
+      />
+    </FormGroup>
+    <FormGroup label="업종">
+      <SelectField name="business_type" value={editData.business_type} options={BUSINESS_TYPES} onChange={onChange} />
+    </FormGroup>
+    <FormGroup label="비즈니스 설명">
+      <TextareaField name="business_description" value={editData.business_description} onChange={onChange} placeholder="비즈니스에 대해 설명해주세요" rows={4} />
+    </FormGroup>
+  </>
+);
+
+// 타겟 고객 수정 폼
+const TargetForm = ({ editData, onChange, onAddInterest, onRemoveInterest }) => (
+  <>
+    <FormGroup label="연령대">
+      <SelectField name="age_range" value={editData.age_range} options={AGE_RANGES.map(v => ({ value: v, label: v }))} onChange={onChange} />
+    </FormGroup>
+    <FormGroup label="성별">
+      <SelectField name="gender" value={editData.gender} options={GENDERS} onChange={onChange} />
+    </FormGroup>
+    <FormGroup label="관심사">
+      <div className="interest-input-row">
+        <input
+          type="text"
+          name="newInterest"
+          value={editData.newInterest || ''}
+          onChange={onChange}
+          placeholder="관심사 입력"
+          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), onAddInterest())}
+        />
+        <button type="button" className="btn-add-interest" onClick={onAddInterest}>추가</button>
+      </div>
+      <div className="edit-interests-tags">
+        {(editData.interests || []).map((interest, index) => (
+          <span key={index} className="edit-interest-tag">
+            {interest}
+            <button onClick={() => onRemoveInterest(index)}>×</button>
+          </span>
+        ))}
+      </div>
+    </FormGroup>
+  </>
+);
+
+// 스타일 선호도 수정 폼
+const StyleForm = ({ editData, onChange }) => (
+  <>
+    <FormGroup label="텍스트 톤">
+      <SelectField name="text_tone" value={editData.text_tone} options={TEXT_TONES} onChange={onChange} />
+    </FormGroup>
+    <FormGroup label="텍스트 샘플">
+      <TextareaField name="text_style_sample" value={editData.text_style_sample} onChange={onChange} placeholder="선호하는 텍스트 스타일 예시를 입력하세요" />
+    </FormGroup>
+    <FormGroup label="이미지 스타일 설명">
+      <TextareaField name="image_style_description" value={editData.image_style_description} onChange={onChange} placeholder="선호하는 이미지 스타일을 설명해주세요" />
+    </FormGroup>
+    <FormGroup label="비디오 스타일 설명">
+      <TextareaField name="video_style_description" value={editData.video_style_description} onChange={onChange} placeholder="선호하는 비디오 스타일을 설명해주세요" />
+    </FormGroup>
+    <FormGroup label="선호 비디오 길이">
+      <SelectField name="video_duration_preference" value={editData.video_duration_preference} options={VIDEO_DURATIONS} onChange={onChange} />
+    </FormGroup>
+  </>
+);
+
+// ==================== 메인 컴포넌트 ====================
 function Settings() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
@@ -11,7 +174,24 @@ function Settings() {
   const [editData, setEditData] = useState({});
   const [saving, setSaving] = useState(false);
 
-  // 로그아웃 처리
+  const user = profile?.user;
+  const preferences = profile?.preferences;
+
+  // 프로필 조회
+  const fetchProfile = async () => {
+    try {
+      const response = await api.get('/api/user/profile');
+      setProfile(response.data);
+    } catch (err) {
+      console.error('Failed to fetch profile:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchProfile(); }, []);
+
+  // 로그아웃
   const handleLogout = () => {
     if (window.confirm('로그아웃 하시겠습니까?')) {
       localStorage.removeItem('access_token');
@@ -20,60 +200,32 @@ function Settings() {
     }
   };
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const response = await api.get('/api/user/profile');
-        setProfile(response.data);
-      } catch (err) {
-        console.error('Failed to fetch profile:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, []);
-
-  // 프로필 새로고침
-  const refreshProfile = async () => {
-    try {
-      const response = await api.get('/api/user/profile');
-      setProfile(response.data);
-    } catch (err) {
-      console.error('Failed to refresh profile:', err);
-    }
-  };
-
-  // 수정 모달 열기
+  // 모달 열기
   const openEditModal = (type) => {
     if (!profile) return;
-    const { user, preferences } = profile;
 
-    if (type === 'business') {
-      const parsed = parseBusinessDescription(user.business_description || '');
-      setEditData({
+    const initialData = {
+      business: () => ({
         brand_name: user.brand_name || '',
         business_type: user.business_type || '',
-        business_description: parsed.mainDescription || '',
-      });
-    } else if (type === 'target') {
-      setEditData({
+        business_description: parseBusinessDescription(user.business_description || '').mainDescription,
+      }),
+      target: () => ({
         age_range: user.target_audience?.age_range || '',
         gender: user.target_audience?.gender || 'all',
         interests: user.target_audience?.interests || [],
         newInterest: '',
-      });
-    } else if (type === 'style') {
-      setEditData({
+      }),
+      style: () => ({
         text_tone: preferences?.text_tone || '',
         text_style_sample: preferences?.text_style_sample || '',
         image_style_description: preferences?.image_style_description || '',
         video_style_description: preferences?.video_style_description || '',
         video_duration_preference: preferences?.video_duration_preference || '',
-      });
-    }
+      }),
+    };
 
+    setEditData(initialData[type]?.() || {});
     setEditModal({ open: true, type });
   };
 
@@ -89,7 +241,7 @@ function Settings() {
     setEditData(prev => ({ ...prev, [name]: value }));
   };
 
-  // 관심사 추가
+  // 관심사 추가/삭제
   const addInterest = () => {
     if (editData.newInterest?.trim()) {
       setEditData(prev => ({
@@ -100,7 +252,6 @@ function Settings() {
     }
   };
 
-  // 관심사 삭제
   const removeInterest = (index) => {
     setEditData(prev => ({
       ...prev,
@@ -112,24 +263,20 @@ function Settings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      let updateData = {};
-
-      if (editModal.type === 'business') {
-        updateData = {
+      const updatePayload = {
+        business: {
           brand_name: editData.brand_name,
           business_type: editData.business_type,
           business_description: editData.business_description,
-        };
-      } else if (editModal.type === 'target') {
-        updateData = {
+        },
+        target: {
           target_audience: {
             age_range: editData.age_range,
             gender: editData.gender,
             interests: editData.interests,
           },
-        };
-      } else if (editModal.type === 'style') {
-        updateData = {
+        },
+        style: {
           preferences: {
             text_tone: editData.text_tone,
             text_style_sample: editData.text_style_sample,
@@ -137,11 +284,11 @@ function Settings() {
             video_style_description: editData.video_style_description,
             video_duration_preference: editData.video_duration_preference,
           },
-        };
-      }
+        },
+      };
 
-      await api.put('/api/user/profile', updateData);
-      await refreshProfile();
+      await api.put('/api/user/profile', updatePayload[editModal.type]);
+      await fetchProfile();
       closeEditModal();
     } catch (err) {
       console.error('프로필 수정 실패:', err);
@@ -151,11 +298,19 @@ function Settings() {
     }
   };
 
-  const user = profile?.user;
-  const preferences = profile?.preferences;
+  // 모달 폼 렌더링
+  const renderModalForm = () => {
+    const forms = {
+      business: <BusinessForm editData={editData} onChange={handleInputChange} />,
+      target: <TargetForm editData={editData} onChange={handleInputChange} onAddInterest={addInterest} onRemoveInterest={removeInterest} />,
+      style: <StyleForm editData={editData} onChange={handleInputChange} />,
+    };
+    return forms[editModal.type] || null;
+  };
 
   return (
     <div className="settings-page">
+      {/* 헤더 */}
       <div className="settings-header">
         <div className="header-left">
           <h2>설정</h2>
@@ -163,11 +318,9 @@ function Settings() {
         </div>
       </div>
 
-      {/* 계정 정보 바로가기 */}
+      {/* 계정 섹션 */}
       <div className="settings-section">
-        <div className="section-header">
-          <h3>계정</h3>
-        </div>
+        <div className="section-header"><h3>계정</h3></div>
         <div className="account-actions">
           <Link to="/mypage" className="account-link-card">
             <div className="account-link-content">
@@ -176,9 +329,7 @@ function Settings() {
             </div>
             <span className="account-link-arrow">→</span>
           </Link>
-          <button className="logout-button" onClick={handleLogout}>
-            로그아웃
-          </button>
+          <button className="logout-button" onClick={handleLogout}>로그아웃</button>
         </div>
       </div>
 
@@ -187,32 +338,13 @@ function Settings() {
         <div className="settings-section">
           <div className="section-header">
             <h3>비즈니스 정보</h3>
-            <button className="btn-edit" onClick={() => openEditModal('business')}>
-              수정
-            </button>
+            <button className="btn-edit" onClick={() => openEditModal('business')}>수정</button>
           </div>
           <div className="profile-info-grid">
-            {user.brand_name && (
-              <div className="info-card">
-                <div className="info-label">브랜드명</div>
-                <div className="info-value">{user.brand_name}</div>
-              </div>
-            )}
-            {user.business_type && (
-              <div className="info-card">
-                <div className="info-label">업종</div>
-                <div className="info-value business-type">
-                  {getBusinessTypeLabel(user.business_type)}
-                </div>
-              </div>
-            )}
+            {user.brand_name && <InfoCard label="브랜드명" value={user.brand_name} />}
+            {user.business_type && <InfoCard label="업종" value={getLabel(BUSINESS_TYPES, user.business_type)} className="business-type" />}
             {user.business_description && (
-              <div className="info-card full-width">
-                <div className="info-label">비즈니스 설명</div>
-                <div className="info-value description">
-                  {parseBusinessDescription(user.business_description).mainDescription}
-                </div>
-              </div>
+              <InfoCard label="비즈니스 설명" value={parseBusinessDescription(user.business_description).mainDescription} className="full-width description" />
             )}
           </div>
         </div>
@@ -223,31 +355,17 @@ function Settings() {
         <div className="settings-section">
           <div className="section-header">
             <h3>타겟 고객</h3>
-            <button className="btn-edit" onClick={() => openEditModal('target')}>
-              수정
-            </button>
+            <button className="btn-edit" onClick={() => openEditModal('target')}>수정</button>
           </div>
           <div className="profile-info-grid">
-            {user.target_audience.age_range && (
-              <div className="info-card">
-                <div className="info-label">연령대</div>
-                <div className="info-value">{user.target_audience.age_range}</div>
-              </div>
-            )}
-            {user.target_audience.gender && (
-              <div className="info-card">
-                <div className="info-label">성별</div>
-                <div className="info-value">{getGenderLabel(user.target_audience.gender)}</div>
-              </div>
-            )}
-            {user.target_audience.interests && user.target_audience.interests.length > 0 && (
+            {user.target_audience.age_range && <InfoCard label="연령대" value={user.target_audience.age_range} />}
+            {user.target_audience.gender && <InfoCard label="성별" value={getLabel(GENDERS, user.target_audience.gender)} />}
+            {user.target_audience.interests?.length > 0 && (
               <div className="info-card full-width">
                 <div className="info-label">관심사</div>
                 <div className="interests-tags">
-                  {user.target_audience.interests.map((interest, index) => (
-                    <span key={index} className="interest-tag">
-                      {interest}
-                    </span>
+                  {user.target_audience.interests.map((interest, idx) => (
+                    <span key={idx} className="interest-tag">{interest}</span>
                   ))}
                 </div>
               </div>
@@ -261,9 +379,7 @@ function Settings() {
         <div className="settings-section">
           <div className="section-header">
             <h3>스타일 선호도</h3>
-            <button className="btn-edit" onClick={() => openEditModal('style')}>
-              수정
-            </button>
+            <button className="btn-edit" onClick={() => openEditModal('style')}>수정</button>
           </div>
           <div className="preferences-grid">
             {(preferences.text_style_sample || preferences.text_tone) && (
@@ -272,17 +388,13 @@ function Settings() {
                 {preferences.text_tone && (
                   <div className="preference-item">
                     <span className="preference-label">톤</span>
-                    <span className="tone-badge">
-                      {getToneLabel(preferences.text_tone)}
-                    </span>
+                    <span className="tone-badge">{getLabel(TEXT_TONES, preferences.text_tone)}</span>
                   </div>
                 )}
                 {preferences.text_style_sample && (
                   <div className="preference-item">
                     <span className="preference-label">샘플</span>
-                    <div className="text-sample">
-                      {preferences.text_style_sample}
-                    </div>
+                    <div className="text-sample">{preferences.text_style_sample}</div>
                   </div>
                 )}
               </div>
@@ -293,19 +405,13 @@ function Settings() {
                 {preferences.image_style_sample_url && (
                   <div className="preference-item">
                     <span className="preference-label">샘플 이미지</span>
-                    <img
-                      src={preferences.image_style_sample_url}
-                      alt="이미지 스타일 샘플"
-                      className="style-sample-image"
-                    />
+                    <img src={preferences.image_style_sample_url} alt="이미지 스타일 샘플" className="style-sample-image" />
                   </div>
                 )}
                 {preferences.image_style_description && (
                   <div className="preference-item">
                     <span className="preference-label">설명</span>
-                    <p className="preference-description">
-                      {preferences.image_style_description}
-                    </p>
+                    <p className="preference-description">{preferences.image_style_description}</p>
                   </div>
                 )}
               </div>
@@ -316,17 +422,13 @@ function Settings() {
                 {preferences.video_style_description && (
                   <div className="preference-item">
                     <span className="preference-label">설명</span>
-                    <p className="preference-description">
-                      {preferences.video_style_description}
-                    </p>
+                    <p className="preference-description">{preferences.video_style_description}</p>
                   </div>
                 )}
                 {preferences.video_duration_preference && (
                   <div className="preference-item">
                     <span className="preference-label">선호 길이</span>
-                    <span className="preference-value">
-                      {getDurationLabel(preferences.video_duration_preference)}
-                    </span>
+                    <span className="preference-value">{getLabel(VIDEO_DURATIONS, preferences.video_duration_preference)}</span>
                   </div>
                 )}
               </div>
@@ -335,18 +437,13 @@ function Settings() {
         </div>
       )}
 
-      {/* 온보딩 미완료 */}
+      {/* 온보딩 미완료 안내 */}
       {!loading && user && !user.onboarding_completed && (
         <div className="settings-section onboarding-prompt">
           <div className="prompt-content">
             <h3>온보딩을 완료하지 않으셨네요!</h3>
             <p>비즈니스 정보를 입력하면 더 나은 콘텐츠 추천을 받을 수 있습니다.</p>
-            <button
-              onClick={() => window.location.href = '/onboarding'}
-              className="onboarding-button"
-            >
-              온보딩 시작하기
-            </button>
+            <button onClick={() => navigate('/onboarding')} className="onboarding-button">온보딩 시작하기</button>
           </div>
         </div>
       )}
@@ -356,184 +453,12 @@ function Settings() {
         <div className="modal-overlay" onClick={closeEditModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>
-                {editModal.type === 'business' && '비즈니스 정보 수정'}
-                {editModal.type === 'target' && '타겟 고객 수정'}
-                {editModal.type === 'style' && '스타일 선호도 수정'}
-              </h3>
+              <h3>{MODAL_TITLES[editModal.type]}</h3>
               <button className="modal-close" onClick={closeEditModal}>×</button>
             </div>
-
-            <div className="modal-body">
-              {/* 비즈니스 정보 수정 폼 */}
-              {editModal.type === 'business' && (
-                <>
-                  <div className="form-group">
-                    <label>브랜드명</label>
-                    <input
-                      type="text"
-                      name="brand_name"
-                      value={editData.brand_name || ''}
-                      onChange={handleInputChange}
-                      placeholder="브랜드명을 입력하세요"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>업종</label>
-                    <select
-                      name="business_type"
-                      value={editData.business_type || ''}
-                      onChange={handleInputChange}
-                    >
-                      <option value="">선택하세요</option>
-                      <option value="food">음식점/카페</option>
-                      <option value="fashion">패션/의류</option>
-                      <option value="health">헬스/피트니스</option>
-                      <option value="education">교육</option>
-                      <option value="tech">기술/IT</option>
-                      <option value="retail">소매/유통</option>
-                      <option value="service">서비스업</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>비즈니스 설명</label>
-                    <textarea
-                      name="business_description"
-                      value={editData.business_description || ''}
-                      onChange={handleInputChange}
-                      placeholder="비즈니스에 대해 설명해주세요"
-                      rows={4}
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* 타겟 고객 수정 폼 */}
-              {editModal.type === 'target' && (
-                <>
-                  <div className="form-group">
-                    <label>연령대</label>
-                    <select
-                      name="age_range"
-                      value={editData.age_range || ''}
-                      onChange={handleInputChange}
-                    >
-                      <option value="">선택하세요</option>
-                      <option value="10대">10대</option>
-                      <option value="20대">20대</option>
-                      <option value="30대">30대</option>
-                      <option value="40대">40대</option>
-                      <option value="50대 이상">50대 이상</option>
-                      <option value="전체">전체</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>성별</label>
-                    <select
-                      name="gender"
-                      value={editData.gender || 'all'}
-                      onChange={handleInputChange}
-                    >
-                      <option value="all">전체</option>
-                      <option value="male">남성</option>
-                      <option value="female">여성</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>관심사</label>
-                    <div className="interest-input-row">
-                      <input
-                        type="text"
-                        name="newInterest"
-                        value={editData.newInterest || ''}
-                        onChange={handleInputChange}
-                        placeholder="관심사 입력"
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addInterest())}
-                      />
-                      <button type="button" className="btn-add-interest" onClick={addInterest}>
-                        추가
-                      </button>
-                    </div>
-                    <div className="edit-interests-tags">
-                      {(editData.interests || []).map((interest, index) => (
-                        <span key={index} className="edit-interest-tag">
-                          {interest}
-                          <button onClick={() => removeInterest(index)}>×</button>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* 스타일 선호도 수정 폼 */}
-              {editModal.type === 'style' && (
-                <>
-                  <div className="form-group">
-                    <label>텍스트 톤</label>
-                    <select
-                      name="text_tone"
-                      value={editData.text_tone || ''}
-                      onChange={handleInputChange}
-                    >
-                      <option value="">선택하세요</option>
-                      <option value="casual">캐주얼</option>
-                      <option value="professional">전문적</option>
-                      <option value="friendly">친근한</option>
-                      <option value="formal">격식있는</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>텍스트 샘플</label>
-                    <textarea
-                      name="text_style_sample"
-                      value={editData.text_style_sample || ''}
-                      onChange={handleInputChange}
-                      placeholder="선호하는 텍스트 스타일 예시를 입력하세요"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>이미지 스타일 설명</label>
-                    <textarea
-                      name="image_style_description"
-                      value={editData.image_style_description || ''}
-                      onChange={handleInputChange}
-                      placeholder="선호하는 이미지 스타일을 설명해주세요"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>비디오 스타일 설명</label>
-                    <textarea
-                      name="video_style_description"
-                      value={editData.video_style_description || ''}
-                      onChange={handleInputChange}
-                      placeholder="선호하는 비디오 스타일을 설명해주세요"
-                      rows={3}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>선호 비디오 길이</label>
-                    <select
-                      name="video_duration_preference"
-                      value={editData.video_duration_preference || ''}
-                      onChange={handleInputChange}
-                    >
-                      <option value="">선택하세요</option>
-                      <option value="short">짧게 (15-30초)</option>
-                      <option value="medium">중간 (30-60초)</option>
-                      <option value="long">길게 (1분 이상)</option>
-                    </select>
-                  </div>
-                </>
-              )}
-            </div>
-
+            <div className="modal-body">{renderModalForm()}</div>
             <div className="modal-footer">
-              <button className="btn-cancel" onClick={closeEditModal}>
-                취소
-              </button>
+              <button className="btn-cancel" onClick={closeEditModal}>취소</button>
               <button className="btn-save" onClick={handleSave} disabled={saving}>
                 {saving ? '저장 중...' : '저장'}
               </button>
@@ -544,53 +469,5 @@ function Settings() {
     </div>
   );
 }
-
-// 헬퍼 함수들
-const parseBusinessDescription = (description) => {
-  const parts = description.split('추가 정보:');
-  const mainDescription = parts[0].trim();
-  return { mainDescription };
-};
-
-const getBusinessTypeLabel = (type) => {
-  const labels = {
-    'food': '음식점/카페',
-    'fashion': '패션/의류',
-    'health': '헬스/피트니스',
-    'education': '교육',
-    'tech': '기술/IT',
-    'retail': '소매/유통',
-    'service': '서비스업'
-  };
-  return labels[type] || type;
-};
-
-const getGenderLabel = (gender) => {
-  const labels = {
-    'all': '전체',
-    'male': '남성',
-    'female': '여성'
-  };
-  return labels[gender] || gender;
-};
-
-const getToneLabel = (tone) => {
-  const labels = {
-    'casual': '캐주얼',
-    'professional': '전문적',
-    'friendly': '친근한',
-    'formal': '격식있는'
-  };
-  return labels[tone] || tone;
-};
-
-const getDurationLabel = (duration) => {
-  const labels = {
-    'short': '짧게 (15-30초)',
-    'medium': '중간 (30-60초)',
-    'long': '길게 (1분 이상)'
-  };
-  return labels[duration] || duration;
-};
 
 export default Settings;

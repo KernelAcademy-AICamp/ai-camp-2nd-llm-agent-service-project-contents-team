@@ -538,7 +538,7 @@ ${JSON.stringify(outputFormat, null, 2)}
 // ============================================
 // Main Agentic Workflow (with Quality Check)
 // ============================================
-export const generateAgenticContent = async ({ textInput, images = [], styleTone = '', selectedPlatforms = ['blog', 'sns', 'x', 'threads'] }, onProgress) => {
+export const generateAgenticContent = async ({ textInput, images = [], styleTone = '', selectedPlatforms = ['blog', 'sns', 'x', 'threads'], userContext = null }, onProgress) => {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
     const criticAgent = new CriticAgent();
@@ -552,6 +552,25 @@ export const generateAgenticContent = async ({ textInput, images = [], styleTone
     };
 
     updateProgress('콘텐츠 생성 중...', 'writing');
+
+    // 사용자 컨텍스트에서 스타일 톤 추출 (온보딩 정보 활용)
+    let effectiveStyleTone = styleTone;
+    if (userContext) {
+      // 사용자가 설정한 텍스트 톤이 있으면 사용
+      if (userContext.text_tone) {
+        const toneMap = {
+          'casual': '친근하고 편안한 말투로',
+          'professional': '전문적이고 신뢰감 있는 말투로',
+          'friendly': '친근하고 따뜻한 말투로',
+          'formal': '격식 있고 정중한 말투로'
+        };
+        effectiveStyleTone = toneMap[userContext.text_tone] || styleTone;
+      }
+      // 브랜드 톤이 있으면 추가
+      if (userContext.brand_tone) {
+        effectiveStyleTone = `${effectiveStyleTone}, ${userContext.brand_tone} 톤으로`;
+      }
+    }
 
     // 이미지 변환 (병렬로 미리 시작)
     const imageDataUrlsPromise = Promise.all(
@@ -570,9 +589,72 @@ export const generateAgenticContent = async ({ textInput, images = [], styleTone
     }
 
     // 스타일 지시문
-    const styleInstruction = styleTone
-      ? `\n**글쓰기 스타일**: ${styleTone}\n위 스타일을 반드시 적용하여 작성하세요.\n`
+    const styleInstruction = effectiveStyleTone
+      ? `\n**글쓰기 스타일**: ${effectiveStyleTone}\n위 스타일을 반드시 적용하여 작성하세요.\n`
       : '';
+
+    // 사용자 컨텍스트 (브랜드/비즈니스 정보) 지시문
+    let userContextInstruction = '';
+    if (userContext) {
+      const contextParts = [];
+      if (userContext.brand_name) {
+        contextParts.push(`- 브랜드명: ${userContext.brand_name}`);
+      }
+      if (userContext.business_type) {
+        const businessTypeMap = {
+          'food': '음식/요식업',
+          'tech': 'IT/기술',
+          'fashion': '패션/의류',
+          'education': '교육',
+          'health': '건강/웰빙',
+          'beauty': '뷰티/화장품',
+          'travel': '여행',
+          'finance': '금융/재테크',
+          'lifestyle': '라이프스타일'
+        };
+        contextParts.push(`- 업종: ${businessTypeMap[userContext.business_type] || userContext.business_type}`);
+      }
+      if (userContext.business_description) {
+        contextParts.push(`- 비즈니스 설명: ${userContext.business_description}`);
+      }
+      if (userContext.target_audience) {
+        const ta = userContext.target_audience;
+        const targetParts = [];
+        if (ta.age_range) targetParts.push(`${ta.age_range}대`);
+        if (ta.gender && ta.gender !== 'all') targetParts.push(ta.gender === 'male' ? '남성' : '여성');
+        if (ta.interests?.length) targetParts.push(`관심사: ${ta.interests.join(', ')}`);
+        if (targetParts.length) {
+          contextParts.push(`- 타겟 고객: ${targetParts.join(', ')}`);
+        }
+      }
+      if (userContext.brand_personality) {
+        contextParts.push(`- 브랜드 성격: ${userContext.brand_personality}`);
+      }
+      if (userContext.key_themes?.length) {
+        contextParts.push(`- 주요 주제: ${userContext.key_themes.join(', ')}`);
+      }
+      if (userContext.emotional_tone) {
+        contextParts.push(`- 감정적 톤: ${userContext.emotional_tone}`);
+      }
+      if (userContext.blog_writing_style) {
+        contextParts.push(`- 블로그 글쓰기 스타일: ${userContext.blog_writing_style}`);
+      }
+      if (userContext.instagram_caption_style) {
+        contextParts.push(`- 인스타그램 캡션 스타일: ${userContext.instagram_caption_style}`);
+      }
+
+      if (contextParts.length > 0) {
+        userContextInstruction = `
+═══════════════════════════════════════
+🏢 브랜드/비즈니스 정보 (온보딩 데이터)
+═══════════════════════════════════════
+${contextParts.join('\n')}
+
+**중요**: 위 브랜드 정보를 반영하여 일관성 있는 콘텐츠를 작성하세요.
+브랜드명이 있다면 자연스럽게 언급하고, 타겟 고객에 맞는 어조와 내용을 사용하세요.
+`;
+      }
+    }
 
     // 선택된 플랫폼 확인
     const hasBlog = selectedPlatforms.includes('blog');
@@ -713,7 +795,7 @@ export const generateAgenticContent = async ({ textInput, images = [], styleTone
 주제/키워드: ${textInput || '이미지 기반 콘텐츠'}
 첨부 이미지: ${images.length}개
 ${styleInstruction}
-
+${userContextInstruction}
 ═══════════════════════════════════════
 🎯 콘텐츠 생성 핵심 원칙
 ═══════════════════════════════════════

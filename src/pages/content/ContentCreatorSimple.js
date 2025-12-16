@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiCopy, FiArrowRight, FiEdit3 } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
-import api, { contentSessionAPI, creditsAPI } from '../../services/api';
+import api, { contentSessionAPI, creditsAPI, userAPI } from '../../services/api';
 import { generateAgenticContent } from '../../services/agenticService';
 import CreditChargeModal from '../../components/credits/CreditChargeModal';
 import './ContentCreatorSimple.css';
@@ -165,6 +165,9 @@ function ContentCreatorSimple() {
   const [creditBalance, setCreditBalance] = useState(0);
   const [isChargeModalOpen, setIsChargeModalOpen] = useState(false);
 
+  // 사용자 컨텍스트 (온보딩 정보)
+  const [userContext, setUserContext] = useState(null);
+
   // 결과 컬럼 높이 동기화 ref
   const snsColumnRef = useRef(null);
   const blogCardRef = useRef(null);
@@ -183,7 +186,7 @@ function ContentCreatorSimple() {
     }
   }, [result]);
 
-  // 크레딧 잔액 조회
+  // 크레딧 잔액 및 사용자 컨텍스트 조회
   useEffect(() => {
     const fetchCreditBalance = async () => {
       try {
@@ -193,7 +196,19 @@ function ContentCreatorSimple() {
         console.error('크레딧 잔액 조회 실패:', error);
       }
     };
+
+    const fetchUserContext = async () => {
+      try {
+        const data = await userAPI.getContext();
+        setUserContext(data.context);
+        console.log('✅ 사용자 컨텍스트 로드:', data.context);
+      } catch (error) {
+        console.error('사용자 컨텍스트 조회 실패:', error);
+      }
+    };
+
     fetchCreditBalance();
+    fetchUserContext();
   }, []);
 
   // 필요한 크레딧 계산
@@ -309,7 +324,13 @@ function ContentCreatorSimple() {
       if (contentType === 'text' || contentType === 'both') {
         setProgress('AI가 글을 작성하고 있습니다...');
         const agenticResult = await generateAgenticContent(
-          { textInput: topic, images: [], styleTone: '친근하고 편안한 말투로', selectedPlatforms },
+          {
+            textInput: topic,
+            images: [],
+            styleTone: '친근하고 편안한 말투로',
+            selectedPlatforms,
+            userContext  // 온보딩에서 수집한 사용자 정보 전달
+          },
           (progress) => setProgress(progress.message)
         );
 
@@ -340,7 +361,10 @@ function ContentCreatorSimple() {
             formData.append('fontStyle', 'pretendard');
             formData.append('colorTheme', colorTheme);
             formData.append('generateImages', 'true');
-            // layoutType 제거: 첫 페이지는 Agent가 판단, 나머지는 상단 고정
+            // 사용자 컨텍스트 전달
+            if (userContext) {
+              formData.append('userContext', JSON.stringify(userContext));
+            }
 
             const cardnewsResponse = await api.post('/api/generate-agentic-cardnews', formData, {
               headers: {

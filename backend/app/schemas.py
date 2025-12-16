@@ -92,6 +92,85 @@ class UserProfile(BaseModel):
         from_attributes = True
 
 
+# 브랜드 분석 스키마
+class BrandAnalysisBase(BaseModel):
+    """브랜드 분석 기본 스키마"""
+    # 전반적 브랜드 요소
+    brand_name: Optional[str] = None
+    business_type: Optional[str] = None
+    brand_tone: Optional[str] = None
+    brand_values: Optional[List[str]] = None
+    target_audience: Optional[str] = None
+    brand_personality: Optional[str] = None
+    key_themes: Optional[List[str]] = None
+    emotional_tone: Optional[str] = None
+
+    # 블로그 플랫폼 특성
+    blog_writing_style: Optional[str] = None
+    blog_content_structure: Optional[str] = None
+    blog_call_to_action: Optional[str] = None
+
+    # 인스타그램 플랫폼 특성
+    instagram_caption_style: Optional[str] = None
+    instagram_image_style: Optional[str] = None
+    instagram_hashtag_pattern: Optional[str] = None
+    instagram_color_palette: Optional[List[str]] = None
+
+    # 유튜브 플랫폼 특성
+    youtube_content_style: Optional[str] = None
+    youtube_title_pattern: Optional[str] = None
+    youtube_description_style: Optional[str] = None
+
+
+class BrandAnalysis(BrandAnalysisBase):
+    """브랜드 분석 응답 스키마"""
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# 콘텐츠 생성용 사용자 컨텍스트 스키마
+class UserContext(BaseModel):
+    """콘텐츠 생성 시 사용할 사용자 컨텍스트"""
+    # 기본 정보
+    brand_name: Optional[str] = None
+    business_type: Optional[str] = None
+    business_description: Optional[str] = None
+    target_audience: Optional[Dict[str, Any]] = None
+
+    # 스타일 선호도
+    text_tone: Optional[str] = None  # casual, professional, friendly, formal
+    text_style_sample: Optional[str] = None
+    image_style_description: Optional[str] = None
+    image_color_palette: Optional[List[str]] = None
+
+    # 브랜드 분석 결과
+    brand_tone: Optional[str] = None
+    brand_personality: Optional[str] = None
+    key_themes: Optional[List[str]] = None
+    emotional_tone: Optional[str] = None
+    blog_writing_style: Optional[str] = None
+    instagram_caption_style: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserProfileWithBrand(BaseModel):
+    """사용자 프로필 + 브랜드 분석 전체 응답 스키마"""
+    user: User
+    preferences: Optional[UserPreference] = None
+    brand_analysis: Optional[BrandAnalysis] = None
+    context: Optional[UserContext] = None  # 콘텐츠 생성용 요약 정보
+
+    class Config:
+        from_attributes = True
+
+
 # 통합 콘텐츠 스키마
 class ContentBase(BaseModel):
     """통합 콘텐츠 기본 스키마"""
