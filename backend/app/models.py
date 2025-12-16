@@ -736,6 +736,7 @@ class ContentGenerationSession(Base):
     sns_content = relationship("GeneratedSNSContent", back_populates="session", uselist=False, cascade="all, delete-orphan")
     x_content = relationship("GeneratedXContent", back_populates="session", uselist=False, cascade="all, delete-orphan")
     threads_content = relationship("GeneratedThreadsContent", back_populates="session", uselist=False, cascade="all, delete-orphan")
+    cardnews_content = relationship("GeneratedCardnewsContent", back_populates="session", uselist=False, cascade="all, delete-orphan")
     images = relationship("GeneratedImage", back_populates="session", cascade="all, delete-orphan")
 
 
@@ -854,6 +855,46 @@ class GeneratedImage(Base):
 
     # Relationships
     session = relationship("ContentGenerationSession", back_populates="images")
+    user = relationship("User")
+
+
+class GeneratedCardnewsContent(Base):
+    """
+    생성된 카드뉴스 콘텐츠
+    - 각 페이지 이미지와 메타데이터 저장
+    """
+    __tablename__ = "generated_cardnews_contents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("content_generation_sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # 카드뉴스 기본 정보
+    title = Column(String, nullable=False)  # 카드뉴스 제목 (첫 페이지 타이틀)
+    prompt = Column(Text, nullable=False)  # 사용자 입력 프롬프트
+    purpose = Column(String(20), nullable=True)  # promotion, menu, info, event
+    page_count = Column(Integer, nullable=False)  # 페이지 수
+
+    # 카드뉴스 페이지 이미지 URL (Supabase Storage)
+    card_image_urls = Column(JSON, nullable=False)  # ["https://...", "https://..."]
+
+    # AI 분석 결과
+    analysis_data = Column(JSON, nullable=True)  # Orchestrator 분석 결과
+    pages_data = Column(JSON, nullable=True)  # 각 페이지별 title, content, layout 등
+
+    # 디자인 설정
+    design_settings = Column(JSON, nullable=True)  # bg_color, text_color, font_pair, style 등
+
+    # 품질 점수
+    quality_score = Column(Float, nullable=True)  # QA Agent 평가 점수
+
+    # 평가 점수 (통합 - 다른 콘텐츠와 일관성)
+    score = Column(Integer, nullable=True)  # 품질 점수 (0-100)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    session = relationship("ContentGenerationSession", back_populates="cardnews_content")
     user = relationship("User")
 
 

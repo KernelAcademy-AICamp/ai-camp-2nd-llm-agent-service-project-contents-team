@@ -6,6 +6,7 @@ AI 생성 콘텐츠 API 라우터
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import logging
@@ -14,7 +15,7 @@ from ..database import get_db
 from ..models import (
     User,
     ContentGenerationSession, GeneratedBlogContent, GeneratedSNSContent,
-    GeneratedXContent, GeneratedThreadsContent, GeneratedImage
+    GeneratedXContent, GeneratedThreadsContent, GeneratedImage, GeneratedCardnewsContent
 )
 from ..auth import get_current_user
 
@@ -105,6 +106,7 @@ class ContentSessionListResponse(BaseModel):
     sns: Optional[Dict[str, Any]] = None
     x: Optional[Dict[str, Any]] = None
     threads: Optional[Dict[str, Any]] = None
+    cardnews: Optional[Dict[str, Any]] = None  # 카드뉴스
 
     # 이미지 갯수만
     image_count: int = 0
@@ -132,6 +134,7 @@ class ContentSessionResponse(BaseModel):
     sns: Optional[Dict[str, Any]] = None
     x: Optional[Dict[str, Any]] = None
     threads: Optional[Dict[str, Any]] = None
+    cardnews: Optional[Dict[str, Any]] = None  # 카드뉴스
 
     # 생성된 이미지
     images: Optional[List[Dict[str, Any]]] = None
@@ -245,20 +248,34 @@ async def list_content_sessions(
     """
     콘텐츠 생성 세션 목록 조회 (v2)
     - 이미지 데이터 제외하여 빠른 로딩 (이미지 갯수만 포함)
+    - N+1 쿼리 방지: 이미지 갯수를 서브쿼리로 한 번에 조회
     """
-    sessions = db.query(ContentGenerationSession).options(
+    # 이미지 갯수 서브쿼리
+    image_count_subq = db.query(
+        GeneratedImage.session_id,
+        func.count(GeneratedImage.id).label('image_count')
+    ).group_by(GeneratedImage.session_id).subquery()
+
+    # 세션 + 이미지 갯수를 한 번에 조회
+    results = db.query(
+        ContentGenerationSession,
+        func.coalesce(image_count_subq.c.image_count, 0).label('image_count')
+    ).outerjoin(
+        image_count_subq,
+        ContentGenerationSession.id == image_count_subq.c.session_id
+    ).options(
         selectinload(ContentGenerationSession.blog_content),
         selectinload(ContentGenerationSession.sns_content),
         selectinload(ContentGenerationSession.x_content),
-        selectinload(ContentGenerationSession.threads_content)
-        # images는 로드하지 않음 (Base64 데이터가 너무 큼)
+        selectinload(ContentGenerationSession.threads_content),
+        selectinload(ContentGenerationSession.cardnews_content)
     ).filter(
         ContentGenerationSession.user_id == current_user.id
     ).order_by(
         ContentGenerationSession.created_at.desc()
     ).offset(skip).limit(limit).all()
 
-    return [_build_session_list_response(s, db) for s in sessions]
+    return [_build_session_list_response(session, image_count) for session, image_count in results]
 
 
 @router.get("/v2/{session_id}", response_model=ContentSessionResponse)
@@ -275,6 +292,7 @@ async def get_content_session(
         joinedload(ContentGenerationSession.sns_content),
         joinedload(ContentGenerationSession.x_content),
         joinedload(ContentGenerationSession.threads_content),
+        joinedload(ContentGenerationSession.cardnews_content),
         joinedload(ContentGenerationSession.images)
     ).filter(
         ContentGenerationSession.id == session_id,
@@ -313,13 +331,8 @@ async def delete_content_session(
     return {"message": "콘텐츠가 삭제되었습니다."}
 
 
-def _build_session_list_response(session: ContentGenerationSession, db: Session) -> ContentSessionListResponse:
-    """목록용 세션 응답 객체 생성 (경량화 - 이미지 갯수만)"""
-    # 이미지 갯수만 조회 (Base64 데이터 로드 안함)
-    image_count = db.query(GeneratedImage).filter(
-        GeneratedImage.session_id == session.id
-    ).count()
-
+def _build_session_list_response(session: ContentGenerationSession, image_count: int) -> ContentSessionListResponse:
+    """목록용 세션 응답 객체 생성 (경량화 - 이미지 갯수는 서브쿼리로 전달받음)"""
     return ContentSessionListResponse(
         id=session.id,
         user_id=session.user_id,
@@ -335,6 +348,12 @@ def _build_session_list_response(session: ContentGenerationSession, db: Session)
         sns={"id": session.sns_content.id} if session.sns_content else None,
         x={"id": session.x_content.id} if session.x_content else None,
         threads={"id": session.threads_content.id} if session.threads_content else None,
+        cardnews={
+            "id": session.cardnews_content.id,
+            "title": session.cardnews_content.title,
+            "page_count": session.cardnews_content.page_count,
+            "purpose": session.cardnews_content.purpose
+        } if session.cardnews_content else None,
         image_count=image_count
     )
 
@@ -378,6 +397,18 @@ def _build_session_response(session: ContentGenerationSession) -> ContentSession
             "hashtags": session.threads_content.hashtags,
             "score": session.threads_content.score
         } if session.threads_content else None,
+        cardnews={
+            "id": session.cardnews_content.id,
+            "title": session.cardnews_content.title,
+            "prompt": session.cardnews_content.prompt,
+            "purpose": session.cardnews_content.purpose,
+            "page_count": session.cardnews_content.page_count,
+            "card_image_urls": session.cardnews_content.card_image_urls,
+            "pages_data": session.cardnews_content.pages_data,
+            "design_settings": session.cardnews_content.design_settings,
+            "quality_score": session.cardnews_content.quality_score,
+            "score": session.cardnews_content.score
+        } if session.cardnews_content else None,
         images=[
             {"id": img.id, "image_url": img.image_url, "prompt": img.prompt}
             for img in session.images

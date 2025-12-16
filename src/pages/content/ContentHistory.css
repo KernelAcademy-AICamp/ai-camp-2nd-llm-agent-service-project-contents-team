@@ -520,6 +520,48 @@
 }
 
 /* ==========================================
+   카드뉴스 스타일
+   ========================================== */
+
+.platform-badge.cardnews {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.cardnews-info {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.cardnews-info .info-badge {
+  background: var(--secondary-color);
+  color: var(--text-primary);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+}
+
+.cardnews-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.cardnews-grid .image-item {
+  aspect-ratio: 1 / 1.25;
+}
+
+.image-label {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 0.7rem;
+  border-radius: 4px;
+}
+
+/* ==========================================
    이미지 그리드 & 팝업
    ========================================== */
 

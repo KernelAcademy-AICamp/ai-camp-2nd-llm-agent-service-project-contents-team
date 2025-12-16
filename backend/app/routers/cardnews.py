@@ -1,5 +1,6 @@
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 from typing import List, Optional
 import json
 import base64
@@ -14,6 +15,182 @@ import httpx
 import google.generativeai as genai
 import logging
 from datetime import datetime
+import unicodedata
+from supabase import create_client, Client
+
+# DB 및 인증 모듈 임포트
+from ..database import get_db
+from ..models import User, ContentGenerationSession, GeneratedCardnewsContent
+from ..auth import get_current_user
+
+# ==================== 이모지 처리 유틸리티 ====================
+
+def strip_markdown(text: str) -> str:
+    """
+    텍스트에서 마크다운 문법을 제거합니다.
+    **굵은 글씨**, *기울임*, `코드` 등의 마크다운 문법을 평문으로 변환합니다.
+    """
+    if not text:
+        return text
+
+    # **굵은 글씨** → 굵은 글씨
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    # *기울임* → 기울임
+    text = re.sub(r'\*(.+?)\*', r'\1', text)
+    # __굵은 글씨__ → 굵은 글씨
+    text = re.sub(r'__(.+?)__', r'\1', text)
+    # _기울임_ → 기울임
+    text = re.sub(r'_(.+?)_', r'\1', text)
+    # `코드` → 코드
+    text = re.sub(r'`(.+?)`', r'\1', text)
+    # ~~취소선~~ → 취소선
+    text = re.sub(r'~~(.+?)~~', r'\1', text)
+    # [링크텍스트](URL) → 링크텍스트
+    text = re.sub(r'\[(.+?)\]\(.+?\)', r'\1', text)
+    # # 헤더 → 헤더 (줄 시작의 # 제거)
+    text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+
+    return text.strip()
+
+
+def strip_emojis(text: str) -> str:
+    """
+    텍스트에서 이모지를 제거합니다.
+    폰트가 이모지를 지원하지 않아 렌더링 문제가 발생하는 것을 방지합니다.
+
+    주의: 한글(AC00-D7AF), 영문, 숫자, 기본 문장부호는 보존합니다.
+    """
+    if not text:
+        return text
+
+    # 이모지 범위를 정규식으로 정의 (한글/영문/숫자에 영향 없는 범위만)
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # 이모티콘 (스마일리)
+        "\U0001F300-\U0001F5FF"  # 기호 및 픽토그램
+        "\U0001F680-\U0001F6FF"  # 교통 및 지도 기호
+        "\U0001F1E0-\U0001F1FF"  # 국기
+        "\U0001F900-\U0001F9FF"  # 보충 기호 및 픽토그램
+        "\U0001FA00-\U0001FA6F"  # 체스 기호
+        "\U0001FA70-\U0001FAFF"  # 기호 및 픽토그램 확장-A
+        "\U0001F000-\U0001F02F"  # 마작 타일
+        "\U0001F0A0-\U0001F0FF"  # 트럼프 카드
+        "\U00002702-\U000027B0"  # 딩뱃 (일부)
+        "\U0000FE00-\U0000FE0F"  # 변형 선택자
+        "\U0001F200-\U0001F251"  # 기타 기호 (한글 범위 제외)
+        "]+",
+        flags=re.UNICODE
+    )
+
+    # 이모지 제거
+    cleaned = emoji_pattern.sub('', text)
+
+    # 연속된 공백을 하나로 정리
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+
+    return cleaned
+
+
+def has_emoji(text: str) -> bool:
+    """텍스트에 이모지가 포함되어 있는지 확인합니다."""
+    if not text:
+        return False
+
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # 이모티콘 (스마일리)
+        "\U0001F300-\U0001F5FF"  # 기호 및 픽토그램
+        "\U0001F680-\U0001F6FF"  # 교통 및 지도 기호
+        "\U0001F1E0-\U0001F1FF"  # 국기
+        "\U0001F900-\U0001F9FF"  # 보충 기호 및 픽토그램
+        "\U0001FA00-\U0001FA6F"  # 체스 기호
+        "\U0001FA70-\U0001FAFF"  # 기호 및 픽토그램 확장-A
+        "\U0001F000-\U0001F02F"  # 마작 타일
+        "\U0001F0A0-\U0001F0FF"  # 트럼프 카드
+        "\U0001F200-\U0001F251"  # 기타 기호
+        "]+",
+        flags=re.UNICODE
+    )
+
+    return bool(emoji_pattern.search(text))
+
+
+# ==================== 이미지 밝기 분석 유틸리티 ====================
+
+def analyze_image_brightness(image: Image.Image) -> float:
+    """
+    이미지의 평균 밝기를 분석합니다.
+
+    Returns:
+        0.0 ~ 1.0 사이의 값 (0=어두움, 1=밝음)
+    """
+    # RGB로 변환
+    if image.mode != 'RGB':
+        img = image.convert('RGB')
+    else:
+        img = image
+
+    # 이미지 크기가 크면 축소하여 빠르게 계산
+    if img.width > 200 or img.height > 200:
+        img = img.resize((200, 200), Image.Resampling.LANCZOS)
+
+    # 픽셀 데이터 가져오기
+    pixels = list(img.getdata())
+
+    # 평균 밝기 계산 (가중 평균: 인간 눈의 민감도 반영)
+    # Y = 0.299*R + 0.587*G + 0.114*B
+    total_brightness = 0
+    for r, g, b in pixels:
+        brightness = 0.299 * r + 0.587 * g + 0.114 * b
+        total_brightness += brightness
+
+    avg_brightness = total_brightness / len(pixels)
+
+    # 0~255 -> 0~1 정규화
+    return avg_brightness / 255.0
+
+
+def get_overlay_and_text_colors(image: Image.Image) -> dict:
+    """
+    이미지 밝기에 따라 오버레이 색상과 텍스트 색상을 결정합니다.
+
+    Returns:
+        {
+            "overlay_color": (r, g, b),
+            "overlay_opacity": float,
+            "text_color": "white" | "black",
+            "card_bg_color": (r, g, b),
+            "card_opacity": float,
+            "is_dark_image": bool
+        }
+    """
+    brightness = analyze_image_brightness(image)
+
+    # 밝기 임계값 (0.5 기준으로 밝음/어두움 구분)
+    is_dark = brightness < 0.45
+
+    if is_dark:
+        # 어두운 이미지: 밝은(흰색) 오버레이 + 검은색 텍스트
+        return {
+            "overlay_color": (255, 255, 255),
+            "overlay_opacity": 0.25,  # 밝은 오버레이는 약하게
+            "text_color": "black",
+            "card_bg_color": (255, 255, 255),
+            "card_opacity": 0.35,
+            "is_dark_image": True,
+            "brightness": brightness
+        }
+    else:
+        # 밝은 이미지: 어두운(검은색) 오버레이 + 흰색 텍스트
+        return {
+            "overlay_color": (0, 0, 0),
+            "overlay_opacity": 0.35,
+            "text_color": "white",
+            "card_bg_color": (0, 0, 0),
+            "card_opacity": 0.35,
+            "is_dark_image": False,
+            "brightness": brightness
+        }
 
 # AI Agents 임포트
 from ..agents import (
@@ -25,6 +202,67 @@ from ..agents import (
 )
 
 router = APIRouter(prefix="/api", tags=["cardnews"])
+
+# ==================== Supabase Storage 설정 ====================
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+# Supabase 클라이언트 초기화
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+
+async def upload_cardnews_image_to_supabase(
+    base64_image: str,
+    user_id: int,
+    session_id: int,
+    page_num: int
+) -> str:
+    """
+    카드뉴스 이미지를 Supabase Storage에 업로드
+
+    Args:
+        base64_image: Base64 인코딩된 이미지 (data:image/... 형식)
+        user_id: 사용자 ID
+        session_id: 세션 ID
+        page_num: 페이지 번호
+
+    Returns:
+        업로드된 이미지 URL
+    """
+    if not supabase:
+        raise Exception("Supabase client not initialized")
+
+    try:
+        # Base64 데이터 추출
+        if base64_image.startswith('data:image'):
+            image_data = base64_image.split(',')[1]
+        else:
+            image_data = base64_image
+
+        # Base64를 바이트로 변환
+        image_bytes = base64.b64decode(image_data)
+
+        # 파일 경로 생성
+        file_path = f"{user_id}/{session_id}/page_{page_num}.png"
+
+        # Supabase Storage에 업로드 (cardnews 버킷)
+        result = supabase.storage.from_("cardnews").upload(
+            file_path,
+            image_bytes,
+            file_options={"content-type": "image/png", "upsert": "true"}
+        )
+
+        # 공개 URL 생성
+        public_url = supabase.storage.from_("cardnews").get_public_url(file_path)
+
+        cardnews_logger.info(f"✅ Supabase 업로드 성공 (page {page_num}): {public_url}")
+        return public_url
+    except Exception as e:
+        cardnews_logger.error(f"Supabase 업로드 실패 (page {page_num}): {e}")
+        raise
+
 
 # ==================== 로깅 설정 ====================
 LOG_DIR = Path(__file__).parent.parent.parent / "logs"
@@ -403,6 +641,10 @@ class TextRenderer:
         letter_spacing: int = 0  # 자간 조절
     ):
         """고품질 그림자가 있는 텍스트 그리기 (Gaussian Blur 지원)"""
+        # 마크다운 및 이모지 제거 (폰트 렌더링 문제 방지)
+        text = strip_markdown(text)
+        text = strip_emojis(text)
+
         draw = ImageDraw.Draw(image, 'RGBA')
 
         # 텍스트 줄바꿈
@@ -478,27 +720,66 @@ class TextRenderer:
         color: str = "white",
         bullet_symbol: str = "•",
         use_shadow: bool = False,
-        shadow_color: tuple = (0, 0, 0, 100)
-    ):
-        """Bullet point 렌더링 (• 기호 처리 + 들여쓰기)"""
+        shadow_color: tuple = (0, 0, 0, 100),
+        max_width: int = None,
+        line_height: int = None
+    ) -> int:
+        """
+        Bullet point 렌더링 (• 기호 처리 + 들여쓰기 + 줄바꿈 지원)
+
+        Args:
+            max_width: 최대 텍스트 너비 (줄바꿈 기준). None이면 줄바꿈 안 함
+            line_height: 줄 높이. None이면 폰트 높이 기반 자동 계산
+
+        Returns:
+            렌더링 후 최종 y 위치 (다음 요소 렌더링에 활용)
+        """
         draw = ImageDraw.Draw(image, 'RGBA')
         x, y = position
 
         # "• " 또는 "- " 제거 후 텍스트 추출
         clean_text = text.lstrip('•- ').strip()
 
-        # 그림자 효과 (옵션)
-        if use_shadow:
-            shadow_offset = 2
-            draw.text((x + shadow_offset, y + shadow_offset), bullet_symbol, font=font, fill=shadow_color)
-            draw.text((x + 35 + shadow_offset, y + shadow_offset), clean_text, font=font, fill=shadow_color)
+        # 마크다운 및 이모지 제거 (폰트 렌더링 문제 방지)
+        clean_text = strip_markdown(clean_text)
+        clean_text = strip_emojis(clean_text)
 
-        # Bullet 기호 그리기
-        draw.text((x, y), bullet_symbol, font=font, fill=color)
-
-        # 텍스트 그리기 (들여쓰기 - 2x 스케일에 맞게 조정)
+        # 들여쓰기 값
         indent = 35 * RENDER_SCALE // 2  # 스케일에 맞게 조정
-        draw.text((x + indent, y), clean_text, font=font, fill=color)
+
+        # 줄바꿈 처리
+        if max_width:
+            # 불릿 뒤 텍스트 영역의 최대 너비
+            text_max_width = max_width - indent
+            wrapped_lines = TextRenderer.wrap_text(clean_text, font, text_max_width, draw)
+        else:
+            wrapped_lines = [clean_text]
+
+        # 줄 높이 계산
+        if line_height is None:
+            bbox = draw.textbbox((0, 0), "가Ag", font=font)
+            line_height = int((bbox[3] - bbox[1]) * 1.4)  # 폰트 높이의 1.4배
+
+        current_y = y
+
+        for i, line in enumerate(wrapped_lines):
+            # 그림자 효과 (옵션)
+            if use_shadow:
+                shadow_offset = 2
+                if i == 0:
+                    draw.text((x + shadow_offset, current_y + shadow_offset), bullet_symbol, font=font, fill=shadow_color)
+                draw.text((x + indent + shadow_offset, current_y + shadow_offset), line, font=font, fill=shadow_color)
+
+            # 첫 줄에만 Bullet 기호 그리기
+            if i == 0:
+                draw.text((x, current_y), bullet_symbol, font=font, fill=color)
+
+            # 텍스트 그리기 (들여쓰기)
+            draw.text((x + indent, current_y), line, font=font, fill=color)
+
+            current_y += line_height
+
+        return current_y
 
     @staticmethod
     def draw_structured_content(
@@ -509,10 +790,14 @@ class TextRenderer:
         color: str = "white",
         line_spacing: int = 50,
         start_x: int = 100,
-        use_shadow: bool = False
+        use_shadow: bool = False,
+        max_width: int = None
     ) -> int:
         """
         구조화된 콘텐츠 렌더링 (bullet points 배열)
+
+        Args:
+            max_width: 최대 텍스트 너비 (줄바꿈 기준). None이면 줄바꿈 안 함
 
         Returns:
             최종 y 위치 (다음 요소 렌더링에 활용)
@@ -520,11 +805,13 @@ class TextRenderer:
         current_y = start_y
 
         for line in content:
-            TextRenderer.draw_bullet_point(
+            next_y = TextRenderer.draw_bullet_point(
                 image, line, (start_x, current_y), font, color,
-                use_shadow=use_shadow
+                use_shadow=use_shadow,
+                max_width=max_width
             )
-            current_y += line_spacing
+            # 줄바꿈 지원: draw_bullet_point가 반환한 y 위치 사용
+            current_y = next_y + int(line_spacing * 0.3)  # 항목 간 추가 여백
 
         return current_y
 
@@ -719,6 +1006,18 @@ class BackgroundProcessor:
 class CardNewsBuilder:
     """고품질 카드뉴스 이미지 생성 (2x 해상도 렌더링 + 다운스케일)"""
 
+    # 동적 폰트 사이즈 설정 (기본값 기준)
+    BASE_TITLE_SIZE_FIRST = 88  # 첫 페이지 제목
+    BASE_SUBTITLE_SIZE = 48  # 첫 페이지 소제목
+    BASE_TITLE_SIZE_CONTENT = 80  # 본문 페이지 제목
+    BASE_BULLET_SIZE = 44  # 본문 불릿 텍스트
+
+    # 폰트 사이즈 최소/최대 범위
+    MIN_TITLE_SIZE = 48
+    MAX_TITLE_SIZE = 88
+    MIN_BULLET_SIZE = 28
+    MAX_BULLET_SIZE = 44
+
     def __init__(self, theme: dict, font_style: str, purpose: str, layout_type: str = "bottom", font_weight: str = "light"):
         self.theme = theme
         self.font_style = font_style
@@ -728,6 +1027,130 @@ class CardNewsBuilder:
         self.badge_text = BADGE_TEXT_MAP.get(purpose, '정보')
         self.scale = RENDER_SCALE  # 2x 렌더링
 
+    def _calculate_dynamic_font_sizes(
+        self,
+        title: str,
+        content_lines: List[str] = None,
+        subtitle: str = None,
+        is_first_page: bool = False
+    ) -> dict:
+        """
+        텍스트 양에 따라 폰트 사이즈를 동적으로 계산합니다.
+        텍스트가 잘리지 않도록 폰트 크기를 자동 조절합니다.
+        이미지 영역(1080x1350)을 벗어나지 않도록 보장합니다.
+
+        Returns:
+            dict: title_size, subtitle_size (첫 페이지), bullet_size (본문 페이지)
+        """
+        title_len = len(title) if title else 0
+
+        # 사용 가능한 높이 (로고 영역 제외): 약 1200px (2x 스케일 기준 2400px)
+        # 상단 로고: ~100px, 하단 여백: ~50px
+        AVAILABLE_HEIGHT = 1200  # 1x 기준
+
+        if is_first_page:
+            # 첫 페이지: 제목 + 소제목
+            subtitle_len = len(subtitle) if subtitle else 0
+            total_text_len = title_len + subtitle_len
+
+            # 제목 길이 기반 사이즈 조절 (더 적극적으로)
+            if title_len <= 8:
+                title_size = self.BASE_TITLE_SIZE_FIRST  # 88
+            elif title_len <= 12:
+                title_size = 76
+            elif title_len <= 16:
+                title_size = 68
+            elif title_len <= 22:
+                title_size = 60
+            elif title_len <= 30:
+                title_size = 52
+            else:
+                title_size = self.MIN_TITLE_SIZE  # 48
+
+            # 소제목 길이 기반 사이즈 조절 (더 적극적으로)
+            if subtitle_len <= 15:
+                subtitle_size = self.BASE_SUBTITLE_SIZE  # 48
+            elif subtitle_len <= 25:
+                subtitle_size = 42
+            elif subtitle_len <= 35:
+                subtitle_size = 38
+            elif subtitle_len <= 50:
+                subtitle_size = 34
+            else:
+                subtitle_size = 30
+
+            # 전체 텍스트 양이 많으면 추가 축소
+            if total_text_len > 60:
+                title_size = max(self.MIN_TITLE_SIZE, title_size - 8)
+                subtitle_size = max(28, subtitle_size - 6)
+
+            return {
+                'title_size': title_size,
+                'subtitle_size': subtitle_size
+            }
+        else:
+            # 본문 페이지: 제목 + 불릿 포인트
+            content_count = len(content_lines) if content_lines else 0
+            total_content_len = sum(len(line) for line in content_lines) if content_lines else 0
+            max_line_len = max([len(line) for line in content_lines], default=0) if content_lines else 0
+
+            # 제목 길이 기반 사이즈 조절
+            if title_len <= 10:
+                title_size = self.BASE_TITLE_SIZE_CONTENT  # 80
+            elif title_len <= 15:
+                title_size = 68
+            elif title_len <= 22:
+                title_size = 58
+            else:
+                title_size = self.MIN_TITLE_SIZE  # 48
+
+            # 불릿 개수 및 총 길이 기반 사이즈 조절 (더 세밀하게)
+            if content_count <= 2:
+                if max_line_len <= 30:
+                    bullet_size = self.BASE_BULLET_SIZE  # 44
+                elif max_line_len <= 45:
+                    bullet_size = 38
+                else:
+                    bullet_size = 34
+            elif content_count <= 3:
+                if max_line_len <= 25:
+                    bullet_size = 40
+                elif max_line_len <= 35:
+                    bullet_size = 36
+                elif max_line_len <= 50:
+                    bullet_size = 32
+                else:
+                    bullet_size = 28
+            elif content_count <= 4:
+                if max_line_len <= 25:
+                    bullet_size = 36
+                elif max_line_len <= 35:
+                    bullet_size = 32
+                elif max_line_len <= 50:
+                    bullet_size = 28
+                else:
+                    bullet_size = self.MIN_BULLET_SIZE  # 28
+            elif content_count <= 5:
+                if max_line_len <= 30:
+                    bullet_size = 32
+                elif max_line_len <= 45:
+                    bullet_size = 28
+                else:
+                    bullet_size = self.MIN_BULLET_SIZE
+            else:
+                # 6개 이상의 불릿 - 최소 크기
+                bullet_size = self.MIN_BULLET_SIZE
+
+            # 총 텍스트 양이 매우 많으면 추가 축소
+            if total_content_len > 150:
+                title_size = max(self.MIN_TITLE_SIZE, title_size - 8)
+                bullet_size = max(self.MIN_BULLET_SIZE, bullet_size - 4)
+
+            return {
+                'title_size': title_size,
+                'bullet_size': bullet_size
+            }
+
     def prepare_background(
         self,
         background_image: Image.Image,
@@ -735,19 +1158,35 @@ class CardNewsBuilder:
         blur_radius: int = 3,
         apply_overlay: bool = True,
         overlay_opacity: float = 0.35,
+        overlay_color: tuple = None,  # None이면 이미지 밝기에 따라 자동 결정
         apply_vignette: bool = True,
         vignette_strength: float = 0.4,
         brightness: float = 0.65,
         contrast: float = 1.1,
-        saturation: float = 1.1
-    ) -> Image.Image:
-        """고급 배경 이미지 준비 (2x 해상도)"""
+        saturation: float = 1.1,
+        auto_adjust_overlay: bool = True  # 이미지 밝기에 따라 오버레이 자동 조정
+    ) -> tuple:
+        """
+        고급 배경 이미지 준비 (2x 해상도)
+
+        Returns:
+            tuple: (이미지, 색상정보 dict) - 색상정보에는 text_color, card_bg_color 등 포함
+        """
         # RGB 변환
         if background_image.mode != 'RGB':
             background_image = background_image.convert('RGB')
 
         # 2x 크기로 조정 (고품질 리샘플링)
         img = background_image.resize((RENDER_WIDTH, RENDER_HEIGHT), Image.Resampling.LANCZOS)
+
+        # 이미지 밝기 분석 및 색상 결정
+        color_info = None
+        if auto_adjust_overlay:
+            color_info = get_overlay_and_text_colors(img)
+            if overlay_color is None:
+                overlay_color = color_info["overlay_color"]
+                overlay_opacity = color_info["overlay_opacity"]
+            print(f"  🎨 이미지 밝기: {color_info['brightness']:.2f}, 텍스트: {color_info['text_color']}")
 
         # 이미지 보정 (밝기, 대비, 채도)
         img = BackgroundProcessor.enhance_image(img, brightness, contrast, saturation)
@@ -758,7 +1197,8 @@ class CardNewsBuilder:
 
         # 반투명 오버레이 (텍스트 가독성 향상)
         if apply_overlay:
-            img = BackgroundProcessor.apply_overlay(img, (0, 0, 0), overlay_opacity)
+            final_overlay_color = overlay_color if overlay_color else (0, 0, 0)
+            img = BackgroundProcessor.apply_overlay(img, final_overlay_color, overlay_opacity)
 
         # 비네트 효과
         if apply_vignette:
@@ -770,7 +1210,7 @@ class CardNewsBuilder:
             rgb_img.paste(img, mask=img.split()[3])
             img = rgb_img
 
-        return img
+        return img, color_info
 
     def _downscale_to_final(self, image: Image.Image) -> Image.Image:
         """2x 이미지를 1x로 다운스케일 (고품질 안티앨리어싱)"""
@@ -893,8 +1333,8 @@ class CardNewsBuilder:
         page_num: int = 1
     ) -> Image.Image:
         """완전한 카드 생성 (기존 방식)"""
-        # 배경 준비
-        card = self.prepare_background(background_image)
+        # 배경 준비 (튜플 반환: 이미지, 색상정보)
+        card, _ = self.prepare_background(background_image, auto_adjust_overlay=False)
 
         # 로고 추가
         self.add_logo(card)
@@ -911,90 +1351,188 @@ class CardNewsBuilder:
         subtitle: str,
         page_num: int = 1,
         layout: str = "center",
-        text_color: str = None  # "white" 또는 "black"
+        text_color: str = None,  # "white" 또는 "black" (None이면 이미지 밝기로 자동 결정)
+        show_logo: bool = True  # 첫 페이지는 기본적으로 로고 표시
     ) -> str:
         """
-        첫 페이지 전용 렌더링 (제목 + 소제목 + AI 배경)
+        첫 페이지 전용 렌더링 (제목 + 소제목 + AI 배경 + 반투명 카드)
         Agent가 판단한 layout에 따라 텍스트 위치 조정
+        이미지 밝기에 따라 오버레이/텍스트 색상 자동 결정
         2x 고해상도 렌더링 후 다운스케일
+        - 로고는 선택적으로 표시 (첫 페이지는 기본: 표시)
         """
-        # 배경 준비 (2x 해상도)
-        card = self.prepare_background(background_image)
+        # 배경 준비 (2x 해상도) + 이미지 밝기 분석
+        card, color_info = self.prepare_background(background_image, auto_adjust_overlay=True)
 
-        # 로고 추가 (2x 스케일)
-        self.add_logo(card)
+        # 로고 추가 (선택적)
+        if show_logo:
+            self.add_logo(card)
 
-        # 텍스트 색상 결정
+        # 텍스트 색상 결정 (이미지 밝기 기반 자동 결정)
         if text_color:
             actual_text_color = text_color
+        elif color_info:
+            actual_text_color = color_info["text_color"]
         else:
             actual_text_color = self.theme.get("text", "white")
 
-        # 폰트 설정 (2x 스케일 적용)
-        title_font = FontManager.get_font(self.font_style, 96 * self.scale, weight='bold')
-        subtitle_font = FontManager.get_font(self.font_style, 56 * self.scale, weight='medium')
+        # 카드 배경색 결정 (이미지 밝기 기반)
+        if color_info:
+            card_bg_color = color_info["card_bg_color"]
+            card_opacity = color_info["card_opacity"]
+        else:
+            card_bg_color = (0, 0, 0)
+            card_opacity = 0.35
+
+        # 동적 폰트 사이즈 계산 (텍스트 길이에 따라 자동 조절)
+        font_sizes = self._calculate_dynamic_font_sizes(
+            title=title,
+            subtitle=subtitle,
+            is_first_page=True
+        )
+        title_size = font_sizes['title_size']
+        subtitle_size = font_sizes['subtitle_size']
+
+        # 폰트 설정 (2x 스케일 적용) - 동적 사이즈 사용
+        title_font = FontManager.get_font(self.font_style, title_size * self.scale, weight='bold')
+        subtitle_font = FontManager.get_font(self.font_style, subtitle_size * self.scale, weight='medium')
 
         # 2x 스케일 기준 치수
-        max_width = RENDER_WIDTH - 120 * self.scale
-        margin_x = 60 * self.scale
+        margin_x = 80 * self.scale
+        card_padding = 45 * self.scale
+        max_width = RENDER_WIDTH - margin_x * 2 - card_padding * 2
+
+        # 로고 영역 (로고 표시 시만 적용)
+        top_margin = (120 * self.scale) if show_logo else (40 * self.scale)
+        bottom_margin = 40 * self.scale
+        available_height = RENDER_HEIGHT - top_margin - bottom_margin
 
         # 텍스트 총 높이 계산
         draw = ImageDraw.Draw(card)
         title_lines = TextRenderer.wrap_text(title, title_font, max_width, draw)
         subtitle_lines = TextRenderer.wrap_text(subtitle, subtitle_font, max_width, draw)
 
-        title_line_height = 120 * self.scale  # 폰트 크기 + 여백 (2x)
-        subtitle_line_height = 72 * self.scale
+        # 라인 높이도 폰트 사이즈에 비례하여 조절
+        title_line_height = int((title_size + 18) * self.scale)
+        subtitle_line_height = int((subtitle_size + 14) * self.scale)
         title_height = len(title_lines) * title_line_height
         subtitle_height = len(subtitle_lines) * subtitle_line_height
-        gap = 40 * self.scale  # 제목-부제목 간격
-        total_height = title_height + subtitle_height + gap
+        gap = 25 * self.scale  # 제목-부제목 간격
 
-        # Agent가 판단한 layout에 따라 시작 위치 결정 (2x 스케일)
+        # 전체 콘텐츠 높이
+        total_content_height = title_height + gap + subtitle_height
+
+        # 카드 높이 계산 (사용 가능한 전체 높이 사용)
+        card_height = total_content_height + card_padding * 2
+        max_card_height = available_height - 20 * self.scale
+
+        # 카드가 너무 크면 사용 가능한 최대 높이로 제한
+        if card_height > max_card_height:
+            card_height = max_card_height
+
+        card_width = RENDER_WIDTH - margin_x * 2
+
+        # Agent가 판단한 layout에 따라 카드 위치 결정
         if layout == "top":
-            title_y = RENDER_HEIGHT // 3  # 1/3 지점
+            card_y = top_margin + 20 * self.scale
         elif layout == "bottom":
-            title_y = RENDER_HEIGHT - total_height - 150 * self.scale  # 하단
+            card_y = RENDER_HEIGHT - card_height - bottom_margin
         else:  # center (기본값)
-            title_y = (RENDER_HEIGHT - total_height) // 2  # 중앙
+            card_y = top_margin + (available_height - card_height) // 2
+
+        # 반투명 카드 배경 그리기 (이미지 밝기에 따라 색상 자동 결정)
+        card = self._draw_content_card(
+            card.convert('RGBA'),
+            x=margin_x,
+            y=int(card_y),
+            width=card_width,
+            height=int(card_height),
+            bg_color=card_bg_color,
+            opacity=card_opacity,
+            corner_radius=25 * self.scale
+        )
+
+        # 제목 Y 위치 (카드 내부)
+        title_y = card_y + card_padding
+
+        # 그림자 색상 결정 (텍스트 색상 반대)
+        if actual_text_color == "black":
+            title_shadow_color = (255, 255, 255, 100)  # 밝은 그림자
+            subtitle_shadow_color = (255, 255, 255, 60)
+        else:
+            title_shadow_color = (0, 0, 0, 140)  # 어두운 그림자
+            subtitle_shadow_color = (0, 0, 0, 80)
 
         # 제목 렌더링 (Gaussian Blur 그림자)
         TextRenderer.draw_text_with_shadow(
-            card, title, (margin_x, title_y),
+            card, title, (margin_x + card_padding, title_y),
             title_font, color=actual_text_color,
             max_width=max_width,
             align="center", shadow=True,
             use_gaussian_shadow=True,
-            blur_radius=12 * self.scale,
-            shadow_offset=(6 * self.scale, 6 * self.scale),
-            shadow_color=(0, 0, 0, 160),
-            line_spacing=24 * self.scale
+            blur_radius=10 * self.scale,
+            shadow_offset=(5 * self.scale, 5 * self.scale),
+            shadow_color=title_shadow_color,
+            line_spacing=20 * self.scale
         )
 
         # 소제목 렌더링 (제목 아래)
         subtitle_y = title_y + title_height + gap
         TextRenderer.draw_text_with_shadow(
-            card, subtitle, (margin_x, subtitle_y),
+            card, subtitle, (margin_x + card_padding, subtitle_y),
             subtitle_font, color=actual_text_color,
             max_width=max_width,
             align="center", shadow=True,
             use_gaussian_shadow=True,
-            blur_radius=8 * self.scale,
-            shadow_offset=(4 * self.scale, 4 * self.scale),
-            shadow_color=(0, 0, 0, 100),
-            line_spacing=16 * self.scale
+            blur_radius=6 * self.scale,
+            shadow_offset=(3 * self.scale, 3 * self.scale),
+            shadow_color=subtitle_shadow_color,
+            line_spacing=12 * self.scale
         )
 
         # 페이지 번호
         self._add_page_number(card, page_num)
 
-        # 다운스케일 (2x → 1x)
+        # RGB로 변환 후 다운스케일
+        if card.mode == 'RGBA':
+            rgb_card = Image.new('RGB', card.size, (0, 0, 0))
+            rgb_card.paste(card, mask=card.split()[3])
+            card = rgb_card
+
         final_card = self._downscale_to_final(card)
 
         # Base64 변환
         buffer = io.BytesIO()
         final_card.save(buffer, format="PNG", optimize=True)
         return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+
+    def _draw_content_card(
+        self,
+        image: Image.Image,
+        x: int, y: int, width: int, height: int,
+        bg_color: tuple = (255, 255, 255),
+        opacity: float = 0.15,
+        corner_radius: int = 40
+    ):
+        """반투명 카드 배경 그리기 (라운드 코너)"""
+        # RGBA 모드로 변환
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+
+        # 반투명 카드 레이어 생성
+        card_layer = Image.new('RGBA', image.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(card_layer, 'RGBA')
+
+        # 라운드 사각형 그리기
+        fill_color = (*bg_color, int(255 * opacity))
+        draw.rounded_rectangle(
+            [x, y, x + width, y + height],
+            radius=corner_radius,
+            fill=fill_color
+        )
+
+        # 합성
+        return Image.alpha_composite(image.convert('RGBA'), card_layer)
 
     def build_content_page(
         self,
@@ -1003,11 +1541,14 @@ class CardNewsBuilder:
         content_lines: List[str],
         page_num: int,
         text_color: str = None,  # "white" 또는 "black"
-        use_gradient: bool = True  # 그라데이션 배경 사용 여부
+        use_gradient: bool = True,  # 그라데이션 배경 사용 여부
+        show_logo: bool = False  # 로고 표시 여부 (기본: 표시 안 함)
     ) -> str:
         """
-        본문 페이지 렌더링 (섹션 제목 + bullet points + 컬러/그라데이션 배경)
+        본문 페이지 렌더링 (카드 스타일 + 수직 중앙 정렬)
         2x 고해상도 렌더링 후 다운스케일
+        - 줄바꿈을 통해 모든 텍스트가 이미지 안에 들어가도록 함
+        - 로고는 선택적으로 표시 (기본: 표시 안 함)
         """
         # 배경 생성 (2x 해상도)
         if use_gradient:
@@ -1022,8 +1563,9 @@ class CardNewsBuilder:
             # 단색 배경
             card = Image.new('RGB', (RENDER_WIDTH, RENDER_HEIGHT), bg_color)
 
-        # 로고 추가 (2x 스케일)
-        self.add_logo(card)
+        # 로고 추가 (선택적)
+        if show_logo:
+            self.add_logo(card)
 
         # 텍스트 색상 결정
         if text_color:
@@ -1031,39 +1573,144 @@ class CardNewsBuilder:
         else:
             actual_text_color = self.theme.get("text", "white")
 
-        # 폰트 설정 (2x 스케일 적용)
-        title_font = FontManager.get_font(self.font_style, 72 * self.scale, weight='bold')
-        bullet_font = FontManager.get_font(self.font_style, 48 * self.scale, weight='regular')
+        # 동적 폰트 사이즈 계산 (텍스트 양에 따라 자동 조절)
+        font_sizes = self._calculate_dynamic_font_sizes(
+            title=title,
+            content_lines=content_lines,
+            is_first_page=False
+        )
+        title_size = font_sizes['title_size']
+        bullet_size = font_sizes['bullet_size']
+
+        # 폰트 설정 (2x 스케일 적용) - 동적 사이즈 사용
+        title_font = FontManager.get_font(self.font_style, title_size * self.scale, weight='bold')
+        bullet_font = FontManager.get_font(self.font_style, bullet_size * self.scale, weight='regular')
 
         # 2x 스케일 기준 치수
-        margin_x = 60 * self.scale
-        max_width = RENDER_WIDTH - 120 * self.scale
+        margin_x = 80 * self.scale
+        card_padding = 50 * self.scale
+        max_width = RENDER_WIDTH - margin_x * 2 - card_padding * 2
 
-        # 섹션 제목 (1/3 지점에서 시작)
-        title_y = RENDER_HEIGHT // 3
+        # 로고 영역 (로고 표시 시만 적용)
+        top_margin = (120 * self.scale) if show_logo else (40 * self.scale)
+        bottom_margin = 40 * self.scale
+        available_height = RENDER_HEIGHT - top_margin - bottom_margin
+
+        # 콘텐츠 높이 사전 계산
+        draw = ImageDraw.Draw(card)
+        title_lines = TextRenderer.wrap_text(title, title_font, max_width, draw)
+        title_line_height = int((title_size + 16) * self.scale)
+        title_height = len(title_lines) * title_line_height
+
+        # 불릿 텍스트의 줄바꿈을 고려한 총 높이 계산
+        bullet_indent = 35 * RENDER_SCALE // 2
+        bullet_text_max_width = max_width - bullet_indent - 40 * self.scale
+
+        # 각 불릿 라인의 줄바꿈 결과 미리 계산
+        wrapped_bullets = []
+        for line in content_lines:
+            clean_text = line.lstrip('•- ').strip()
+            clean_text = strip_markdown(clean_text)
+            clean_text = strip_emojis(clean_text)
+            lines = TextRenderer.wrap_text(clean_text, bullet_font, bullet_text_max_width, draw)
+            wrapped_bullets.append(lines)
+
+        # 불릿 줄 높이 계산
+        bbox = draw.textbbox((0, 0), "가Ag", font=bullet_font)
+        bullet_single_line_height = int((bbox[3] - bbox[1]) * 1.35)
+
+        # 불릿 간 여백 (각 불릿 항목 사이)
+        bullet_item_gap = int(20 * self.scale)
+
+        # 총 불릿 영역 높이 계산
+        total_bullet_height = 0
+        for lines in wrapped_bullets:
+            total_bullet_height += len(lines) * bullet_single_line_height + bullet_item_gap
+
+        # 전체 콘텐츠 높이 (제목 + 구분선 + 간격 + 불릿)
+        title_bullet_gap = 60 * self.scale  # 구분선 + 간격
+        total_content_height = title_height + title_bullet_gap + total_bullet_height
+
+        # 카드 높이 계산 (사용 가능한 전체 높이 사용)
+        card_height = total_content_height + card_padding * 2
+        max_card_height = available_height - 20 * self.scale
+
+        # 카드가 너무 크면 사용 가능한 최대 높이로 제한
+        if card_height > max_card_height:
+            card_height = max_card_height
+
+        card_width = RENDER_WIDTH - margin_x * 2
+
+        # 카드 Y 위치 (수직 중앙)
+        card_y = top_margin + (available_height - card_height) // 2
+
+        # 반투명 카드 배경 그리기
+        card = self._draw_content_card(
+            card.convert('RGBA'),
+            x=margin_x,
+            y=int(card_y),
+            width=card_width,
+            height=int(card_height),
+            bg_color=(255, 255, 255) if actual_text_color == "black" else (0, 0, 0),
+            opacity=0.12,
+            corner_radius=25 * self.scale
+        )
+
+        # 제목 Y 위치 (카드 내부 상단)
+        title_y = card_y + card_padding
+
+        # 제목 렌더링 (중앙 정렬)
         TextRenderer.draw_text_with_shadow(
-            card, title, (margin_x, title_y),
+            card, title, (margin_x + card_padding, title_y),
             title_font, color=actual_text_color,
             max_width=max_width,
             align="center", shadow=False,
             use_gaussian_shadow=False
         )
 
-        # Bullet points 렌더링 (제목 아래)
-        bullet_y = title_y + 120 * self.scale
-        bullet_start_x = 100 * self.scale
-        bullet_line_spacing = 120 * self.scale
-        TextRenderer.draw_structured_content(
-            card, content_lines, bullet_y,
-            bullet_font, color=actual_text_color,
-            line_spacing=bullet_line_spacing, start_x=bullet_start_x,
-            use_shadow=False
+        # 구분선 추가
+        line_y = title_y + title_height + 20 * self.scale
+        line_draw = ImageDraw.Draw(card, 'RGBA')
+        line_color = (255, 255, 255, 60) if actual_text_color == "white" else (0, 0, 0, 40)
+        line_draw.line(
+            [(margin_x + card_padding + 40 * self.scale, line_y),
+             (RENDER_WIDTH - margin_x - card_padding - 40 * self.scale, line_y)],
+            fill=line_color,
+            width=2 * self.scale
         )
+
+        # Bullet points 렌더링 (구분선 아래) - 줄바꿈 적용
+        bullet_y = line_y + 30 * self.scale
+        bullet_start_x = margin_x + card_padding + 20 * self.scale
+        max_bullet_y = card_y + card_height - card_padding
+
+        current_y = bullet_y
+        for i, line in enumerate(content_lines):
+            # 카드 영역을 벗어나는지 확인
+            if current_y >= max_bullet_y:
+                break
+
+            # 줄바꿈을 적용하여 불릿 포인트 렌더링
+            next_y = TextRenderer.draw_bullet_point(
+                card, line, (bullet_start_x, current_y),
+                bullet_font, color=actual_text_color,
+                use_shadow=False,
+                max_width=max_width - 40 * self.scale,
+                line_height=bullet_single_line_height
+            )
+
+            # 다음 불릿 항목 시작 위치 (항목 간 여백 추가)
+            current_y = next_y + bullet_item_gap
 
         # 페이지 번호
         self._add_page_number(card, page_num)
 
-        # 다운스케일 (2x → 1x)
+        # RGB로 변환 후 다운스케일
+        if card.mode == 'RGBA':
+            rgb_card = Image.new('RGB', card.size, (0, 0, 0))
+            rgb_card.paste(card, mask=card.split()[3])
+            card = rgb_card
+
         final_card = self._downscale_to_final(card)
 
         # Base64 변환
@@ -1232,7 +1879,10 @@ async def generate_agentic_cardnews(
     colorTheme: str = Form(default="warm"),  # 사용자가 선택한 테마 사용 (기본: warm)
     generateImages: bool = Form(default=True),
     layoutType: str = Form(default="bottom"),
-    userContext: str = Form(default=None)  # 사용자 컨텍스트 (JSON 문자열)
+    userContext: str = Form(default=None),  # 사용자 컨텍스트 (JSON 문자열)
+    saveToDb: bool = Form(default=True),  # DB에 저장할지 여부
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     AI Agentic 방식으로 카드뉴스 자동 생성
@@ -1411,13 +2061,15 @@ async def generate_agentic_cardnews(
                     bg_image = Image.open(io.BytesIO(response.content))
 
                 # 첫 페이지 생성 (Agent가 판단한 layout 사용)
+                # 첫 페이지는 AI 이미지가 배경이므로 text_color=None으로 전달하여
+                # 이미지 밝기 기반으로 텍스트 색상을 자동 결정하도록 함
                 card_base64 = builder.build_first_page(
                     background_image=bg_image,
                     title=page['title'],
                     subtitle=page.get('subtitle', ''),
                     page_num=i + 1,
                     layout=page.get('layout', 'center'),
-                    text_color=text_color  # 동적 텍스트 색상
+                    text_color=None  # 이미지 밝기로 자동 결정
                 )
                 final_cards.append(card_base64)
 
@@ -1438,9 +2090,99 @@ async def generate_agentic_cardnews(
         print(result_log)
         cardnews_logger.info(result_log)
 
+        # ==================== DB 저장 로직 ====================
+        session_id = None
+        card_image_urls = []
+
+        if saveToDb:
+            try:
+                cardnews_logger.info(f"💾 DB 저장 시작: user_id={current_user.id}")
+                print(f"\n💾 DB 저장 시작...")
+
+                # 1. ContentGenerationSession 생성
+                first_page_title = pages[0].get('title', prompt[:50]) if pages else prompt[:50]
+                session = ContentGenerationSession(
+                    user_id=current_user.id,
+                    topic=prompt,
+                    content_type="cardnews",
+                    style=selected_style,
+                    selected_platforms=["cardnews"],
+                    analysis_data=analysis,
+                    status="generated"
+                )
+                db.add(session)
+                db.flush()  # session.id 생성을 위해 flush
+                session_id = session.id
+                cardnews_logger.info(f"✅ 세션 생성: session_id={session_id}")
+
+                # 2. Supabase Storage에 이미지 업로드
+                print(f"  ☁️ Supabase Storage 업로드 중...")
+                for i, card_base64 in enumerate(final_cards):
+                    try:
+                        image_url = await upload_cardnews_image_to_supabase(
+                            card_base64,
+                            current_user.id,
+                            session_id,
+                            i + 1
+                        )
+                        card_image_urls.append(image_url)
+                        print(f"    ✅ 페이지 {i+1} 업로드 완료")
+                    except Exception as upload_error:
+                        cardnews_logger.error(f"페이지 {i+1} 업로드 실패: {upload_error}")
+                        # 업로드 실패 시 Base64를 그대로 저장하지 않고 빈 URL 추가
+                        card_image_urls.append(None)
+
+                # 3. GeneratedCardnewsContent 저장
+                design_settings_data = {
+                    "bg_color": list(final_bg_color) if isinstance(final_bg_color, tuple) else final_bg_color,
+                    "text_color": text_color,
+                    "font_korean": FONT_PAIRS.get(font_pair, {}).get('korean', 'Pretendard'),
+                    "font_english": FONT_PAIRS.get(font_pair, {}).get('english', 'Inter'),
+                    "style": selected_style
+                }
+
+                pages_data = [
+                    {
+                        "page": p['page'],
+                        "title": p['title'],
+                        "subtitle": p.get('subtitle', ''),
+                        "content": p.get('content', []),
+                        "layout": p.get('layout', 'center')
+                    }
+                    for p in pages
+                ]
+
+                cardnews_content = GeneratedCardnewsContent(
+                    session_id=session_id,
+                    user_id=current_user.id,
+                    title=first_page_title,
+                    prompt=prompt,
+                    purpose=purpose,
+                    page_count=len(final_cards),
+                    card_image_urls=card_image_urls,
+                    analysis_data=analysis,
+                    pages_data=pages_data,
+                    design_settings=design_settings_data,
+                    quality_score=quality_report.get('overall_score') if quality_report else None,
+                    score=int(quality_report.get('overall_score', 0) * 10) if quality_report and quality_report.get('overall_score') else None
+                )
+                db.add(cardnews_content)
+                db.commit()
+
+                cardnews_logger.info(f"✅ DB 저장 완료: session_id={session_id}, cardnews_id={cardnews_content.id}")
+                print(f"  ✅ DB 저장 완료: session_id={session_id}")
+
+            except Exception as db_error:
+                cardnews_logger.error(f"DB 저장 실패: {db_error}")
+                print(f"  ❌ DB 저장 실패: {db_error}")
+                db.rollback()
+                # DB 저장 실패해도 생성된 카드뉴스는 반환
+
         return {
             "success": True,
             "cards": final_cards,
+            "card_image_urls": card_image_urls if saveToDb else [],
+            "session_id": session_id,
             "count": len(final_cards),
             "analysis": {
                 "page_count": analysis.get('page_count'),
