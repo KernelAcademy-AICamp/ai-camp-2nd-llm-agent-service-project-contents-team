@@ -498,6 +498,141 @@
   background: rgba(255, 255, 255, 0.4);
 }
 
+/* Brand Identity Section */
+.optional-badge {
+  display: inline-block;
+  margin-left: var(--space-sm);
+  padding: 2px var(--space-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+}
+
+.section-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  line-height: 1.6;
+}
+
+.text-success {
+  color: var(--success-color);
+  font-weight: 600;
+}
+
+.text-warning {
+  color: var(--warning-dark);
+  font-weight: 600;
+}
+
+/* Style Chips */
+.style-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.chip {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-primary);
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.chip.selected {
+  background: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(255, 214, 102, 0.3);
+}
+
+.chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Brand Values Input */
+.values-input-container {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.values-input-container input {
+  flex: 1;
+}
+
+.values-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.value-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--info-color);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 20px;
+  animation: tagIn 0.2s ease;
+}
+
+.value-tag button {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 14px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease;
+}
+
+.value-tag button:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Sample Note Variants */
+.sample-note.required {
+  background: var(--warning-light);
+  border-left: 3px solid var(--warning-dark);
+}
+
+.sample-note.optional {
+  background: var(--info-light);
+  border-left: 3px solid var(--info-color);
+  color: var(--info-dark);
+}
+
 /* Style Card */
 .style-card {
   background: var(--bg-secondary);
@@ -870,6 +1005,129 @@
   line-height: 1.5;
 }
 
+/* Style Selector Container */
+.style-selector-container {
+  display: flex;
+  gap: var(--space-xl);
+  margin-top: var(--space-md);
+}
+
+/* Style Options Grid (2행 4열) */
+.style-options-grid {
+  flex: 0 0 55%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: var(--space-sm);
+}
+
+/* Style Option Button */
+.style-option-button {
+  padding: var(--space-md);
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-primary);
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.style-option-button:hover:not(:disabled) {
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.style-option-button.selected {
+  background: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(255, 214, 102, 0.3);
+}
+
+.style-option-button.previewing:not(.selected) {
+  border-color: var(--info-color);
+  background: var(--info-light);
+  color: var(--text-primary);
+}
+
+.style-option-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Style Preview Card */
+.style-preview-card {
+  flex: 1;
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.preview-content {
+  width: 100%;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 2px solid var(--secondary-color);
+}
+
+.preview-header h4 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+}
+
+.preview-industry {
+  display: inline-block;
+  padding: 4px var(--space-sm);
+  background: var(--info-color);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+}
+
+.preview-text {
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: keep-all;
+}
+
+.preview-placeholder {
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.preview-placeholder p {
+  font-size: 14px;
+  margin: 0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .dynamic-onboarding {
@@ -936,6 +1194,22 @@
     width: 36px;
     height: 36px;
     font-size: 13px;
+  }
+
+  /* Style Selector 모바일 반응형 */
+  .style-selector-container {
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .style-options-grid {
+    flex: 1;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+  }
+
+  .style-preview-card {
+    min-height: 200px;
   }
 }
 
