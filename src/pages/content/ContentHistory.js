@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiCopy, FiTrash2, FiArrowLeft, FiEdit3 } from 'react-icons/fi';
+import { FiCopy, FiTrash2, FiArrowLeft, FiEdit3, FiDownload } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
-import { contentSessionAPI } from '../../services/api';
+import { contentSessionAPI, generatedVideoAPI } from '../../services/api';
 import './ContentHistory.css';
 
 // ========== 상수 정의 ==========
@@ -115,13 +115,27 @@ function ContentHistory() {
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
   const [historyDetailTab, setHistoryDetailTab] = useState('blog');
   const [popupImage, setPopupImage] = useState(null);
+  const [filterType, setFilterType] = useState('all'); // all, content, video
 
   // ========== 히스토리 관련 함수 ==========
   const fetchHistory = useCallback(async () => {
     setIsLoadingHistory(true);
     try {
-      const data = await contentSessionAPI.list(0, 50);
-      setHistory(data);
+      // 콘텐츠와 비디오 데이터 동시 로드
+      const [contentData, videoData] = await Promise.all([
+        contentSessionAPI.list(0, 50),
+        generatedVideoAPI.list(0, 50)
+      ]);
+
+      // 두 데이터를 통합하고 시간순 정렬
+      const contentItems = contentData.map(item => ({ ...item, type: 'content' }));
+      const videoItems = videoData.map(item => ({ ...item, type: 'video' }));
+
+      const allItems = [...contentItems, ...videoItems].sort((a, b) =>
+        new Date(b.created_at) - new Date(a.created_at)
+      );
+
+      setHistory(allItems);
     } catch (error) {
       console.error('생성 내역 로드 실패:', error);
     } finally {
@@ -142,6 +156,19 @@ function ContentHistory() {
       else if (fullData.x) setHistoryDetailTab('x');
       else if (fullData.threads) setHistoryDetailTab('threads');
       else if (fullData.cardnews) setHistoryDetailTab('cardnews');
+      if (item.type === 'video') {
+        // 비디오 아이템은 이미 모든 데이터를 가지고 있음
+        setSelectedHistoryItem(item);
+        setHistoryDetailTab('video');
+      } else {
+        // 콘텐츠 아이템은 상세 데이터 로드
+        const fullData = await contentSessionAPI.get(item.id);
+        setSelectedHistoryItem(fullData);
+        if (fullData.blog) setHistoryDetailTab('blog');
+        else if (fullData.sns) setHistoryDetailTab('sns');
+        else if (fullData.x) setHistoryDetailTab('x');
+        else if (fullData.threads) setHistoryDetailTab('threads');
+      }
     } catch (error) {
       console.error('상세 데이터 조회 실패:', error);
       setSelectedHistoryItem(item);
@@ -205,6 +232,21 @@ function ContentHistory() {
     }
   };
 
+  const handleDownloadVideo = async (url, productName) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${productName.replace(/[^a-zA-Z0-9가-힣]/g, '_')}_video.mp4`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      console.error('비디오 다운로드 실패:', error);
+      alert('비디오 다운로드에 실패했습니다.');
+    }
+  };
+
   // 편집 페이지로 이동
   const handleGoToEditor = (item) => {
     // ContentEditor가 기대하는 형식으로 데이터 변환
@@ -227,6 +269,14 @@ function ContentHistory() {
     });
   };
 
+  // 필터링된 히스토리
+  const filteredHistory = history.filter(item => {
+    if (filterType === 'all') return true;
+    if (filterType === 'content') return item.type === 'content';
+    if (filterType === 'video') return item.type === 'video';
+    return true;
+  });
+
   return (
     <div className="content-history">
       <button className="btn-back" onClick={() => navigate('/content')}>
@@ -237,13 +287,35 @@ function ContentHistory() {
         <p className="history-subtitle">이전에 생성한 콘텐츠를 확인하고 복사할 수 있습니다</p>
       </div>
 
+      {/* 필터 탭 */}
+      <div className="history-filter-tabs">
+        <button
+          className={`filter-tab ${filterType === 'all' ? 'active' : ''}`}
+          onClick={() => setFilterType('all')}
+        >
+          전체
+        </button>
+        <button
+          className={`filter-tab ${filterType === 'content' ? 'active' : ''}`}
+          onClick={() => setFilterType('content')}
+        >
+          텍스트 + 이미지
+        </button>
+        <button
+          className={`filter-tab ${filterType === 'video' ? 'active' : ''}`}
+          onClick={() => setFilterType('video')}
+        >
+          숏폼 영상
+        </button>
+      </div>
+
       <div className="history-content">
         {isLoadingHistory ? (
           <div className="loading-state">
             <span className="spinner"></span>
             <p>생성 내역을 불러오는 중...</p>
           </div>
-        ) : history.length === 0 ? (
+        ) : filteredHistory.length === 0 ? (
           <div className="empty-state">
             <span className="empty-icon">📝</span>
             <h3>생성 내역이 없습니다</h3>
@@ -254,14 +326,14 @@ function ContentHistory() {
           <div className="history-layout">
             {/* 히스토리 목록 */}
             <div className="history-list">
-              {history.map(item => (
+              {filteredHistory.map(item => (
                 <div
-                  key={item.id}
-                  className={`history-item ${selectedHistoryItem?.id === item.id ? 'selected' : ''}`}
+                  key={`${item.type}-${item.id}`}
+                  className={`history-item ${selectedHistoryItem?.id === item.id && selectedHistoryItem?.type === item.type ? 'selected' : ''}`}
                   onClick={() => handleSelectHistory(item)}
                 >
                   <div className="history-item-header">
-                    <h4>{item.topic || '주제 없음'}</h4>
+                    <h4>{item.type === 'video' ? item.product_name : (item.topic || '주제 없음')}</h4>
                     <span className="history-date">{formatDate(item.created_at)}</span>
                   </div>
                   <div className="history-item-info">
@@ -277,6 +349,28 @@ function ContentHistory() {
                     {item.threads && <span className="platform-badge">Threads</span>}
                     {item.cardnews && <span className="platform-badge cardnews">카드뉴스</span>}
                   </div>
+
+                  {item.type === 'content' ? (
+                    <>
+                      <div className="history-item-info">
+                        <span className="info-badge type">
+                          {item.content_type === 'text' ? '글만' : item.content_type === 'image' ? '이미지만' : '글+이미지'}
+                        </span>
+                        <span className="info-badge style">{getStyleLabel(item.style)}</span>
+                      </div>
+                      <div className="history-item-meta">
+                        {item.blog && <span className="platform-badge">블로그</span>}
+                        {item.sns && <span className="platform-badge">IG/FB</span>}
+                        {item.x && <span className="platform-badge">X</span>}
+                        {item.threads && <span className="platform-badge">Threads</span>}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="history-item-info">
+                      <span className="info-badge type">🎬 숏폼 영상</span>
+                      <span className="info-badge style">{item.tier} · {item.duration_seconds}초</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -284,27 +378,28 @@ function ContentHistory() {
             {/* 히스토리 상세 */}
             <div className="history-detail">
               {selectedHistoryItem ? (
-                <>
-                  <div className="history-detail-header">
-                    <div className="history-detail-title-row">
-                      <h3>{selectedHistoryItem.topic}</h3>
-                      <div className="history-detail-actions">
-                        <button className="btn-icon btn-icon-edit" onClick={() => handleGoToEditor(selectedHistoryItem)} title="편집">
-                          <FiEdit3 />
-                        </button>
-                        <button className="btn-icon btn-icon-delete" onClick={() => handleDeleteHistory(selectedHistoryItem.id)} title="삭제">
-                          <FiTrash2 />
-                        </button>
+                selectedHistoryItem.type === 'video' ? (
+                  /* 비디오 상세 뷰 */
+                  <>
+                    <div className="history-detail-header">
+                      <div className="history-detail-title-row">
+                        <h3>{selectedHistoryItem.product_name}</h3>
+                        <div className="history-detail-actions">
+                          <button
+                            className="btn-icon btn-icon-download"
+                            onClick={() => handleDownloadVideo(selectedHistoryItem.final_video_url, selectedHistoryItem.product_name)}
+                            title="다운로드"
+                          >
+                            <FiDownload />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="history-detail-meta">
+                        <span className="info-badge type">🎬 숏폼 영상</span>
+                        <span className="info-badge style">{selectedHistoryItem.tier} · {selectedHistoryItem.duration_seconds}초</span>
+                        <span className="history-date">{formatDateDetail(selectedHistoryItem.created_at)}</span>
                       </div>
                     </div>
-                    <div className="history-detail-meta">
-                      <span className="info-badge type">
-                        {selectedHistoryItem.content_type === 'text' ? '글만' : selectedHistoryItem.content_type === 'image' ? '이미지만' : '글+이미지'}
-                      </span>
-                      <span className="info-badge style">{getStyleLabel(selectedHistoryItem.style)}</span>
-                      <span className="history-date">{formatDateDetail(selectedHistoryItem.created_at)}</span>
-                    </div>
-                  </div>
 
                   {/* 플랫폼 탭 */}
                   <div className="history-detail-tabs">
@@ -379,29 +474,119 @@ function ContentHistory() {
                       </div>
                     )}
                     {historyDetailTab === 'images' && selectedHistoryItem.images?.length > 0 && (
+                    {/* 비디오 플레이어 */}
+                    <div className="history-detail-content">
                       <div className="result-card result-card-full">
                         <div className="result-card-header">
-                          <h3>생성된 이미지 ({selectedHistoryItem.images.length}장)</h3>
+                          <h3>생성된 영상</h3>
                         </div>
                         <div className="result-card-content">
-                          <div className="images-grid">
-                            {selectedHistoryItem.images.map((img, idx) => (
-                              <div key={idx} className="image-item" onClick={() => setPopupImage(img.image_url)}>
-                                <img src={img.image_url} alt={`생성된 이미지 ${idx + 1}`} />
-                                <button
-                                  className="btn-download-single"
-                                  onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.image_url, idx); }}
-                                >
-                                  다운로드
-                                </button>
-                              </div>
-                            ))}
+                          <div className="video-player-container">
+                            <video
+                              controls
+                              src={selectedHistoryItem.final_video_url}
+                              className="generated-video-player"
+                            >
+                              <source src={selectedHistoryItem.final_video_url} type="video/mp4" />
+                              브라우저가 비디오 재생을 지원하지 않습니다.
+                            </video>
+                          </div>
+                          <div className="video-info">
+                            <p><strong>제품명:</strong> {selectedHistoryItem.product_name}</p>
+                            <p><strong>등급:</strong> {selectedHistoryItem.tier}</p>
+                            <p><strong>길이:</strong> {selectedHistoryItem.duration_seconds}초</p>
+                            <p><strong>세션 ID:</strong> {selectedHistoryItem.session_id}</p>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                </>
+                    </div>
+                  </>
+                ) : (
+                  /* 콘텐츠 상세 뷰 */
+                  <>
+                    <div className="history-detail-header">
+                      <div className="history-detail-title-row">
+                        <h3>{selectedHistoryItem.topic}</h3>
+                        <div className="history-detail-actions">
+                          <button className="btn-icon btn-icon-edit" onClick={() => handleGoToEditor(selectedHistoryItem)} title="편집">
+                            <FiEdit3 />
+                          </button>
+                          <button className="btn-icon btn-icon-delete" onClick={() => handleDeleteHistory(selectedHistoryItem.id)} title="삭제">
+                            <FiTrash2 />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="history-detail-meta">
+                        <span className="info-badge type">
+                          {selectedHistoryItem.content_type === 'text' ? '글만' : selectedHistoryItem.content_type === 'image' ? '이미지만' : '글+이미지'}
+                        </span>
+                        <span className="info-badge style">{getStyleLabel(selectedHistoryItem.style)}</span>
+                        <span className="history-date">{formatDateDetail(selectedHistoryItem.created_at)}</span>
+                      </div>
+                    </div>
+
+                    {/* 플랫폼 탭 */}
+                    <div className="history-detail-tabs">
+                      {['blog', 'sns', 'x', 'threads'].map(platform => (
+                        selectedHistoryItem[platform] && (
+                          <button
+                            key={platform}
+                            className={`history-tab ${historyDetailTab === platform ? 'active' : ''}`}
+                            onClick={() => setHistoryDetailTab(platform)}
+                          >
+                            {platform === 'blog' ? '블로그' : platform === 'sns' ? 'IG/FB' : platform === 'threads' ? 'Threads' : 'X'}
+                          </button>
+                        )
+                      ))}
+                      {selectedHistoryItem.images?.length > 0 && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'images' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('images')}
+                        >
+                          이미지 ({selectedHistoryItem.images.length})
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 탭 콘텐츠 */}
+                    <div className="history-detail-content">
+                      {historyDetailTab === 'blog' && (
+                        <PlatformContent platform="blog" data={selectedHistoryItem.blog} onCopy={() => handleCopyBlog(selectedHistoryItem)} />
+                      )}
+                      {historyDetailTab === 'sns' && (
+                        <PlatformContent platform="sns" data={selectedHistoryItem.sns} onCopy={() => handleCopySNS(selectedHistoryItem)} />
+                      )}
+                      {historyDetailTab === 'x' && (
+                        <PlatformContent platform="x" data={selectedHistoryItem.x} onCopy={() => handleCopyX(selectedHistoryItem)} />
+                      )}
+                      {historyDetailTab === 'threads' && (
+                        <PlatformContent platform="threads" data={selectedHistoryItem.threads} onCopy={() => handleCopyThreads(selectedHistoryItem)} />
+                      )}
+                      {historyDetailTab === 'images' && selectedHistoryItem.images?.length > 0 && (
+                        <div className="result-card result-card-full">
+                          <div className="result-card-header">
+                            <h3>생성된 이미지 ({selectedHistoryItem.images.length}장)</h3>
+                          </div>
+                          <div className="result-card-content">
+                            <div className="images-grid">
+                              {selectedHistoryItem.images.map((img, idx) => (
+                                <div key={idx} className="image-item" onClick={() => setPopupImage(img.image_url)}>
+                                  <img src={img.image_url} alt={`생성된 이미지 ${idx + 1}`} />
+                                  <button
+                                    className="btn-download-single"
+                                    onClick={(e) => { e.stopPropagation(); handleDownloadImage(img.image_url, idx); }}
+                                  >
+                                    다운로드
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )
               ) : (
                 <div className="empty-detail">
                   <span className="empty-icon">👈</span>

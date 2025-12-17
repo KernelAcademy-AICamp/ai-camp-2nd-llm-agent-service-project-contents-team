@@ -859,6 +859,18 @@ export const userAPI = {
   // 프로필 업데이트
   updateProfile: async (data) => {
     const response = await api.put('/api/user/profile', data);
+// Generated Videos API
+// ==========================================
+export const generatedVideoAPI = {
+  // 생성된 비디오 목록 조회
+  list: async (skip = 0, limit = 20) => {
+    const response = await api.get(`/api/generated-videos?skip=${skip}&limit=${limit}`);
+    return response.data;
+  },
+
+  // 특정 세션의 비디오 조회
+  get: async (sessionId) => {
+    const response = await api.get(`/api/generated-videos/${sessionId}`);
     return response.data;
   },
 };

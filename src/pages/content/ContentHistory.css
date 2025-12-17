@@ -64,6 +64,36 @@
   margin: 0;
 }
 
+/* Filter Tabs */
+.history-filter-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.filter-tab {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-radius: 6px;
+}
+
+.filter-tab:hover {
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+.filter-tab.active {
+  background: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+}
+
 /* ==========================================
    히스토리 콘텐츠 영역
    ========================================== */
@@ -517,6 +547,57 @@
 .btn-icon-delete:hover {
   background: #dc3545;
   color: white;
+}
+
+.btn-icon-download {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.btn-icon-download:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* ==========================================
+   비디오 플레이어
+   ========================================== */
+
+.video-player-container {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto 1.5rem;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 9/16;
+}
+
+.generated-video-player {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.video-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.video-info p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.video-info strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-right: 0.5rem;
 }
 
 /* ==========================================

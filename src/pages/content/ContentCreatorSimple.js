@@ -441,6 +441,75 @@ function ContentCreatorSimple() {
         }
       }
 
+      // 숏폼 영상 생성
+      if (contentType === 'shortform') {
+        setProgress('AI가 숏폼 영상을 생성하고 있습니다...');
+        try {
+          // FormData 생성
+          const formData = new FormData();
+          formData.append('product_name', topic);
+          formData.append('product_description', `${topic} 홍보 영상`);
+          formData.append('tier', videoDuration);
+          formData.append('image', uploadedImages[0].file);
+
+          // 비디오 생성 작업 생성
+          const videoJobResponse = await api.post('/api/ai-video/jobs', formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+
+          if (videoJobResponse.data && videoJobResponse.data.id) {
+            const jobId = videoJobResponse.data.id;
+            generatedResult.videoJobId = jobId;
+            generatedResult.videoStatus = 'processing';
+
+            console.log('Video generation job created:', jobId);
+
+            // 작업 상태를 주기적으로 확인하는 폴링
+            const checkVideoStatus = async () => {
+              try {
+                const statusResponse = await api.get(`/api/ai-video/jobs/${jobId}`);
+                const job = statusResponse.data;
+
+                console.log('Job status:', job.status, job.current_step);
+
+                if (job.status === 'completed' && job.final_video_url) {
+                  generatedResult.videoUrl = job.final_video_url;
+                  generatedResult.videoStatus = 'completed';
+                  setProgress('숏폼 영상 생성 완료!');
+                  setResult({ ...generatedResult }); // 상태 업데이트
+                } else if (job.status === 'failed') {
+                  generatedResult.videoStatus = 'failed';
+                  generatedResult.videoError = job.error_message;
+                  setProgress(`영상 생성 실패: ${job.error_message}`);
+                  setResult({ ...generatedResult }); // 상태 업데이트
+                } else {
+                  // 아직 처리 중 - 백엔드의 current_step을 그대로 표시
+                  const currentStep = job.current_step || '처리 중';
+                  setProgress(currentStep);
+                  setResult({ ...generatedResult }); // 진행 중 상태도 계속 업데이트
+                  setTimeout(checkVideoStatus, 2000); // 2초 후 다시 확인
+                }
+              } catch (statusError) {
+                console.error('영상 상태 확인 실패:', statusError);
+                setProgress('영상 상태 확인 중 오류가 발생했습니다.');
+              }
+            };
+
+            // 즉시 결과 화면으로 전환하고 폴링 시작
+            setProgress('AI가 숏폼 영상을 생성하고 있습니다...');
+            setResult({ ...generatedResult });
+            setTimeout(checkVideoStatus, 1000); // 1초 후 첫 번째 상태 확인
+          }
+        } catch (videoError) {
+          console.error('숏폼 영상 생성 실패:', videoError);
+          const errorMsg = videoError.response?.data?.detail || videoError.message || '알 수 없는 오류';
+          alert(`숏폼 영상 생성 중 오류가 발생했습니다: ${errorMsg}`);
+          setProgress('');
+        }
+      }
+
       // 자동 저장
       if (generatedResult.agenticResult || generatedResult.text) {
         const imageUrls = generatedResult.images?.map(img => img.url) || [];
@@ -893,8 +962,17 @@ function ContentCreatorSimple() {
         /* 결과 화면 */
         <div className="creator-result">
           <div className="result-header">
-            <h2 className="result-title">생성 완료!</h2>
-            <p className="result-subtitle">"{topic}" 주제로 콘텐츠가 생성되었습니다</p>
+            {contentType === 'shortform' && result.videoStatus === 'processing' ? (
+              <>
+                <h2 className="result-title">생성 중..</h2>
+                <p className="result-subtitle">"{topic}" 주제로 숏폼 영상을 생성하고 있습니다</p>
+              </>
+            ) : (
+              <>
+                <h2 className="result-title">생성 완료!</h2>
+                <p className="result-subtitle">"{topic}" 주제로 콘텐츠가 생성되었습니다</p>
+              </>
+            )}
           </div>
 
           {/* 생성된 이미지 */}
@@ -916,6 +994,180 @@ function ContentCreatorSimple() {
                       </button>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 생성된 비디오 */}
+          {result.videoUrl && (
+            <div className="creator-result-card result-video-section">
+              <div className="creator-result-card-header">
+                <h3>생성된 숏폼 영상</h3>
+              </div>
+              <div className="creator-result-card-content">
+                <div className="creator-video-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <video
+                    controls
+                    style={{
+                      width: '100%',
+                      maxWidth: '400px',
+                      aspectRatio: '9/16',
+                      borderRadius: '8px',
+                      backgroundColor: '#000'
+                    }}
+                  >
+                    <source src={result.videoUrl} type="video/mp4" />
+                    브라우저가 비디오를 지원하지 않습니다.
+                  </video>
+                  <a href={result.videoUrl} download className="btn-download" style={{ marginTop: '16px', display: 'inline-block' }}>
+                    비디오 다운로드
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 비디오 생성 중 */}
+          {result.videoStatus === 'processing' && (() => {
+            // 진행 단계 파싱
+            const currentStep = progress || '';
+            let currentPhase = 0;
+            let progressPercent = 0;
+
+            if (currentStep.includes('Analyzing') || currentStep.includes('storyboard')) {
+              currentPhase = 0;
+              progressPercent = currentStep.includes('storyboard') ? 20 : 10;
+            } else if (currentStep.includes('Generating image')) {
+              currentPhase = 1;
+              const match = currentStep.match(/(\d+)\/(\d+)/);
+              if (match) {
+                const current = parseInt(match[1]);
+                const total = parseInt(match[2]);
+                progressPercent = 25 + (current / total) * 25;
+              } else {
+                progressPercent = 30;
+              }
+            } else if (currentStep.includes('transition')) {
+              currentPhase = 2;
+              const match = currentStep.match(/(\d+)\/(\d+)/);
+              if (match) {
+                const current = parseInt(match[1]);
+                const total = parseInt(match[2]);
+                progressPercent = 50 + (current / total) * 35;
+              } else {
+                progressPercent = 55;
+              }
+            } else if (currentStep.includes('Composing') || currentStep.includes('Concatenating') || currentStep.includes('Rendering') || currentStep.includes('Uploading')) {
+              currentPhase = 3;
+              if (currentStep.includes('Composing')) progressPercent = 85;
+              else if (currentStep.includes('Concatenating')) progressPercent = 90;
+              else if (currentStep.includes('Rendering')) progressPercent = 95;
+              else if (currentStep.includes('Uploading')) progressPercent = 98;
+            }
+
+            const phases = [
+              { name: '스토리보드 생성', icon: '📝' },
+              { name: '이미지 생성', icon: '🖼️' },
+              { name: '전환 비디오 생성', icon: '🎬' },
+              { name: '최종 합성', icon: '✨' }
+            ];
+
+            return (
+              <div className="creator-result-card result-video-section">
+                <div className="creator-result-card-header">
+                  <h3>숏폼 영상 생성 중...</h3>
+                </div>
+                <div className="creator-result-card-content">
+                  <div style={{ padding: '40px' }}>
+                    {/* 전체 프로그레스바 */}
+                    <div style={{ marginBottom: '32px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: '500' }}>전체 진행률</span>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#D8BFD8' }}>{Math.round(progressPercent)}%</span>
+                      </div>
+                      <div style={{
+                        width: '100%',
+                        height: '8px',
+                        backgroundColor: '#F8F8FF',
+                        borderRadius: '4px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          width: `${progressPercent}%`,
+                          height: '100%',
+                          backgroundColor: '#D8BFD8',
+                          transition: 'width 0.5s ease',
+                          borderRadius: '4px'
+                        }}></div>
+                      </div>
+                    </div>
+
+                    {/* 단계별 표시 */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(4, 1fr)',
+                      gap: '16px',
+                      marginBottom: '24px'
+                    }}>
+                      {phases.map((phase, index) => (
+                        <div key={index} style={{
+                          padding: '16px',
+                          borderRadius: '8px',
+                          border: `2px solid ${currentPhase === index ? '#D8BFD8' : currentPhase > index ? '#E6E6FA' : '#F8F8FF'}`,
+                          backgroundColor: currentPhase === index ? '#E6E6FA' : currentPhase > index ? '#F8F8FF' : '#fff',
+                          textAlign: 'center',
+                          transition: 'all 0.3s ease'
+                        }}>
+                          <div style={{ fontSize: '24px', marginBottom: '8px' }}>
+                            {phase.icon}
+                          </div>
+                          <div style={{
+                            fontSize: '12px',
+                            fontWeight: currentPhase === index ? '600' : '500',
+                            color: currentPhase === index ? '#D8BFD8' : currentPhase > index ? '#6b7280' : '#9ca3af'
+                          }}>
+                            {phase.name}
+                          </div>
+                          {currentPhase === index && (
+                            <div style={{ marginTop: '8px' }}>
+                              <div className="spinner" style={{ margin: '0 auto', width: '16px', height: '16px', borderWidth: '2px', borderColor: '#D8BFD8 transparent #D8BFD8 transparent' }}></div>
+                            </div>
+                          )}
+                          {currentPhase > index && (
+                            <div style={{ marginTop: '8px', fontSize: '16px', color: '#D8BFD8' }}>✓</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 현재 작업 표시 */}
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>
+                        현재 작업
+                      </p>
+                      <p style={{ fontSize: '15px', fontWeight: '500', color: '#111827' }}>
+                        {currentStep || 'AI가 영상을 생성하고 있습니다...'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 비디오 생성 실패 */}
+          {result.videoStatus === 'failed' && (
+            <div className="creator-result-card result-video-section">
+              <div className="creator-result-card-header">
+                <h3>영상 생성 실패</h3>
+              </div>
+              <div className="creator-result-card-content">
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <p style={{ color: '#ef4444' }}>❌ {result.videoError || '알 수 없는 오류가 발생했습니다.'}</p>
+                  <button className="btn-reset" onClick={handleReset} style={{ marginTop: '16px' }}>
+                    다시 시도
+                  </button>
                 </div>
               </div>
             </div>

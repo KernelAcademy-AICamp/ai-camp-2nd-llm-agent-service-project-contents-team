@@ -808,12 +808,13 @@ class ImageGenerationAgent:
                     if not image_bytes:
                         raise ValueError(f"Failed to generate image for cut {cut_number}")
 
-                    # 이미지를 로컬 파일 시스템에 저장
+                    # 이미지를 Supabase Storage에 저장
                     image_url = await self._upload_to_cloudinary(
                         image_bytes,
                         job.user_id,
                         job.id,
-                        cut_number
+                        cut_number,
+                        job.session_id
                     )
 
                     generated_images.append({
@@ -945,25 +946,29 @@ class ImageGenerationAgent:
         image_data: bytes,
         user_id: int,
         job_id: int,
-        cut_number: int
+        cut_number: int,
+        session_id: str
     ) -> str:
-        """이미지를 로컬 파일 시스템에 PNG로 저장"""
+        """이미지를 Supabase Storage에 PNG로 저장"""
         try:
-            # 저장 경로 생성
-            save_dir = Path("uploads") / "ai_video_images" / str(user_id) / str(job_id)
-            save_dir.mkdir(parents=True, exist_ok=True)
+            from app.services.supabase_storage import get_storage_service
+            storage = get_storage_service()
 
-            # 파일 저장 (PNG 형식)
-            file_path = save_dir / f"cut_{cut_number}.png"
-            with open(file_path, 'wb') as f:
-                f.write(image_data)
+            # 파일 경로 생성
+            file_path = f"{user_id}/{session_id}/cut_{cut_number}.png"
 
-            # URL 반환 (FastAPI static files 경로)
-            file_url = f"/uploads/ai_video_images/{user_id}/{job_id}/cut_{cut_number}.png"
-            logger.info(f"Image saved to local filesystem as PNG: {file_url}")
+            # Supabase Storage에 업로드
+            file_url = storage.upload_file(
+                bucket="ai-video-cuts",
+                file_path=file_path,
+                file_data=image_data,
+                content_type="image/png"
+            )
+
+            logger.info(f"Image saved to Supabase Storage: {file_url}")
             return file_url
         except Exception as e:
-            logger.error(f"Failed to save image to local filesystem: {str(e)}")
+            logger.error(f"Failed to save image to Supabase Storage: {str(e)}")
             raise
 
 
@@ -1116,19 +1121,39 @@ class KlingVideoGenerationAgent:
             video_url = result["video"]["url"]
             logger.info(f"Video URL: {video_url}")
 
-            # 4. 비디오 다운로드
-            # 저장 경로: backend/uploads/ai_video_transitions/{user_id}/{job_id}/
-            save_dir = Path("uploads") / "ai_video_transitions" / str(user_id) / str(job_id)
-            save_dir.mkdir(parents=True, exist_ok=True)
-            save_path = save_dir / f"{transition_name}.mp4"
+            # 4. 비디오 다운로드 및 Supabase Storage에 업로드
+            # 먼저 비디오를 다운로드
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.get(video_url) as response:
+                    if response.status != 200:
+                        raise Exception(f"Failed to download video: HTTP {response.status}")
+                    video_bytes = await response.read()
 
-            download_success = await self.download_video(video_url, str(save_path))
+            # Supabase Storage에 업로드
+            from app.services.supabase_storage import get_storage_service
+            from app.database import SessionLocal
 
-            if not download_success:
-                raise Exception("Failed to download video")
+            # session_id 가져오기
+            db = SessionLocal()
+            try:
+                from app import models
+                job = db.query(models.VideoGenerationJob).filter(
+                    models.VideoGenerationJob.id == job_id
+                ).first()
+                session_id = job.session_id if job else str(job_id)
+            finally:
+                db.close()
 
-            # 5. 상대 경로 URL 생성
-            relative_url = f"/uploads/ai_video_transitions/{user_id}/{job_id}/{transition_name}.mp4"
+            storage = get_storage_service()
+            file_path = f"{user_id}/{session_id}/{transition_name}.mp4"
+
+            relative_url = storage.upload_file(
+                bucket="ai-video-transitions",
+                file_path=file_path,
+                file_data=video_bytes,
+                content_type="video/mp4"
+            )
 
             logger.info(f"Kling video generated successfully: {relative_url}")
 
@@ -1528,20 +1553,23 @@ class VideoGenerationAgent:
                     if not video_data:
                         raise ValueError(f"No video data in Veo response for transition {transition_name}")
 
-                    # 비디오 저장 (로컬 파일 시스템)
-                    save_dir = Path("uploads") / "ai_video_transitions" / str(job.user_id) / str(job.id)
-                    save_dir.mkdir(parents=True, exist_ok=True)
-                    save_path = save_dir / f"{transition_name}.mp4"
+                    # 비디오 저장 (Supabase Storage)
+                    from app.services.supabase_storage import get_storage_service
+                    storage = get_storage_service()
 
-                    # base64 디코딩하여 파일로 저장
+                    # base64 디코딩
                     video_bytes = base64.b64decode(video_data)
-                    with open(save_path, 'wb') as f:
-                        f.write(video_bytes)
 
-                    # 상대 경로 URL 생성
-                    video_url = f"/uploads/ai_video_transitions/{job.user_id}/{job.id}/{transition_name}.mp4"
+                    # Supabase Storage에 업로드
+                    file_path = f"{job.user_id}/{job.session_id}/{transition_name}.mp4"
+                    video_url = storage.upload_file(
+                        bucket="ai-video-transitions",
+                        file_path=file_path,
+                        file_data=video_bytes,
+                        content_type="video/mp4"
+                    )
 
-                    logger.info(f"Veo video saved to: {save_path} ({len(video_bytes)} bytes)")
+                    logger.info(f"Veo video saved to Supabase Storage: {video_url} ({len(video_bytes)} bytes)")
 
                     generated_videos.append({
                         "transition": transition_name,
@@ -1594,41 +1622,18 @@ class VideoGenerationAgent:
 
     async def _download_image(self, url: str) -> bytes:
         """
-        이미지 다운로드 (로컬 파일 또는 HTTP)
-        - 상대 경로(/uploads/...)인 경우: 로컬 파일 시스템에서 직접 읽기
-        - 절대 URL(http://, https://)인 경우: HTTP로 다운로드
+        이미지 다운로드 (Supabase Storage URL에서 HTTP 다운로드)
         """
-        # 상대 경로인 경우 로컬 파일 시스템에서 직접 읽기
-        if url.startswith('/uploads/'):
-            try:
-                # /uploads/ 경로를 실제 파일 시스템 경로로 변환
-                # 파일 위치 기준 절대 경로 사용 (환경 독립적)
-                # backend/app/services/ → backend/app/ → backend/ → 프로젝트루트/
-                file_path = Path(__file__).parent.parent.parent / url.lstrip('/')
-
-                logger.info(f"Reading image from local filesystem: {file_path}")
-
-                with open(file_path, 'rb') as f:
-                    image_data = f.read()
-
-                logger.info(f"Successfully read local image: {len(image_data)} bytes")
-                return image_data
-
-            except Exception as e:
-                logger.error(f"Failed to read local image {file_path}: {str(e)}")
-                raise
-        else:
-            # 절대 URL인 경우 HTTP로 다운로드
-            try:
-                logger.info(f"Downloading image from URL: {url}")
-                async with httpx.AsyncClient() as client:
-                    response = await client.get(url)
-                    response.raise_for_status()
-                    logger.info(f"Successfully downloaded image: {len(response.content)} bytes")
-                    return response.content
-            except Exception as e:
-                logger.error(f"Failed to download image from {url}: {str(e)}")
-                raise
+        try:
+            logger.info(f"Downloading image from Supabase Storage: {url}")
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                logger.info(f"Successfully downloaded image: {len(response.content)} bytes")
+                return response.content
+        except Exception as e:
+            logger.error(f"Failed to download image from {url}: {str(e)}")
+            raise
 
     async def _upload_to_cloudinary(
         self,
@@ -2027,37 +2032,33 @@ class MiniMaxVideoGenerationAgent:
 
             video_bytes = response.content
 
-        # 로컬 파일 시스템에 저장
-        save_dir = Path("uploads") / "ai_video_transitions" / str(job.user_id) / str(job.id)
-        save_dir.mkdir(parents=True, exist_ok=True)
-        save_path = save_dir / f"{transition_name}.mp4"
+        # Supabase Storage에 저장
+        from app.services.supabase_storage import get_storage_service
+        storage = get_storage_service()
 
-        with open(save_path, 'wb') as f:
-            f.write(video_bytes)
+        file_path = f"{job.user_id}/{job.session_id}/{transition_name}.mp4"
 
-        # 상대 경로 URL 생성
-        video_url = f"/uploads/ai_video_transitions/{job.user_id}/{job.id}/{transition_name}.mp4"
+        video_url = storage.upload_file(
+            bucket="ai-video-transitions",
+            file_path=file_path,
+            file_data=video_bytes,
+            content_type="video/mp4"
+        )
 
-        logger.info(f"MiniMax video saved: {save_path} ({len(video_bytes)} bytes)")
+        logger.info(f"MiniMax video saved to Supabase Storage: {video_url} ({len(video_bytes)} bytes)")
 
         return video_url
 
     async def _image_url_to_base64(self, image_url: str) -> str:
         """
-        이미지 URL을 base64로 인코딩
+        이미지 URL을 base64로 인코딩 (Supabase Storage URL 사용)
         """
-        # 로컬 파일 경로인 경우
-        if image_url.startswith('/uploads/'):
-            file_path = Path(image_url.lstrip('/'))
-            with open(file_path, 'rb') as f:
-                image_bytes = f.read()
-        else:
-            # URL인 경우 다운로드
-            async with httpx.AsyncClient() as client:
-                response = await client.get(image_url)
-                if response.status_code != 200:
-                    raise Exception(f"Failed to download image: {response.status_code}")
-                image_bytes = response.content
+        # 모든 URL은 HTTP/HTTPS URL (Supabase Storage)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(image_url)
+            if response.status_code != 200:
+                raise Exception(f"Failed to download image from {image_url}: {response.status_code}")
+            image_bytes = response.content
 
         # base64 인코딩
         base64_str = base64.b64encode(image_bytes).decode('utf-8')
@@ -2401,24 +2402,17 @@ class VideoCompositionAgent:
 
             logger.info(f"Final video rendered: {output_path}")
 
-            # Cloudinary에 업로드
-            job.current_step = "Uploading final video to cloud storage"
+            # Supabase Storage에 업로드
+            job.current_step = "Uploading final video to Supabase Storage"
             db.commit()
 
             with open(output_path, 'rb') as f:
                 video_url = await self._upload_to_cloudinary(
                     f.read(),
                     job.user_id,
-                    job.id
+                    job.id,
+                    job.session_id
                 )
-
-            # 썸네일 생성 및 업로드
-            thumbnail_url = await self._generate_and_upload_thumbnail(
-                final_video,
-                temp_dir,
-                job.user_id,
-                job.id
-            )
 
             # 임시 파일 정리
             logger.info("Cleaning up temporary files...")
@@ -2437,11 +2431,24 @@ class VideoCompositionAgent:
             # Job 업데이트
             from sqlalchemy import func
             job.final_video_url = video_url
-            job.thumbnail_url = thumbnail_url
             job.status = "completed"
             job.current_step = "Video generation completed"
             job.completed_at = func.now()
             db.commit()
+
+            # GeneratedVideo 레코드 생성 (완료된 비디오 결과 저장)
+            from app import models
+            generated_video = models.GeneratedVideo(
+                session_id=job.session_id,
+                user_id=job.user_id,
+                final_video_url=video_url,
+                product_name=job.product_name,
+                tier=job.tier,
+                duration_seconds=job.duration_seconds
+            )
+            db.add(generated_video)
+            db.commit()
+            logger.info(f"GeneratedVideo record created for session {job.session_id}")
 
             logger.info(f"Video composition completed for job {job.id}: {video_url}")
             return video_url
@@ -2504,51 +2511,30 @@ class VideoCompositionAgent:
         self,
         video_data: bytes,
         user_id: int,
-        job_id: int
+        job_id: int,
+        session_id: str
     ) -> str:
-        """최종 비디오를 로컬 파일 시스템에 저장"""
+        """최종 비디오를 Supabase Storage에 저장"""
         try:
-            # 저장 경로 생성
-            save_dir = Path("uploads") / "ai_video_final" / str(user_id)
-            save_dir.mkdir(parents=True, exist_ok=True)
+            from app.services.supabase_storage import get_storage_service
+            storage = get_storage_service()
 
-            # 파일 저장
-            file_path = save_dir / f"video_{job_id}.mp4"
-            with open(file_path, 'wb') as f:
-                f.write(video_data)
+            # 파일 경로 생성
+            file_path = f"{user_id}/{session_id}.mp4"
 
-            # URL 반환 (FastAPI static files 경로)
-            file_url = f"/uploads/ai_video_final/{user_id}/video_{job_id}.mp4"
-            logger.info(f"Final video saved to local filesystem: {file_url}")
+            # Supabase Storage에 업로드
+            file_url = storage.upload_file(
+                bucket="ai-video-finals",
+                file_path=file_path,
+                file_data=video_data,
+                content_type="video/mp4"
+            )
+
+            logger.info(f"Final video saved to Supabase Storage: {file_url}")
             return file_url
         except Exception as e:
-            logger.error(f"Failed to save final video to local filesystem: {str(e)}")
+            logger.error(f"Failed to save final video to Supabase Storage: {str(e)}")
             raise
-
-    async def _generate_and_upload_thumbnail(
-        self,
-        video_clip,
-        temp_dir: str,
-        user_id: int,
-        job_id: int
-    ) -> str:
-        """비디오에서 썸네일 생성 및 로컬 파일 시스템에 저장"""
-        try:
-            # 저장 경로 생성
-            save_dir = Path("uploads") / "ai_video_thumbnails" / str(user_id)
-            save_dir.mkdir(parents=True, exist_ok=True)
-
-            # 첫 번째 프레임을 썸네일로 저장
-            thumbnail_path = save_dir / f"thumbnail_{job_id}.jpg"
-            video_clip.save_frame(str(thumbnail_path), t=0)
-
-            # URL 반환 (FastAPI static files 경로)
-            file_url = f"/uploads/ai_video_thumbnails/{user_id}/thumbnail_{job_id}.jpg"
-            logger.info(f"Thumbnail saved to local filesystem: {file_url}")
-            return file_url
-        except Exception as e:
-            logger.error(f"Failed to generate/save thumbnail: {str(e)}")
-            return None
 
 
 # 비디오 생성 파이프라인 실행 함수

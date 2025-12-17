@@ -11,10 +11,11 @@ import logging
 import asyncio
 
 from ..database import get_db, SessionLocal
-from ..models import User, BrandAnalysis
+from ..models import User, BrandAnalysis, YouTubeConnection
 from ..auth import get_current_user
 from ..services.naver_blog_service import NaverBlogService
 from ..services.brand_analyzer_service import BrandAnalyzerService
+from ..brand_agents import BrandAnalysisPipeline
 
 router = APIRouter(prefix="/api/brand-analysis", tags=["brand-analysis"])
 logger = logging.getLogger(__name__)
@@ -26,6 +27,16 @@ class MultiPlatformAnalysisRequest(BaseModel):
     instagram_url: Optional[str] = None
     youtube_url: Optional[str] = None
     max_posts: int = 10  # 각 플랫폼당 최대 포스트 수
+
+
+class BasicProfileRequest(BaseModel):
+    """기본 프로필 생성 요청"""
+    brand_name: str
+    business_type: str
+    business_description: str
+    target_audience: str
+    selected_styles: Optional[List[str]] = None
+    brand_values: Optional[List[str]] = None
 
 
 class ManualAnalysisRequest(BaseModel):
@@ -119,7 +130,7 @@ async def multi_platform_analysis_background(
     max_posts: int
 ):
     """
-    백그라운드에서 멀티 플랫폼 분석 수행
+    백그라운드에서 멀티 플랫폼 분석 수행 (Multi-Agent Pipeline 사용)
     """
     logger.info(f"🚀 백그라운드 태스크 시작 - 사용자 ID: {user_id}")
 
@@ -146,130 +157,101 @@ async def multi_platform_analysis_background(
             brand_analysis = BrandAnalysis(user_id=user_id)
             db.add(brand_analysis)
 
-        # 분석할 플랫폼 확인
-        platforms_to_analyze = []
+        # 플랫폼 URL 구성
+        platform_urls = {}
         if blog_url:
-            platforms_to_analyze.append(("blog", blog_url))
+            platform_urls['blog'] = blog_url
+            brand_analysis.blog_analysis_status = "analyzing"
+            brand_analysis.blog_url = blog_url
         if instagram_url:
-            platforms_to_analyze.append(("instagram", instagram_url))
+            platform_urls['instagram'] = instagram_url
+            brand_analysis.instagram_analysis_status = "analyzing"
+            brand_analysis.instagram_url = instagram_url
         if youtube_url:
-            platforms_to_analyze.append(("youtube", youtube_url))
+            platform_urls['youtube'] = youtube_url
+            brand_analysis.youtube_analysis_status = "analyzing"
+            brand_analysis.youtube_url = youtube_url
 
-        if not platforms_to_analyze:
+        # YouTube Connection 자동 감지 (OAuth 연동 기반)
+        youtube_connection = db.query(YouTubeConnection).filter(
+            YouTubeConnection.user_id == user_id,
+            YouTubeConnection.is_active == True
+        ).first()
+
+        if youtube_connection:
+            logger.info(f"✅ YouTube 계정 연동 확인됨: {youtube_connection.channel_title}")
+            platform_urls['youtube'] = 'connected'  # OAuth 연동 표시
+            brand_analysis.youtube_analysis_status = "analyzing"
+            brand_analysis.youtube_url = f"https://youtube.com/@{youtube_connection.channel_custom_url or youtube_connection.channel_id}"
+
+        if not platform_urls:
             logger.error("분석할 플랫폼이 없습니다")
             return
 
-        # 상태 업데이트
-        for platform, _ in platforms_to_analyze:
-            if platform == "blog":
-                brand_analysis.blog_analysis_status = "analyzing"
-                brand_analysis.blog_url = blog_url
-            elif platform == "instagram":
-                brand_analysis.instagram_analysis_status = "analyzing"
-                brand_analysis.instagram_url = instagram_url
-            elif platform == "youtube":
-                brand_analysis.youtube_analysis_status = "analyzing"
-                brand_analysis.youtube_url = youtube_url
         db.commit()
 
-        # 병렬로 플랫폼 분석 실행
-        tasks = []
-        if blog_url:
-            tasks.append(analyze_blog_platform(blog_url, max_posts))
-        if instagram_url:
-            tasks.append(analyze_instagram_platform(instagram_url, max_posts))
-        if youtube_url:
-            tasks.append(analyze_youtube_platform(youtube_url, max_posts))
+        # ===== Multi-Agent Pipeline 실행 =====
+        pipeline = BrandAnalysisPipeline(db=db)
+        brand_profile = await pipeline.run(
+            user_id=user_id,  # int 타입으로 전달
+            platform_urls=platform_urls,
+            max_items=max_posts
+        )
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        # ===== BrandProfile → BrandAnalysis 변환 =====
+        # Overall 데이터
+        brand_analysis.brand_name = brand_profile.identity.brand_name
+        brand_analysis.business_type = brand_profile.identity.business_type
+        brand_analysis.brand_tone = brand_profile.tone_of_voice.sentence_style
+        brand_analysis.brand_values = brand_profile.identity.brand_values
+        brand_analysis.target_audience = brand_profile.identity.target_audience
+        brand_analysis.brand_personality = brand_profile.identity.brand_personality
+        brand_analysis.key_themes = brand_profile.content_strategy.primary_topics
+        brand_analysis.emotional_tone = brand_profile.identity.emotional_tone
 
-        # 결과 처리
-        overall_data = {
-            "brand_name": None,
-            "business_type": None,
-            "brand_tone": None,
-            "brand_values": None,
-            "target_audience": None,
-            "brand_personality": None,
-            "key_themes": None,
-            "emotional_tone": None
-        }
+        # Blog 데이터 (blog 플랫폼이 분석되었으면)
+        if 'naver_blog' in brand_profile.analyzed_platforms:
+            brand_analysis.blog_writing_style = brand_profile.content_strategy.content_structure
+            brand_analysis.blog_content_structure = brand_profile.content_strategy.content_structure
+            brand_analysis.blog_call_to_action = brand_profile.content_strategy.call_to_action_style
+            brand_analysis.blog_keyword_usage = brand_profile.content_strategy.keyword_usage
+            brand_analysis.blog_analyzed_posts = brand_profile.total_contents_analyzed
+            brand_analysis.blog_analyzed_at = datetime.utcnow()
+            brand_analysis.blog_analysis_status = "completed"
 
-        for i, (platform, url) in enumerate(platforms_to_analyze):
-            result = results[i]
+        # Instagram 데이터
+        if 'instagram' in brand_profile.analyzed_platforms:
+            brand_analysis.instagram_caption_style = brand_profile.tone_of_voice.sentence_style
+            brand_analysis.instagram_image_style = brand_profile.visual_style.image_style
+            brand_analysis.instagram_hashtag_pattern = "분석됨"
+            brand_analysis.instagram_color_palette = brand_profile.visual_style.color_palette
+            brand_analysis.instagram_analyzed_posts = brand_profile.total_contents_analyzed
+            brand_analysis.instagram_analyzed_at = datetime.utcnow()
+            brand_analysis.instagram_analysis_status = "completed"
 
-            if isinstance(result, Exception) or result is None:
-                # 분석 실패
-                if platform == "blog":
-                    brand_analysis.blog_analysis_status = "failed"
-                elif platform == "instagram":
-                    brand_analysis.instagram_analysis_status = "failed"
-                elif platform == "youtube":
-                    brand_analysis.youtube_analysis_status = "failed"
-                continue
+        # YouTube 데이터
+        if 'youtube' in brand_profile.analyzed_platforms:
+            brand_analysis.youtube_content_style = brand_profile.content_strategy.content_structure
+            brand_analysis.youtube_title_pattern = "분석됨"
+            brand_analysis.youtube_description_style = brand_profile.content_strategy.content_structure
+            brand_analysis.youtube_thumbnail_style = brand_profile.visual_style.composition_style
+            brand_analysis.youtube_analyzed_videos = brand_profile.total_contents_analyzed
+            brand_analysis.youtube_analyzed_at = datetime.utcnow()
+            brand_analysis.youtube_analysis_status = "completed"
 
-            # 플랫폼별 데이터 저장
-            if platform == "blog" and result.get("analysis"):
-                analysis = result["analysis"]
-                overall = analysis.get("overall", {})
-                blog = analysis.get("blog", {})
-
-                # Overall 데이터 (첫 번째 플랫폼 데이터 사용)
-                if not overall_data["brand_tone"]:
-                    overall_data["brand_name"] = overall.get("brand_name")
-                    overall_data["business_type"] = overall.get("business_type")
-                    overall_data["brand_tone"] = overall.get("brand_tone")
-                    overall_data["brand_values"] = overall.get("brand_values")
-                    overall_data["target_audience"] = overall.get("target_audience")
-                    overall_data["brand_personality"] = overall.get("brand_personality")
-                    overall_data["key_themes"] = overall.get("key_themes")
-                    overall_data["emotional_tone"] = overall.get("emotional_tone")
-
-                # Blog 데이터
-                brand_analysis.blog_writing_style = blog.get("writing_style")
-                brand_analysis.blog_content_structure = blog.get("content_structure")
-                brand_analysis.blog_call_to_action = blog.get("call_to_action")
-                brand_analysis.blog_keyword_usage = blog.get("keyword_usage")
-                brand_analysis.blog_analyzed_posts = result.get("analyzed_posts", 0)
-                brand_analysis.blog_analyzed_at = datetime.utcnow()
-                brand_analysis.blog_analysis_status = "completed"
-
-            elif platform == "instagram" and result.get("analysis"):
-                instagram = result["analysis"].get("instagram", {})
-                brand_analysis.instagram_caption_style = instagram.get("caption_style")
-                brand_analysis.instagram_image_style = instagram.get("image_style")
-                brand_analysis.instagram_hashtag_pattern = instagram.get("hashtag_pattern")
-                brand_analysis.instagram_color_palette = instagram.get("color_palette")
-                brand_analysis.instagram_analyzed_posts = result.get("analyzed_posts", 0)
-                brand_analysis.instagram_analyzed_at = datetime.utcnow()
-                brand_analysis.instagram_analysis_status = "completed"
-
-            elif platform == "youtube" and result.get("analysis"):
-                youtube = result["analysis"].get("youtube", {})
-                brand_analysis.youtube_content_style = youtube.get("content_style")
-                brand_analysis.youtube_title_pattern = youtube.get("title_pattern")
-                brand_analysis.youtube_description_style = youtube.get("description_style")
-                brand_analysis.youtube_thumbnail_style = youtube.get("thumbnail_style")
-                brand_analysis.youtube_analyzed_videos = result.get("analyzed_videos", 0)
-                brand_analysis.youtube_analyzed_at = datetime.utcnow()
-                brand_analysis.youtube_analysis_status = "completed"
-
-        # Overall 데이터 저장
-        if overall_data["brand_tone"]:
-            brand_analysis.brand_name = overall_data["brand_name"]
-            brand_analysis.business_type = overall_data["business_type"]
-            brand_analysis.brand_tone = overall_data["brand_tone"]
-            brand_analysis.brand_values = overall_data["brand_values"]
-            brand_analysis.target_audience = overall_data["target_audience"]
-            brand_analysis.brand_personality = overall_data["brand_personality"]
-            brand_analysis.key_themes = overall_data["key_themes"]
-            brand_analysis.emotional_tone = overall_data["emotional_tone"]
+        # ===== 통합 브랜드 프로필 저장 =====
+        brand_analysis.brand_profile_json = brand_profile.dict()
+        brand_analysis.profile_source = brand_profile.source
+        brand_analysis.profile_confidence = brand_profile.confidence_level
+        brand_analysis.profile_updated_at = datetime.utcnow()
 
         db.commit()
         logger.info(f"사용자 {user_id}의 멀티 플랫폼 분석 완료")
 
     except Exception as e:
         logger.error(f"멀티 플랫폼 분석 중 오류: {e}")
+        import traceback
+        traceback.print_exc()
         try:
             brand_analysis = db.query(BrandAnalysis).filter(BrandAnalysis.user_id == user_id).first()
             if brand_analysis:
@@ -445,10 +427,10 @@ async def manual_content_analysis_background(
     db: Session
 ):
     """
-    백그라운드에서 수동 콘텐츠 분석 수행
+    백그라운드에서 수동 콘텐츠 분석 수행 (Multi-Agent Pipeline 사용)
     """
     try:
-        logger.info(f"사용자 {user_id}의 수동 콘텐츠 분석 시작")
+        logger.info(f"사용자 {user_id}의 수동 콘텐츠 분석 시작 (Multi-Agent Pipeline)")
 
         # 사용자 조회
         user = db.query(User).filter(User.id == user_id).first()
@@ -463,123 +445,74 @@ async def manual_content_analysis_background(
             db.add(brand_analysis)
             db.commit()
 
-        # Gemini를 사용하여 샘플 분석
-        analyzer = BrandAnalyzerService()
+        # ===== Multi-Agent Pipeline 실행 =====
+        pipeline = BrandAnalysisPipeline(db=db)
+        brand_profile = await pipeline.run_from_manual_samples(
+            user_id=user_id,  # int 타입으로 전달
+            text_samples=text_samples,
+            image_samples=image_samples,
+            video_samples=video_samples
+        )
 
-        # 텍스트 샘플 분석
-        if text_samples and len(text_samples) >= 2:
-            # 텍스트를 포스트 형태로 변환
-            posts = [{"title": f"샘플 {i+1}", "content": sample, "date": "N/A"}
-                     for i, sample in enumerate(text_samples)]
+        # ===== BrandProfile → BrandAnalysis 매핑 (기존 컬럼 호환성) =====
+        logger.info("BrandProfile → BrandAnalysis 매핑 중...")
 
-            business_info = {
-                'brand_name': user.brand_name,
-                'business_type': user.business_type,
-                'business_description': user.business_description
-            }
+        # Overall 필드
+        brand_analysis.brand_name = brand_profile.identity.brand_name
+        brand_analysis.business_type = brand_profile.identity.business_type
+        brand_analysis.brand_personality = brand_profile.identity.brand_personality
+        brand_analysis.brand_values = brand_profile.identity.brand_values
+        brand_analysis.target_audience = brand_profile.identity.target_audience
+        brand_analysis.emotional_tone = brand_profile.identity.emotional_tone
+        brand_analysis.brand_tone = brand_profile.tone_of_voice.sentence_style
+        brand_analysis.key_themes = brand_profile.content_strategy.primary_topics
 
-            text_analysis = await analyzer.analyze_brand(posts, business_info)
-
-            # Overall 데이터 저장
-            overall = text_analysis.get('overall', {})
-            brand_analysis.brand_tone = overall.get('brand_tone')
-            brand_analysis.brand_values = overall.get('brand_values')
-            brand_analysis.target_audience = overall.get('target_audience')
-            brand_analysis.brand_personality = overall.get('brand_personality')
-            brand_analysis.key_themes = overall.get('key_themes')
-            brand_analysis.emotional_tone = overall.get('emotional_tone')
-
-            # Blog 데이터 저장 (수동 입력의 경우 blog 필드 활용)
-            blog = text_analysis.get('blog', {})
-            brand_analysis.blog_writing_style = blog.get('writing_style')
-            brand_analysis.blog_content_structure = blog.get('content_structure')
-            brand_analysis.blog_call_to_action = blog.get('call_to_action')
-            brand_analysis.blog_keyword_usage = blog.get('keyword_usage')
+        # Blog 필드 (텍스트 샘플 분석 결과)
+        if text_samples:
+            brand_analysis.blog_writing_style = brand_profile.content_strategy.content_structure
+            brand_analysis.blog_content_structure = brand_profile.tone_of_voice.sentence_style
+            brand_analysis.blog_call_to_action = brand_profile.content_strategy.call_to_action_style
+            brand_analysis.blog_keyword_usage = brand_profile.content_strategy.keyword_usage
             brand_analysis.blog_analyzed_posts = len(text_samples)
             brand_analysis.blog_analyzed_at = datetime.utcnow()
             brand_analysis.blog_analysis_status = "completed"
 
-        # 이미지 샘플 분석 (AI 보완 분석)
-        if image_samples and len(image_samples) >= 2:
-            # TODO: 이미지 스타일 분석 구현
-            # 현재는 기본값 설정
-            brand_analysis.instagram_caption_style = "수동 입력 기반"
-            brand_analysis.instagram_image_style = f"{len(image_samples)}개 샘플 기반 분석"
-            brand_analysis.instagram_hashtag_pattern = "일반적인 패턴"
-            brand_analysis.instagram_color_palette = ["#000000", "#FFFFFF"]
+        # Instagram 필드 (이미지 샘플 분석 결과)
+        if image_samples:
+            brand_analysis.instagram_caption_style = brand_profile.tone_of_voice.sentence_style
+            brand_analysis.instagram_image_style = brand_profile.visual_style.image_style or "기본 스타일"
+            brand_analysis.instagram_hashtag_pattern = "분석 기반 패턴"
+            brand_analysis.instagram_color_palette = brand_profile.visual_style.color_palette
             brand_analysis.instagram_analyzed_posts = len(image_samples)
             brand_analysis.instagram_analyzed_at = datetime.utcnow()
             brand_analysis.instagram_analysis_status = "completed"
 
-        # 영상 샘플 분석 (AI 보완 분석)
-        if video_samples and len(video_samples) >= 2:
-            # TODO: 영상 스타일 분석 구현
-            # 현재는 기본값 설정
-            brand_analysis.youtube_content_style = "수동 입력 기반"
-            brand_analysis.youtube_title_pattern = f"{len(video_samples)}개 샘플 기반 분석"
-            brand_analysis.youtube_description_style = "일반적인 스타일"
-            brand_analysis.youtube_thumbnail_style = "기본 스타일"
+        # YouTube 필드 (영상 샘플 분석 결과)
+        if video_samples:
+            brand_analysis.youtube_content_style = brand_profile.content_strategy.content_structure
+            brand_analysis.youtube_title_pattern = brand_profile.tone_of_voice.sentence_style
+            brand_analysis.youtube_description_style = brand_profile.tone_of_voice.sentence_style
+            brand_analysis.youtube_thumbnail_style = brand_profile.visual_style.image_style or "기본 스타일"
             brand_analysis.youtube_analyzed_videos = len(video_samples)
             brand_analysis.youtube_analyzed_at = datetime.utcnow()
             brand_analysis.youtube_analysis_status = "completed"
 
-        # AI 보완 분석: 데이터가 부족한 경우 Gemini로 보완
-        if not brand_analysis.brand_tone:
-            # Overall 데이터가 없는 경우 AI로 생성
-            logger.info("Overall 데이터 부족 - AI 보완 분석 수행")
-
-            # 비즈니스 정보 기반으로 AI 보완
-            supplemental_prompt = f"""
-다음 비즈니스 정보를 바탕으로 브랜드 특성을 추론해주세요:
-
-- 브랜드명: {user.brand_name}
-- 업종: {user.business_type}
-- 설명: {user.business_description}
-
-다음 정보를 JSON 형식으로 제공해주세요:
-{{
-  "brand_tone": "브랜드 톤앤매너",
-  "brand_values": ["가치1", "가치2"],
-  "target_audience": "타겟 고객층",
-  "brand_personality": "브랜드 성격 설명",
-  "key_themes": ["주제1", "주제2"],
-  "emotional_tone": "감정적 톤"
-}}
-"""
-            try:
-                import google.generativeai as genai
-                import json
-                import os
-
-                api_key = os.getenv("GEMINI_API_KEY")
-                if api_key:
-                    genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-2.0-flash-exp')
-                    response = model.generate_content(supplemental_prompt)
-                    response_text = response.text.strip()
-
-                    # JSON 파싱
-                    if response_text.startswith('```json'):
-                        response_text = response_text.replace('```json', '').replace('```', '').strip()
-
-                    supplemental_data = json.loads(response_text)
-
-                    brand_analysis.brand_tone = supplemental_data.get('brand_tone')
-                    brand_analysis.brand_values = supplemental_data.get('brand_values')
-                    brand_analysis.target_audience = supplemental_data.get('target_audience')
-                    brand_analysis.brand_personality = supplemental_data.get('brand_personality')
-                    brand_analysis.key_themes = supplemental_data.get('key_themes')
-                    brand_analysis.emotional_tone = supplemental_data.get('emotional_tone')
-
-                    logger.info("AI 보완 분석 완료")
-            except Exception as e:
-                logger.error(f"AI 보완 분석 실패: {e}")
+        # ===== 통합 브랜드 프로필 저장 =====
+        brand_analysis.brand_profile_json = brand_profile.dict()
+        brand_analysis.profile_source = brand_profile.source
+        brand_analysis.profile_confidence = brand_profile.confidence_level
+        brand_analysis.profile_updated_at = datetime.utcnow()
 
         db.commit()
-        logger.info(f"사용자 {user_id}의 수동 콘텐츠 분석 완료")
+        logger.info(f"사용자 {user_id}의 수동 콘텐츠 분석 완료 (신뢰도: {brand_profile.confidence_level})")
+
+        # BrandProfile JSON 로그 (디버깅용)
+        logger.info(f"생성된 BrandProfile: {brand_profile.dict()}")
 
     except Exception as e:
         logger.error(f"수동 콘텐츠 분석 중 오류: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 @router.post("/manual", response_model=AnalysisResponse)
@@ -662,3 +595,111 @@ async def analyze_manual_content(
     except Exception as e:
         logger.error(f"수동 콘텐츠 분석 시작 실패: {e}")
         raise HTTPException(status_code=500, detail=f"분석을 시작할 수 없습니다: {str(e)}")
+
+
+@router.post("/create-basic-profile", response_model=AnalysisResponse)
+async def create_basic_profile(
+    request: BasicProfileRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    비즈니스 정보만으로 기본 BrandProfile 생성 (샘플 없음)
+
+    - 사용자가 스타일/가치를 입력한 경우 샘플 없이도 브랜드 프로필 생성 가능
+    - AI가 업종 특성 기반으로 브랜드 특성 추론
+    - 신뢰도: LOW (추론 기반)
+    """
+    try:
+        logger.info(f"사용자 {current_user.id}의 기본 브랜드 프로필 생성 시작")
+
+        # BrandAnalysis 레코드 확인
+        brand_analysis = db.query(BrandAnalysis).filter(BrandAnalysis.user_id == current_user.id).first()
+        if not brand_analysis:
+            brand_analysis = BrandAnalysis(user_id=current_user.id)
+            db.add(brand_analysis)
+            db.commit()
+
+        # 백그라운드 태스크로 BrandProfile 생성
+        background_tasks.add_task(
+            create_basic_profile_background,
+            current_user.id,
+            request.brand_name,
+            request.business_type,
+            request.business_description,
+            request.target_audience,
+            request.selected_styles,
+            request.brand_values,
+            db
+        )
+
+        return AnalysisResponse(
+            status="started",
+            message="기본 브랜드 프로필 생성이 시작되었습니다. 잠시 후 결과를 확인해주세요."
+        )
+
+    except Exception as e:
+        logger.error(f"기본 프로필 생성 시작 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"기본 프로필 생성을 시작할 수 없습니다: {str(e)}")
+
+
+async def create_basic_profile_background(
+    user_id: int,
+    brand_name: str,
+    business_type: str,
+    business_description: str,
+    target_audience: str,
+    selected_styles: Optional[List[str]],
+    brand_values: Optional[List[str]],
+    db: Session
+):
+    """
+    백그라운드에서 기본 BrandProfile 생성
+    """
+    try:
+        logger.info(f"사용자 {user_id}의 기본 BrandProfile 생성 중...")
+
+        # BrandProfileSynthesizer 사용
+        from ..brand_agents.synthesizer import BrandProfileSynthesizer
+
+        synthesizer = BrandProfileSynthesizer()
+        brand_profile = await synthesizer.synthesize_from_business_info(
+            user_id=str(user_id),
+            brand_name=brand_name,
+            business_type=business_type,
+            business_description=business_description,
+            target_audience=target_audience,
+            selected_styles=selected_styles,
+            brand_values=brand_values
+        )
+
+        # BrandAnalysis 레코드 업데이트
+        brand_analysis = db.query(BrandAnalysis).filter(BrandAnalysis.user_id == user_id).first()
+        if brand_analysis:
+            # BrandProfile → BrandAnalysis 매핑
+            brand_analysis.brand_name = brand_profile.identity.brand_name
+            brand_analysis.business_type = brand_profile.identity.business_type
+            brand_analysis.brand_personality = brand_profile.identity.brand_personality
+            brand_analysis.brand_values = brand_profile.identity.brand_values
+            brand_analysis.target_audience = brand_profile.identity.target_audience
+            brand_analysis.emotional_tone = brand_profile.identity.emotional_tone
+            brand_analysis.brand_tone = brand_profile.tone_of_voice.sentence_style
+            brand_analysis.key_themes = brand_profile.content_strategy.primary_topics
+
+            # ===== 통합 브랜드 프로필 저장 =====
+            brand_analysis.brand_profile_json = brand_profile.dict()
+            brand_analysis.profile_source = brand_profile.source
+            brand_analysis.profile_confidence = brand_profile.confidence_level
+            brand_analysis.profile_updated_at = datetime.utcnow()
+
+            db.commit()
+            logger.info(f"사용자 {user_id}의 기본 BrandProfile 생성 완료 (신뢰도: {brand_profile.confidence_level})")
+
+            # BrandProfile JSON 로그 (디버깅용)
+            logger.info(f"생성된 BrandProfile: {brand_profile.dict()}")
+
+    except Exception as e:
+        logger.error(f"기본 BrandProfile 생성 중 오류: {e}")
+        import traceback
+        traceback.print_exc()

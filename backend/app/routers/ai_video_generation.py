@@ -59,6 +59,7 @@ class StoryboardCut(BaseModel):
 class VideoGenerationJobResponse(BaseModel):
     """비디오 생성 작업 응답"""
     id: int
+    session_id: str
     user_id: int
     product_name: str
     product_description: Optional[str]
@@ -66,17 +67,14 @@ class VideoGenerationJobResponse(BaseModel):
     tier: str
     cut_count: int
     duration_seconds: int
-    cost: float
     storyboard: Optional[List[dict]]
     generated_image_urls: Optional[List[dict]]
     generated_video_urls: Optional[List[dict]]
     final_video_url: Optional[str]
-    thumbnail_url: Optional[str]
     status: str
     current_step: Optional[str]
     error_message: Optional[str]
     created_at: datetime
-    updated_at: Optional[datetime]
     completed_at: Optional[datetime]
 
     class Config:
@@ -173,29 +171,46 @@ async def create_video_generation_job(
     tier_config = TIER_CONFIG[tier]
 
     try:
-        # 1. 이미지를 로컬 파일 시스템에 저장 (backend/uploads/)
-        logger.info(f"Saving product image for user {current_user.id} to local filesystem")
+        # 1. 세션 ID 생성 (파일 경로에 사용)
+        session_id = str(uuid.uuid4())
 
-        # 업로드 디렉토리 생성
-        upload_dir = Path("uploads") / "ai_video_products" / str(current_user.id)
-        upload_dir.mkdir(parents=True, exist_ok=True)
+        # 2. 이미지를 Supabase Storage에 업로드
+        logger.info(f"Uploading product image for user {current_user.id} to Supabase Storage")
 
-        # 고유한 파일명 생성
-        file_extension = image.filename.split(".")[-1] if "." in image.filename else "jpg"
-        unique_filename = f"{uuid.uuid4()}.{file_extension}"
-        file_path = upload_dir / unique_filename
+        from app.services.supabase_storage import get_storage_service
+        storage = get_storage_service()
 
-        # 파일 저장
-        with open(file_path, "wb") as f:
-            content = await image.read()
-            f.write(content)
+        # 파일 데이터 읽기
+        content = await image.read()
 
-        # 상대 경로를 URL 형식으로 저장 (나중에 접근할 수 있도록)
-        uploaded_image_url = f"/uploads/ai_video_products/{current_user.id}/{unique_filename}"
-        logger.info(f"Image saved to: {file_path} (URL: {uploaded_image_url})")
+        # 파일명 및 경로 생성
+        file_extension = image.filename.split(".")[-1].lower() if "." in image.filename else "jpg"
+        unique_filename = f"product.{file_extension}"
+        file_path = f"{current_user.id}/{session_id}/{unique_filename}"
 
-        # 2. VideoGenerationJob 생성
+        # 파일 확장자를 올바른 MIME 타입으로 매핑
+        mime_type_map = {
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "png": "image/png",
+            "webp": "image/webp",
+            "gif": "image/gif"
+        }
+        content_type = mime_type_map.get(file_extension, "image/jpeg")
+
+        # Supabase Storage에 업로드
+        uploaded_image_url = storage.upload_file(
+            bucket="ai-video-products",
+            file_path=file_path,
+            file_data=content,
+            content_type=content_type
+        )
+
+        logger.info(f"Image uploaded to Supabase Storage: {uploaded_image_url}")
+
+        # 3. VideoGenerationJob 생성
         job = models.VideoGenerationJob(
+            session_id=session_id,  # 생성된 세션 ID 사용
             user_id=current_user.id,
             product_name=product_name,
             product_description=product_description,
@@ -203,12 +218,7 @@ async def create_video_generation_job(
             tier=tier,
             cut_count=tier_config["cut_count"],
             duration_seconds=tier_config["duration_seconds"],
-            cost=tier_config["cost"],
-            status="pending",
-            # 실제 사용하는 모델명 명시
-            planning_model="gemini-2.5-flash",
-            image_model="gemini-2.5-flash-image",
-            video_model="veo-3.1-fast-generate-001"
+            status="pending"
         )
         db.add(job)
         db.commit()
