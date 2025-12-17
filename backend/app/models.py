@@ -37,7 +37,6 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    videos = relationship("Video", back_populates="user", cascade="all, delete-orphan")
     preferences = relationship("UserPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
     contents = relationship("Content", back_populates="user", cascade="all, delete-orphan")
     brand_analysis = relationship("BrandAnalysis", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -128,45 +127,6 @@ class Content(Base):
     # Relationships
     user = relationship("User", back_populates="contents")
 
-
-class Video(Base):
-    """
-    AI 생성 동영상 모델
-    """
-    __tablename__ = "videos"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-
-    # 동영상 정보
-    title = Column(String, nullable=False)
-    description = Column(Text, nullable=True)
-    prompt = Column(Text, nullable=False)  # 생성에 사용된 프롬프트
-
-    # 생성 설정
-    model = Column(String, nullable=False)  # stable-video-diffusion, ltx-video, etc.
-    source_image_url = Column(String, nullable=True)  # 원본 이미지 URL (image-to-video)
-
-    # 동영상 메타데이터
-    video_url = Column(String, nullable=True)  # 생성된 동영상 URL
-    thumbnail_url = Column(String, nullable=True)  # 썸네일 이미지 URL
-    duration = Column(Float, nullable=True)  # 동영상 길이 (초)
-    width = Column(Integer, nullable=True)  # 해상도 너비
-    height = Column(Integer, nullable=True)  # 해상도 높이
-    fps = Column(Integer, nullable=True)  # 프레임 레이트
-
-    # 상태
-    status = Column(String, nullable=False, default="pending")  # pending, processing, completed, failed
-    error_message = Column(Text, nullable=True)
-    replicate_id = Column(String, nullable=True)  # Replicate prediction ID
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # Relationships
-    user = relationship("User", back_populates="videos")
-
-
 class BrandAnalysis(Base):
     """
     브랜드 분석 모델 (멀티 플랫폼 지원)
@@ -218,6 +178,12 @@ class BrandAnalysis(Base):
     youtube_analyzed_videos = Column(Integer, default=0)  # 분석된 영상 수
     youtube_analyzed_at = Column(DateTime(timezone=True), nullable=True)
     youtube_analysis_status = Column(String, default="pending")
+
+    # ===== 통합 브랜드 프로필 (Unified Brand Profile) =====
+    brand_profile_json = Column(JSON, nullable=True)  # BrandProfile 전체 객체를 JSON으로 저장
+    profile_source = Column(String, nullable=True)  # inferred_from_business_info, analyzed_from_sns, analyzed_from_samples, user_edited
+    profile_confidence = Column(String, nullable=True)  # low, medium, high
+    profile_updated_at = Column(DateTime(timezone=True), nullable=True)  # 프로필 마지막 업데이트 시간
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -564,6 +530,7 @@ class VideoGenerationJob(Base):
     __tablename__ = "video_generation_jobs"
 
     id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, unique=True, nullable=False, index=True)  # 작업 추적용 고유 세션 ID (UUID)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # 제품 정보
@@ -575,14 +542,12 @@ class VideoGenerationJob(Base):
     tier = Column(String, nullable=False)  # short, standard, premium
     cut_count = Column(Integer, nullable=False)  # 4, 6, 8
     duration_seconds = Column(Integer, nullable=False)  # 15, 25, 40
-    cost = Column(Float, nullable=False)  # 3.90, 5.90, 7.90
 
     # 생성 단계별 데이터
     storyboard = Column(JSON, nullable=True)  # [{"cut": 1, "scene": "...", "image_prompt": "...", "duration": 5}, ...]
     generated_image_urls = Column(JSON, nullable=True)  # [{"cut": 1, "url": "..."}, ...]
     generated_video_urls = Column(JSON, nullable=True)  # [{"transition": "1-2", "url": "..."}, ...]
     final_video_url = Column(String, nullable=True)  # 최종 합성된 비디오 URL
-    thumbnail_url = Column(String, nullable=True)  # 썸네일 이미지 URL
 
     # 상태 추적
     status = Column(String, nullable=False, default="pending")
@@ -597,14 +562,32 @@ class VideoGenerationJob(Base):
     current_step = Column(String, nullable=True)  # 현재 진행 중인 단계 상세 설명
     error_message = Column(Text, nullable=True)  # 에러 메시지
 
-    # AI 모델 사용 정보
-    planning_model = Column(String, default="gemini-2.5-flash")  # 스토리보드 생성 모델 (Vertex AI)
-    image_model = Column(String, default="gemini-2.5-flash-image")  # 이미지 생성 모델 (Vertex AI)
-    video_model = Column(String, default="veo-3.1-fast-generate-001")  # 비디오 생성 모델 (Vertex AI)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    user = relationship("User")
+
+
+class GeneratedVideo(Base):
+    """
+    생성된 비디오 (완료된 결과물만 저장)
+    - VideoGenerationJob과 session_id로 1:1 연결
+    - 최종 비디오 URL만 저장 (Supabase Storage)
+    """
+    __tablename__ = "generated_videos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, ForeignKey("video_generation_jobs.session_id"), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # 비디오 정보
+    final_video_url = Column(String, nullable=False)  # Supabase Storage URL
+    product_name = Column(String, nullable=False)  # 제품명 (검색/표시용)
+    tier = Column(String, nullable=False)  # short, standard, premium
+    duration_seconds = Column(Integer, nullable=False)  # 15, 25, 40
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    completed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     user = relationship("User")
