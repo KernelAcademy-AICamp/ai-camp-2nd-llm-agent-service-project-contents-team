@@ -96,7 +96,7 @@ async def connect_wordpress(
             )
 
             if user_response.status_code == 401:
-                raise HTTPException(status_code=401, detail="인증 실패: 사용자명 또는 Application Password를 확인하세요")
+                raise HTTPException(status_code=400, detail="WordPress 인증 실패: 사용자명 또는 Application Password를 확인하세요")
             elif user_response.status_code != 200:
                 raise HTTPException(status_code=400, detail=f"WordPress 연결 실패: {user_response.status_code}")
 
@@ -787,3 +787,232 @@ async def get_wordpress_analytics(
             "by_status": {status: count for status, count in status_counts}
         }
     }
+
+
+@router.get("/stats/check")
+async def check_stats_availability(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user)
+):
+    """
+    Jetpack 통계 API 가용 여부 확인
+    """
+    connection = db.query(WordPressConnection).filter(
+        WordPressConnection.user_id == current_user.id,
+        WordPressConnection.is_active == True
+    ).first()
+
+    if not connection:
+        raise HTTPException(status_code=404, detail="WordPress connection not found")
+
+    auth_header = get_wp_auth_header(connection.wp_username, connection.wp_app_password)
+
+    stats_available = False
+    stats_type = None
+    error_message = None
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # Jetpack Stats REST API 확인 (최신 Jetpack)
+            jetpack_response = await client.get(
+                f"{connection.site_url}/wp-json/wpcom/v2/sites/{connection.site_url.replace('https://', '').replace('http://', '')}/stats",
+                headers={"Authorization": auth_header}
+            )
+
+            if jetpack_response.status_code == 200:
+                stats_available = True
+                stats_type = "jetpack_wpcom"
+            else:
+                # Jetpack Module API 확인
+                module_response = await client.get(
+                    f"{connection.site_url}/wp-json/jetpack/v4/module/stats",
+                    headers={"Authorization": auth_header}
+                )
+
+                if module_response.status_code == 200:
+                    stats_available = True
+                    stats_type = "jetpack_module"
+                else:
+                    # WP Statistics 플러그인 확인
+                    wp_stats_response = await client.get(
+                        f"{connection.site_url}/wp-json/wp-statistics/v2/hit",
+                        headers={"Authorization": auth_header}
+                    )
+
+                    if wp_stats_response.status_code in [200, 400]:  # 400은 파라미터 누락이지만 API 존재함
+                        stats_available = True
+                        stats_type = "wp_statistics"
+                    else:
+                        error_message = "통계 플러그인을 찾을 수 없습니다. Jetpack 또는 WP Statistics 플러그인을 설치해주세요."
+
+    except Exception as e:
+        error_message = f"통계 API 확인 중 오류: {str(e)}"
+
+    return {
+        "stats_available": stats_available,
+        "stats_type": stats_type,
+        "error": error_message
+    }
+
+
+@router.get("/stats")
+async def get_wordpress_stats(
+    period: str = Query("day", description="Stats period: day, week, month, year"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user)
+):
+    """
+    WordPress 사이트 통계 조회 (Jetpack/WP Statistics)
+    """
+    connection = db.query(WordPressConnection).filter(
+        WordPressConnection.user_id == current_user.id,
+        WordPressConnection.is_active == True
+    ).first()
+
+    if not connection:
+        raise HTTPException(status_code=404, detail="WordPress connection not found")
+
+    auth_header = get_wp_auth_header(connection.wp_username, connection.wp_app_password)
+
+    # 기간 설정
+    period_map = {
+        "day": 1,
+        "week": 7,
+        "month": 30,
+        "year": 365
+    }
+    num_days = period_map.get(period, 7)
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Jetpack Stats 시도
+            site_domain = connection.site_url.replace('https://', '').replace('http://', '').rstrip('/')
+
+            # 방법 1: Jetpack REST API (wpcom/v2)
+            stats_response = await client.get(
+                f"{connection.site_url}/wp-json/wpcom/v2/sites/{site_domain}/stats/summary",
+                headers={"Authorization": auth_header},
+                params={"num": num_days}
+            )
+
+            if stats_response.status_code == 200:
+                data = stats_response.json()
+                return {
+                    "source": "jetpack",
+                    "period": period,
+                    "summary": {
+                        "views": data.get("views", 0),
+                        "visitors": data.get("visitors", 0),
+                        "likes": data.get("likes", 0),
+                        "comments": data.get("comments", 0)
+                    },
+                    "raw_data": data
+                }
+
+            # 방법 2: Jetpack v4 stats/data
+            stats_v4_response = await client.get(
+                f"{connection.site_url}/wp-json/jetpack/v4/module/stats/data",
+                headers={"Authorization": auth_header},
+                params={"range": period}
+            )
+
+            if stats_v4_response.status_code == 200:
+                data = stats_v4_response.json()
+                return {
+                    "source": "jetpack_v4",
+                    "period": period,
+                    "data": data
+                }
+
+            # 방법 3: WP Statistics 플러그인
+            from datetime import datetime, timedelta
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=num_days)
+
+            wp_stats_response = await client.get(
+                f"{connection.site_url}/wp-json/wp-statistics/v2/hit",
+                headers={"Authorization": auth_header},
+                params={
+                    "from": start_date.strftime("%Y-%m-%d"),
+                    "to": end_date.strftime("%Y-%m-%d")
+                }
+            )
+
+            if wp_stats_response.status_code == 200:
+                data = wp_stats_response.json()
+                return {
+                    "source": "wp_statistics",
+                    "period": period,
+                    "data": data
+                }
+
+            # 통계 API 없음
+            return {
+                "source": None,
+                "error": "통계 데이터를 가져올 수 없습니다. Jetpack 또는 WP Statistics 플러그인이 활성화되어 있는지 확인해주세요.",
+                "jetpack_status": stats_response.status_code,
+                "wp_statistics_status": wp_stats_response.status_code
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"통계 조회 실패: {str(e)}")
+
+
+@router.get("/stats/posts")
+async def get_post_stats(
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(auth.get_current_active_user)
+):
+    """
+    인기 게시물 통계 조회
+    """
+    connection = db.query(WordPressConnection).filter(
+        WordPressConnection.user_id == current_user.id,
+        WordPressConnection.is_active == True
+    ).first()
+
+    if not connection:
+        raise HTTPException(status_code=404, detail="WordPress connection not found")
+
+    auth_header = get_wp_auth_header(connection.wp_username, connection.wp_app_password)
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            site_domain = connection.site_url.replace('https://', '').replace('http://', '').rstrip('/')
+
+            # Jetpack 인기 게시물
+            response = await client.get(
+                f"{connection.site_url}/wp-json/wpcom/v2/sites/{site_domain}/stats/top-posts",
+                headers={"Authorization": auth_header},
+                params={"num": limit, "period": "week"}
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "source": "jetpack",
+                    "top_posts": data.get("top-posts", [])
+                }
+
+            # WP Statistics 인기 게시물
+            wp_stats_response = await client.get(
+                f"{connection.site_url}/wp-json/wp-statistics/v2/posts",
+                headers={"Authorization": auth_header},
+                params={"per_page": limit, "order": "desc", "orderby": "views"}
+            )
+
+            if wp_stats_response.status_code == 200:
+                data = wp_stats_response.json()
+                return {
+                    "source": "wp_statistics",
+                    "top_posts": data
+                }
+
+            return {
+                "source": None,
+                "error": "인기 게시물 데이터를 가져올 수 없습니다."
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"인기 게시물 조회 실패: {str(e)}")

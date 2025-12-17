@@ -368,6 +368,256 @@
   border-bottom-color: #21759b;
 }
 
+/* 통계 섹션 */
+.stats-section {
+  background: var(--card-bg, #ffffff);
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.stats-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-primary, #1f2937);
+}
+
+.stats-period-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.period-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 20px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.period-btn:hover {
+  border-color: #21759b;
+  color: #21759b;
+}
+
+.period-btn.active {
+  background: #21759b;
+  border-color: #21759b;
+  color: white;
+}
+
+/* 통계 요약 카드 */
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-icon {
+  font-size: 24px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary, #1f2937);
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.stats-source {
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+  margin-bottom: 24px;
+}
+
+/* 인기 게시물 섹션 */
+.top-posts-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.top-posts-section h4 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  color: var(--text-primary, #1f2937);
+}
+
+.top-posts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.top-post-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 8px;
+}
+
+.top-post-rank {
+  font-size: 14px;
+  font-weight: 700;
+  color: #21759b;
+  min-width: 32px;
+}
+
+.top-post-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+  gap: 12px;
+}
+
+.top-post-title {
+  font-size: 14px;
+  color: var(--text-primary, #1f2937);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-post-views {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+/* 통계 불가 메시지 */
+.stats-unavailable {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.stats-unavailable h3 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  color: var(--text-primary, #1f2937);
+}
+
+.stats-unavailable > p {
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 24px;
+}
+
+.stats-help {
+  text-align: left;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.stats-help h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+}
+
+.stats-help ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.stats-help li {
+  margin-bottom: 12px;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+}
+
+.stats-help li:last-child {
+  margin-bottom: 0;
+}
+
+.stats-help strong {
+  color: var(--text-primary, #1f2937);
+}
+
+.stats-help small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted, #9ca3af);
+}
+
+/* 통계 로딩 */
+.stats-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+}
+
+.stats-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color, #e5e7eb);
+  border-top-color: #21759b;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.stats-loading p {
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+}
+
+/* 통계 에러 */
+.stats-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.stats-error p {
+  margin: 0;
+  color: #dc2626;
+  font-size: 14px;
+}
+
 /* 반응형 */
 @media (max-width: 768px) {
   .wordpress-page {
@@ -389,5 +639,29 @@
 
   .category-list {
     gap: 8px;
+  }
+
+  .stats-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stats-period-selector {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .stats-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  .top-post-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 }

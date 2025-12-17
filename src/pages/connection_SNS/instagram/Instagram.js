@@ -59,7 +59,9 @@ function Instagram() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('connected') === 'true') {
       setError(null);
-      window.history.replaceState({}, '', '/instagram');
+      // 연동 성공 시 페이지 새로고침하여 사이드바 업데이트
+      window.location.replace('/instagram');
+      return;
     }
     if (params.get('error')) {
       const errorType = params.get('error');

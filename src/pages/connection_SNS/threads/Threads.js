@@ -82,7 +82,9 @@ function Threads() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('connected') === 'true') {
       setError(null);
-      window.history.replaceState({}, '', '/threads');
+      // 연동 성공 시 페이지 새로고침하여 사이드바 업데이트
+      window.location.replace('/threads');
+      return;
     }
     if (params.get('error')) {
       setError('Threads 연동에 실패했습니다. 다시 시도해주세요.');

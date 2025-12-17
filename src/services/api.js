@@ -551,6 +551,24 @@ export const wordpressAPI = {
     const response = await api.get('/api/wordpress/analytics');
     return response.data;
   },
+
+  // 통계 API 가용 여부 확인 (Jetpack/WP Statistics)
+  checkStatsAvailability: async () => {
+    const response = await api.get('/api/wordpress/stats/check');
+    return response.data;
+  },
+
+  // 사이트 통계 조회
+  getStats: async (period = 'week') => {
+    const response = await api.get(`/api/wordpress/stats?period=${period}`);
+    return response.data;
+  },
+
+  // 인기 게시물 통계
+  getPostStats: async (limit = 10) => {
+    const response = await api.get(`/api/wordpress/stats/posts?limit=${limit}`);
+    return response.data;
+  },
 };
 
 // ==========================================

@@ -19,6 +19,7 @@ import './WordPress.css';
 // WordPress 탭 설정
 const WORDPRESS_TABS = [
   { id: 'posts', label: '글 목록' },
+  { id: 'stats', label: '통계' },
   { id: 'compose', label: '새 글 작성' }
 ];
 
@@ -179,6 +180,10 @@ function WordPress() {
               <PostsTab posts={posts} onDelete={handleDeletePost} />
             )}
 
+            {activeTab === 'stats' && (
+              <StatsTab />
+            )}
+
             {activeTab === 'compose' && (
               <PostComposeForm
                 categories={categories}
@@ -217,10 +222,12 @@ function WordPressConnectForm({ onConnect, onError }) {
         username: username.trim(),
         app_password: appPassword.trim()
       });
-      onConnect();
+      // 연동 성공 시 페이지 새로고침하여 사이드바 업데이트
+      window.location.reload();
     } catch (err) {
       console.error('Connection failed:', err);
-      onError('연동에 실패했습니다. 사이트 URL, 사용자명, 애플리케이션 비밀번호를 확인해주세요.');
+      const errorMessage = err.response?.data?.detail || '연동에 실패했습니다. 사이트 URL, 사용자명, 애플리케이션 비밀번호를 확인해주세요.';
+      onError(errorMessage);
     } finally {
       setConnecting(false);
     }
@@ -294,6 +301,174 @@ function WordPressConnectForm({ onConnect, onError }) {
           {connecting ? '연동 중...' : 'WordPress 연동하기'}
         </button>
       </form>
+    </div>
+  );
+}
+
+// 통계 탭 컴포넌트
+function StatsTab() {
+  const [statsAvailable, setStatsAvailable] = useState(null);
+  const [statsType, setStatsType] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [topPosts, setTopPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState('week');
+  const [error, setError] = useState(null);
+
+  // 통계 가용 여부 확인 및 데이터 로드
+  useEffect(() => {
+    const loadStats = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // 먼저 통계 API 가용 여부 확인
+        const availability = await wordpressAPI.checkStatsAvailability();
+        setStatsAvailable(availability.stats_available);
+        setStatsType(availability.stats_type);
+
+        if (availability.stats_available) {
+          // 통계 데이터 로드
+          const [statsData, postsData] = await Promise.all([
+            wordpressAPI.getStats(period),
+            wordpressAPI.getPostStats(10)
+          ]);
+
+          setStats(statsData);
+          if (postsData.top_posts) {
+            setTopPosts(postsData.top_posts);
+          }
+        } else {
+          setError(availability.error);
+        }
+      } catch (err) {
+        console.error('Failed to load stats:', err);
+        setError('통계 데이터를 불러오는데 실패했습니다.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStats();
+  }, [period]);
+
+  // 기간 변경 핸들러
+  const handlePeriodChange = (newPeriod) => {
+    setPeriod(newPeriod);
+  };
+
+  if (loading) {
+    return (
+      <div className="stats-section">
+        <div className="stats-loading">
+          <div className="spinner"></div>
+          <p>통계 데이터를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!statsAvailable) {
+    return (
+      <div className="stats-section">
+        <div className="stats-unavailable">
+          <h3>📊 통계 기능 사용 불가</h3>
+          <p>{error || '통계 플러그인이 설치되어 있지 않습니다.'}</p>
+          <div className="stats-help">
+            <h4>통계 기능을 사용하려면:</h4>
+            <ul>
+              <li>
+                <strong>Jetpack</strong> 플러그인을 설치하고 활성화하세요.
+                <br />
+                <small>WordPress.com 계정과 연결이 필요합니다.</small>
+              </li>
+              <li>
+                또는 <strong>WP Statistics</strong> 플러그인을 설치하세요.
+                <br />
+                <small>무료이며 별도의 계정 연결이 필요하지 않습니다.</small>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="stats-section">
+      <div className="stats-header">
+        <h3>📊 사이트 통계</h3>
+        <div className="stats-period-selector">
+          {[
+            { value: 'day', label: '오늘' },
+            { value: 'week', label: '이번 주' },
+            { value: 'month', label: '이번 달' },
+            { value: 'year', label: '올해' }
+          ].map((p) => (
+            <button
+              key={p.value}
+              className={`period-btn ${period === p.value ? 'active' : ''}`}
+              onClick={() => handlePeriodChange(p.value)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {stats?.summary && (
+        <div className="stats-summary">
+          <div className="stat-card">
+            <span className="stat-icon">👁️</span>
+            <span className="stat-value">{formatNumber(stats.summary.views || 0)}</span>
+            <span className="stat-label">조회수</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">👤</span>
+            <span className="stat-value">{formatNumber(stats.summary.visitors || 0)}</span>
+            <span className="stat-label">방문자</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">❤️</span>
+            <span className="stat-value">{formatNumber(stats.summary.likes || 0)}</span>
+            <span className="stat-label">좋아요</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-icon">💬</span>
+            <span className="stat-value">{formatNumber(stats.summary.comments || 0)}</span>
+            <span className="stat-label">댓글</span>
+          </div>
+        </div>
+      )}
+
+      {stats?.source && (
+        <p className="stats-source">
+          데이터 출처: {stats.source === 'jetpack' ? 'Jetpack' : stats.source === 'wp_statistics' ? 'WP Statistics' : stats.source}
+        </p>
+      )}
+
+      {topPosts.length > 0 && (
+        <div className="top-posts-section">
+          <h4>🏆 인기 게시물</h4>
+          <div className="top-posts-list">
+            {topPosts.map((post, index) => (
+              <div key={post.id || index} className="top-post-item">
+                <span className="top-post-rank">#{index + 1}</span>
+                <div className="top-post-info">
+                  <span className="top-post-title">{post.title}</span>
+                  <span className="top-post-views">👁️ {formatNumber(post.views || post.view_count || 0)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {stats?.error && (
+        <div className="stats-error">
+          <p>{stats.error}</p>
+        </div>
+      )}
     </div>
   );
 }
