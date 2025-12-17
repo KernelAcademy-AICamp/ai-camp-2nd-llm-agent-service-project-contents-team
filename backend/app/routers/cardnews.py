@@ -23,6 +23,26 @@ from ..database import get_db
 from ..models import User, ContentGenerationSession, GeneratedCardnewsContent
 from ..auth import get_current_user
 
+# 개선된 템플릿 시스템 임포트
+from ..utils.cardnews_templates_improved import (
+    DESIGN_TEMPLATES as IMPROVED_TEMPLATES,
+    COLOR_PALETTES,
+    LAYOUT_STYLES,
+    TEMPLATE_CATEGORIES,
+    get_template,
+    get_palette,
+    get_layout,
+    get_frontend_template_list,
+    get_templates_by_category
+)
+from ..utils.cardnews_renderer import (
+    CardNewsRenderer as ImprovedRenderer,
+    GradientGenerator,
+    EffectsProcessor,
+    CardRenderer,
+    DecorationRenderer
+)
+
 # ==================== 이모지 처리 유틸리티 ====================
 
 def strip_markdown(text: str) -> str:
@@ -191,6 +211,108 @@ def get_overlay_and_text_colors(image: Image.Image) -> dict:
             "is_dark_image": False,
             "brightness": brightness
         }
+
+
+def generate_harmonious_palette(base_color: tuple, num_colors: int = 5) -> list:
+    """
+    기준 색상에서 조화로운 색상 팔레트 생성
+
+    Args:
+        base_color: 기준 RGB 색상 (첫 페이지에서 추출한 색상)
+        num_colors: 생성할 색상 개수
+
+    Returns:
+        list of RGB tuples - 각 페이지에 사용할 조화로운 색상들
+    """
+    import colorsys
+
+    r, g, b = base_color
+    # RGB -> HSV 변환 (0-1 범위)
+    h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+
+    palette = []
+
+    # 색상 조화 전략들
+    strategies = [
+        # 1. 유사색 (Analogous) - 색상환에서 인접한 색
+        lambda h, i: ((h + 0.08 * i) % 1.0, max(0.3, s * 0.9), min(1.0, v * 1.05)),
+        # 2. 보색 방향으로 약간 이동
+        lambda h, i: ((h + 0.15 * i) % 1.0, max(0.25, s * 0.85), min(1.0, v * 1.1)),
+        # 3. 채도/명도 변화
+        lambda h, i: (h, max(0.2, s - 0.1 * i), min(1.0, v + 0.05 * i)),
+        # 4. 트라이어드 방향
+        lambda h, i: ((h + 0.33 * (i % 2)) % 1.0, max(0.3, s * 0.95), min(1.0, v)),
+    ]
+
+    for i in range(num_colors):
+        if i == 0:
+            # 첫 번째는 기준 색상과 유사하지만 약간 다른 톤
+            new_h = h
+            new_s = max(0.25, min(1.0, s * 0.95))
+            new_v = max(0.3, min(1.0, v * 1.02))
+        else:
+            # 페이지별로 다양한 전략 적용
+            strategy_idx = i % len(strategies)
+            new_h, new_s, new_v = strategies[strategy_idx](h, i)
+
+        # HSV -> RGB 변환
+        new_r, new_g, new_b = colorsys.hsv_to_rgb(new_h, new_s, new_v)
+        palette.append((int(new_r * 255), int(new_g * 255), int(new_b * 255)))
+
+    return palette
+
+
+def generate_complementary_palette(base_color: tuple, num_colors: int = 5) -> list:
+    """
+    보색 기반 조화로운 팔레트 생성 (더 대비가 강한 버전)
+
+    Args:
+        base_color: 기준 RGB 색상
+        num_colors: 생성할 색상 개수
+
+    Returns:
+        list of RGB tuples
+    """
+    import colorsys
+
+    r, g, b = base_color
+    h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+
+    palette = []
+
+    for i in range(num_colors):
+        if i == 0:
+            # 첫 번째: 기준 색상 톤 변형
+            new_h = h
+            new_s = max(0.3, s * 0.9)
+            new_v = min(0.95, v * 1.05)
+        elif i == 1:
+            # 두 번째: 유사색 (30도 이동)
+            new_h = (h + 0.083) % 1.0
+            new_s = max(0.25, s * 0.85)
+            new_v = min(0.9, v * 1.1)
+        elif i == 2:
+            # 세 번째: 반대 유사색 (-30도)
+            new_h = (h - 0.083) % 1.0
+            new_s = max(0.3, s * 0.95)
+            new_v = min(0.85, v)
+        elif i == 3:
+            # 네 번째: 보색 방향으로 60도
+            new_h = (h + 0.167) % 1.0
+            new_s = max(0.35, s * 0.8)
+            new_v = min(0.9, v * 1.05)
+        else:
+            # 나머지: 점진적 색상 변화
+            shift = 0.05 * (i - 3)
+            new_h = (h + shift) % 1.0
+            new_s = max(0.25, s * (0.9 - 0.05 * (i - 4)))
+            new_v = min(0.95, v * (1 + 0.03 * (i - 4)))
+
+        new_r, new_g, new_b = colorsys.hsv_to_rgb(new_h, new_s, new_v)
+        palette.append((int(new_r * 255), int(new_g * 255), int(new_b * 255)))
+
+    return palette
+
 
 # AI Agents 임포트
 from ..agents import (
@@ -398,6 +520,56 @@ BADGE_TEXT_MAP = {
     'info': '정보',
     'event': '이벤트'
 }
+
+# ==================== 디자인 템플릿 ====================
+# 새로운 개선된 템플릿 시스템 사용 (IMPROVED_TEMPLATES)
+# 기존 DESIGN_TEMPLATES는 삭제됨
+
+# 디자인 템플릿 목록 (프론트엔드용)
+def get_design_templates_list():
+    """프론트엔드에 전달할 디자인 템플릿 목록 (새 템플릿만)"""
+    return [
+        {
+            "id": template["id"],
+            "name": template["name"],
+            "description": template["description"],
+            "preview_color": template["preview_color"],
+            "category": template.get("category", "minimal")
+        }
+        for template in IMPROVED_TEMPLATES.values()
+    ]
+
+
+def get_improved_templates_by_category():
+    """카테고리별로 그룹화된 개선된 템플릿 목록"""
+    return get_frontend_template_list()
+
+
+def get_all_template_config(template_id: str) -> dict:
+    """
+    템플릿 ID로 전체 설정 가져오기
+    새 템플릿 시스템만 사용
+    """
+    # 새 템플릿에서 찾기
+    if template_id in IMPROVED_TEMPLATES:
+        template = IMPROVED_TEMPLATES[template_id]
+        palette = get_palette(template["palette"])
+        layout = get_layout(template["layout"])
+        return {
+            "type": "improved",
+            "template": template,
+            "palette": palette,
+            "layout": layout
+        }
+
+    # 기본값 (minimal_white)
+    default_template = IMPROVED_TEMPLATES.get("minimal_white", list(IMPROVED_TEMPLATES.values())[0])
+    return {
+        "type": "improved",
+        "template": default_template,
+        "palette": get_palette(default_template["palette"]),
+        "layout": get_layout(default_template["layout"])
+    }
 
 # ==================== 폰트 관리 ====================
 
@@ -1018,7 +1190,7 @@ class CardNewsBuilder:
     MIN_BULLET_SIZE = 28
     MAX_BULLET_SIZE = 44
 
-    def __init__(self, theme: dict, font_style: str, purpose: str, layout_type: str = "bottom", font_weight: str = "light"):
+    def __init__(self, theme: dict, font_style: str, purpose: str, layout_type: str = "bottom", font_weight: str = "light", design_template: str = "default", aspect_ratio: str = "1:1"):
         self.theme = theme
         self.font_style = font_style
         self.purpose = purpose
@@ -1026,6 +1198,70 @@ class CardNewsBuilder:
         self.font_weight = font_weight  # light, medium, bold
         self.badge_text = BADGE_TEXT_MAP.get(purpose, '정보')
         self.scale = RENDER_SCALE  # 2x 렌더링
+
+        # 이미지 비율에 따른 크기 설정
+        self.aspect_ratio = aspect_ratio
+        if aspect_ratio == "3:4":
+            self.card_width = 1080
+            self.card_height = 1440  # 3:4 비율
+        else:  # 기본 1:1
+            self.card_width = CARD_WIDTH
+            self.card_height = CARD_HEIGHT
+        self.render_width = self.card_width * self.scale
+        self.render_height = self.card_height * self.scale
+
+        # 디자인 템플릿 적용 (새 템플릿 시스템 사용)
+        self.design_template = IMPROVED_TEMPLATES.get(design_template, IMPROVED_TEMPLATES.get("minimal_white", list(IMPROVED_TEMPLATES.values())[0]))
+        self._apply_design_template()
+
+    def _apply_design_template(self):
+        """디자인 템플릿 설정을 인스턴스에 적용"""
+        template = self.design_template
+
+        # 텍스트 스타일 적용
+        text_style = template.get("text_style", {})
+        self.title_weight = text_style.get("title_weight", "bold")
+        self.content_weight = text_style.get("content_weight", "medium")
+        self.title_size_ratio = text_style.get("title_size_ratio", 1.0)
+        self.content_size_ratio = text_style.get("content_size_ratio", 1.0)
+        self.letter_spacing = text_style.get("letter_spacing", 0)
+        self.line_height_ratio = text_style.get("line_height_ratio", 1.4)
+
+        # 배경 스타일 적용
+        bg_style = template.get("background_style", {})
+        self.overlay_opacity = bg_style.get("overlay_opacity", 0.35)
+        self.blur_radius = bg_style.get("blur_radius", 3)
+        self.use_vignette = bg_style.get("use_vignette", False)
+        self.gradient_overlay = bg_style.get("gradient_overlay", False)
+        self.sepia_tone = bg_style.get("sepia_tone", False)
+
+        # 레이아웃 스타일 적용
+        layout_style = template.get("layout_style", {})
+        self.padding_ratio = layout_style.get("padding_ratio", 1.0)
+        self.content_align = layout_style.get("content_align", "center")
+        self.title_position = layout_style.get("title_position", "center")
+
+        # 카드 스타일 적용 (새로운 속성)
+        card_style = template.get("card_style", {})
+        self.corner_radius = card_style.get("corner_radius", 25)
+        self.border_width = card_style.get("border_width", 0)
+        self.border_color = card_style.get("border_color", None)
+        self.card_shadow_blur = card_style.get("shadow_blur", 0)
+        self.card_margin_ratio = card_style.get("card_margin_ratio", 1.0)
+        self.glass_effect = card_style.get("glass_effect", False)
+
+        # 장식 스타일 적용
+        decoration = template.get("decoration", {})
+        self.decoration_type = decoration.get("type", None)
+        self.decoration_color = decoration.get("color", None)
+        self.decoration_thickness = decoration.get("thickness", 0)
+
+        # 텍스트 효과 적용
+        text_effect = template.get("text_effect", {})
+        self.shadow_type = text_effect.get("shadow_type", "gaussian")
+        self.shadow_intensity = text_effect.get("shadow_intensity", 1.0)
+        self.text_outline = text_effect.get("outline", False)
+        self.outline_width = text_effect.get("outline_width", 0)
 
     def _calculate_dynamic_font_sizes(
         self,
@@ -1177,7 +1413,7 @@ class CardNewsBuilder:
             background_image = background_image.convert('RGB')
 
         # 2x 크기로 조정 (고품질 리샘플링)
-        img = background_image.resize((RENDER_WIDTH, RENDER_HEIGHT), Image.Resampling.LANCZOS)
+        img = background_image.resize((self.render_width, self.render_height), Image.Resampling.LANCZOS)
 
         # 이미지 밝기 분석 및 색상 결정
         color_info = None
@@ -1191,6 +1427,10 @@ class CardNewsBuilder:
         # 이미지 보정 (밝기, 대비, 채도)
         img = BackgroundProcessor.enhance_image(img, brightness, contrast, saturation)
 
+        # 세피아 톤 효과 (레트로 빈티지 템플릿)
+        if self.sepia_tone:
+            img = self._apply_sepia_tone(img)
+
         # Gaussian Blur (옵션)
         if apply_blur:
             img = BackgroundProcessor.apply_gaussian_blur(img, blur_radius * self.scale)
@@ -1199,6 +1439,10 @@ class CardNewsBuilder:
         if apply_overlay:
             final_overlay_color = overlay_color if overlay_color else (0, 0, 0)
             img = BackgroundProcessor.apply_overlay(img, final_overlay_color, overlay_opacity)
+
+        # 그라데이션 오버레이 (그라데이션 드림 템플릿)
+        if self.gradient_overlay:
+            img = self._apply_gradient_overlay(img)
 
         # 비네트 효과
         if apply_vignette:
@@ -1214,7 +1458,7 @@ class CardNewsBuilder:
 
     def _downscale_to_final(self, image: Image.Image) -> Image.Image:
         """2x 이미지를 1x로 다운스케일 (고품질 안티앨리어싱)"""
-        return image.resize((CARD_WIDTH, CARD_HEIGHT), Image.Resampling.LANCZOS)
+        return image.resize((self.card_width, self.card_height), Image.Resampling.LANCZOS)
 
     def add_logo(self, image: Image.Image):
         """로고 배지 추가 (상단 중앙) - 2x 스케일 대응"""
@@ -1222,7 +1466,7 @@ class CardNewsBuilder:
 
         # 현재 이미지 크기에 따라 스케일 결정
         current_width = image.size[0]
-        is_2x = current_width == RENDER_WIDTH
+        is_2x = current_width == self.render_width
 
         # 로고 파일 경로 (ddukddak_white.png 사용)
         logo_path = os.path.join(os.path.dirname(__file__), "../../../public/ddukddak_white.png")
@@ -1247,7 +1491,7 @@ class CardNewsBuilder:
             logo = logo.resize((logo_width, logo_height), Image.Resampling.LANCZOS)
 
             # 로고 위치 (상단 중앙) - 2x 스케일 적용
-            target_width = RENDER_WIDTH if is_2x else CARD_WIDTH
+            target_width = self.render_width if is_2x else self.card_width
             base_y = 30
             logo_x = (target_width - logo_width) // 2
             logo_y = base_y * self.scale if is_2x else base_y
@@ -1268,7 +1512,7 @@ class CardNewsBuilder:
         draw = ImageDraw.Draw(image)
 
         # 제목 텍스트 줄바꿈 처리
-        max_width = CARD_WIDTH - 160
+        max_width = self.card_width - 160
         title_lines = TextRenderer.wrap_text(title, title_font, max_width, draw) if title else []
         desc_lines = TextRenderer.wrap_text(description, desc_font, max_width, draw) if description else []
 
@@ -1285,13 +1529,13 @@ class CardNewsBuilder:
             total_height += len(desc_lines) * desc_line_height
 
         # 정중앙 Y 좌표 계산
-        start_y = (CARD_HEIGHT - total_height) // 2
+        start_y = (self.card_height - total_height) // 2
 
         # 위치에 따른 Y 좌표 조정
         if self.layout_type == "top":
             start_y = 150
         elif self.layout_type == "bottom":
-            start_y = CARD_HEIGHT - total_height - 150
+            start_y = self.card_height - total_height - 150
 
         align = "center"
         current_y = start_y
@@ -1361,8 +1605,16 @@ class CardNewsBuilder:
         2x 고해상도 렌더링 후 다운스케일
         - 로고는 선택적으로 표시 (첫 페이지는 기본: 표시)
         """
-        # 배경 준비 (2x 해상도) + 이미지 밝기 분석
-        card, color_info = self.prepare_background(background_image, auto_adjust_overlay=True)
+        # 배경 준비 (2x 해상도) + 이미지 밝기 분석 (템플릿 설정 적용)
+        card, color_info = self.prepare_background(
+            background_image,
+            apply_blur=self.blur_radius > 0,
+            blur_radius=self.blur_radius,
+            apply_overlay=True,
+            overlay_opacity=self.overlay_opacity,
+            apply_vignette=self.use_vignette,
+            auto_adjust_overlay=True
+        )
 
         # 로고 추가 (선택적)
         if show_logo:
@@ -1390,34 +1642,35 @@ class CardNewsBuilder:
             subtitle=subtitle,
             is_first_page=True
         )
-        title_size = font_sizes['title_size']
-        subtitle_size = font_sizes['subtitle_size']
+        # 디자인 템플릿의 사이즈 비율 적용
+        title_size = int(font_sizes['title_size'] * self.title_size_ratio)
+        subtitle_size = int(font_sizes['subtitle_size'] * self.content_size_ratio)
 
-        # 폰트 설정 (2x 스케일 적용) - 동적 사이즈 사용
-        title_font = FontManager.get_font(self.font_style, title_size * self.scale, weight='bold')
-        subtitle_font = FontManager.get_font(self.font_style, subtitle_size * self.scale, weight='medium')
+        # 폰트 설정 (2x 스케일 적용) - 동적 사이즈 + 템플릿 weight 사용
+        title_font = FontManager.get_font(self.font_style, title_size * self.scale, weight=self.title_weight)
+        subtitle_font = FontManager.get_font(self.font_style, subtitle_size * self.scale, weight=self.content_weight)
 
-        # 2x 스케일 기준 치수
-        margin_x = 80 * self.scale
-        card_padding = 45 * self.scale
-        max_width = RENDER_WIDTH - margin_x * 2 - card_padding * 2
+        # 2x 스케일 기준 치수 (템플릿 패딩 비율 적용)
+        margin_x = int(80 * self.scale * self.padding_ratio)
+        card_padding = int(45 * self.scale * self.padding_ratio)
+        max_width = self.render_width - margin_x * 2 - card_padding * 2
 
         # 로고 영역 (로고 표시 시만 적용)
-        top_margin = (120 * self.scale) if show_logo else (40 * self.scale)
-        bottom_margin = 40 * self.scale
-        available_height = RENDER_HEIGHT - top_margin - bottom_margin
+        top_margin = int((120 * self.scale) if show_logo else (40 * self.scale))
+        bottom_margin = int(40 * self.scale)
+        available_height = self.render_height - top_margin - bottom_margin
 
         # 텍스트 총 높이 계산
         draw = ImageDraw.Draw(card)
         title_lines = TextRenderer.wrap_text(title, title_font, max_width, draw)
         subtitle_lines = TextRenderer.wrap_text(subtitle, subtitle_font, max_width, draw)
 
-        # 라인 높이도 폰트 사이즈에 비례하여 조절
-        title_line_height = int((title_size + 18) * self.scale)
-        subtitle_line_height = int((subtitle_size + 14) * self.scale)
+        # 라인 높이도 폰트 사이즈에 비례하여 조절 (템플릿 line_height_ratio 적용)
+        title_line_height = int((title_size + 18) * self.scale * self.line_height_ratio)
+        subtitle_line_height = int((subtitle_size + 14) * self.scale * self.line_height_ratio)
         title_height = len(title_lines) * title_line_height
         subtitle_height = len(subtitle_lines) * subtitle_line_height
-        gap = 25 * self.scale  # 제목-부제목 간격
+        gap = int(25 * self.scale * self.padding_ratio)  # 제목-부제목 간격
 
         # 전체 콘텐츠 높이
         total_content_height = title_height + gap + subtitle_height
@@ -1430,13 +1683,13 @@ class CardNewsBuilder:
         if card_height > max_card_height:
             card_height = max_card_height
 
-        card_width = RENDER_WIDTH - margin_x * 2
+        card_width = self.render_width - margin_x * 2
 
         # Agent가 판단한 layout에 따라 카드 위치 결정
         if layout == "top":
             card_y = top_margin + 20 * self.scale
         elif layout == "bottom":
-            card_y = RENDER_HEIGHT - card_height - bottom_margin
+            card_y = self.render_height - card_height - bottom_margin
         else:  # center (기본값)
             card_y = top_margin + (available_height - card_height) // 2
 
@@ -1506,33 +1759,231 @@ class CardNewsBuilder:
         final_card.save(buffer, format="PNG", optimize=True)
         return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
+    def _apply_sepia_tone(self, image: Image.Image) -> Image.Image:
+        """세피아 톤 효과 적용"""
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
+        # 세피아 매트릭스 적용
+        sepia_data = []
+        for r, g, b in image.getdata():
+            tr = int(0.393 * r + 0.769 * g + 0.189 * b)
+            tg = int(0.349 * r + 0.686 * g + 0.168 * b)
+            tb = int(0.272 * r + 0.534 * g + 0.131 * b)
+            sepia_data.append((min(255, tr), min(255, tg), min(255, tb)))
+
+        sepia_image = Image.new('RGB', image.size)
+        sepia_image.putdata(sepia_data)
+        return sepia_image
+
+    def _apply_gradient_overlay(self, image: Image.Image) -> Image.Image:
+        """그라데이션 오버레이 효과 적용"""
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+
+        # 대각선 그라데이션 오버레이 생성
+        overlay = Image.new('RGBA', image.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+
+        width, height = image.size
+        # 보라-파랑 그라데이션
+        for i in range(height):
+            ratio = i / height
+            r = int(102 + (118 - 102) * ratio)  # 667EEA -> 764BA2
+            g = int(126 + (75 - 126) * ratio)
+            b = int(234 + (162 - 234) * ratio)
+            alpha = int(80 * (1 - abs(ratio - 0.5) * 2))  # 중앙에서 가장 진함
+            draw.line([(0, i), (width, i)], fill=(r, g, b, alpha))
+
+        return Image.alpha_composite(image, overlay)
+
+    def _draw_decoration(self, image: Image.Image, card_x: int, card_y: int,
+                         card_width: int, card_height: int) -> Image.Image:
+        """템플릿에 따른 장식 요소 그리기"""
+        if not self.decoration_type:
+            return image
+
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+
+        decoration_layer = Image.new('RGBA', image.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(decoration_layer, 'RGBA')
+
+        # 색상 파싱
+        color = self._parse_decoration_color(self.decoration_color)
+        thickness = int(self.decoration_thickness * self.scale)
+
+        if self.decoration_type == "line_top":
+            # 상단 라인
+            line_y = card_y - thickness * 2
+            line_width = int(card_width * 0.3)
+            line_x = card_x + (card_width - line_width) // 2
+            draw.rectangle([line_x, line_y, line_x + line_width, line_y + thickness], fill=color)
+
+        elif self.decoration_type == "line_bottom":
+            # 하단 라인
+            line_y = card_y + card_height + thickness
+            line_width = int(card_width * 0.3)
+            line_x = card_x + (card_width - line_width) // 2
+            draw.rectangle([line_x, line_y, line_x + line_width, line_y + thickness], fill=color)
+
+        elif self.decoration_type == "corner_accent":
+            # 코너 강조
+            corner_size = int(40 * self.scale)
+            # 좌상단
+            draw.rectangle([card_x, card_y, card_x + corner_size, card_y + thickness], fill=color)
+            draw.rectangle([card_x, card_y, card_x + thickness, card_y + corner_size], fill=color)
+            # 우상단
+            draw.rectangle([card_x + card_width - corner_size, card_y, card_x + card_width, card_y + thickness], fill=color)
+            draw.rectangle([card_x + card_width - thickness, card_y, card_x + card_width, card_y + corner_size], fill=color)
+            # 좌하단
+            draw.rectangle([card_x, card_y + card_height - thickness, card_x + corner_size, card_y + card_height], fill=color)
+            draw.rectangle([card_x, card_y + card_height - corner_size, card_x + thickness, card_y + card_height], fill=color)
+            # 우하단
+            draw.rectangle([card_x + card_width - corner_size, card_y + card_height - thickness, card_x + card_width, card_y + card_height], fill=color)
+            draw.rectangle([card_x + card_width - thickness, card_y + card_height - corner_size, card_x + card_width, card_y + card_height], fill=color)
+
+        elif self.decoration_type == "frame":
+            # 전체 프레임
+            draw.rectangle([card_x, card_y, card_x + card_width, card_y + thickness], fill=color)
+            draw.rectangle([card_x, card_y + card_height - thickness, card_x + card_width, card_y + card_height], fill=color)
+            draw.rectangle([card_x, card_y, card_x + thickness, card_y + card_height], fill=color)
+            draw.rectangle([card_x + card_width - thickness, card_y, card_x + card_width, card_y + card_height], fill=color)
+
+        elif self.decoration_type == "neon_border":
+            # 네온 테두리 (글로우 효과)
+            for i in range(3):
+                blur_thickness = thickness + (3 - i) * 4
+                alpha = 80 + i * 50
+                glow_color = (*color[:3], alpha)
+                draw.rounded_rectangle(
+                    [card_x - blur_thickness, card_y - blur_thickness,
+                     card_x + card_width + blur_thickness, card_y + card_height + blur_thickness],
+                    radius=int(self.corner_radius * self.scale) + blur_thickness,
+                    outline=glow_color,
+                    width=2
+                )
+
+        elif self.decoration_type == "vintage_frame":
+            # 빈티지 프레임 (이중 테두리)
+            outer_offset = thickness * 2
+            # 외부 프레임
+            draw.rounded_rectangle(
+                [card_x - outer_offset, card_y - outer_offset,
+                 card_x + card_width + outer_offset, card_y + card_height + outer_offset],
+                radius=int(self.corner_radius * self.scale) + outer_offset,
+                outline=color,
+                width=thickness
+            )
+            # 내부 프레임
+            inner_offset = thickness // 2
+            draw.rounded_rectangle(
+                [card_x + inner_offset, card_y + inner_offset,
+                 card_x + card_width - inner_offset, card_y + card_height - inner_offset],
+                radius=max(0, int(self.corner_radius * self.scale) - inner_offset),
+                outline=(*color[:3], color[3] // 2),
+                width=max(1, thickness // 2)
+            )
+
+        return Image.alpha_composite(image, decoration_layer)
+
+    def _parse_decoration_color(self, color_str) -> tuple:
+        """장식 색상 문자열을 RGBA 튜플로 변환"""
+        if not color_str:
+            return (255, 255, 255, 200)
+
+        if color_str == "accent":
+            # 테마에서 액센트 색상 가져오기
+            return (255, 255, 255, 200)
+
+        if color_str.startswith("rgba"):
+            # rgba(255,255,255,0.3) 형식 파싱
+            import re
+            match = re.match(r'rgba\((\d+),(\d+),(\d+),([\d.]+)\)', color_str.replace(' ', ''))
+            if match:
+                r, g, b = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                a = int(float(match.group(4)) * 255)
+                return (r, g, b, a)
+
+        if color_str.startswith("#"):
+            # HEX 색상 파싱
+            hex_color = color_str.lstrip('#')
+            if len(hex_color) == 6:
+                r = int(hex_color[0:2], 16)
+                g = int(hex_color[2:4], 16)
+                b = int(hex_color[4:6], 16)
+                return (r, g, b, 255)
+
+        return (255, 255, 255, 200)
+
     def _draw_content_card(
         self,
         image: Image.Image,
         x: int, y: int, width: int, height: int,
         bg_color: tuple = (255, 255, 255),
         opacity: float = 0.15,
-        corner_radius: int = 40
+        corner_radius: int = None
     ):
-        """반투명 카드 배경 그리기 (라운드 코너)"""
+        """반투명 카드 배경 그리기 (라운드 코너 + 테두리 + 그림자)"""
+        # 템플릿 설정 사용
+        if corner_radius is None:
+            corner_radius = int(self.corner_radius * self.scale)
+
         # RGBA 모드로 변환
         if image.mode != 'RGBA':
             image = image.convert('RGBA')
+
+        # 그림자 레이어 (카드 그림자가 있는 경우)
+        if self.card_shadow_blur > 0:
+            shadow_layer = Image.new('RGBA', image.size, (0, 0, 0, 0))
+            shadow_draw = ImageDraw.Draw(shadow_layer, 'RGBA')
+            shadow_offset = int(self.card_shadow_blur * 0.3)
+            shadow_color = (0, 0, 0, int(80 * (self.card_shadow_blur / 50)))
+            shadow_draw.rounded_rectangle(
+                [x + shadow_offset, y + shadow_offset, x + width + shadow_offset, y + height + shadow_offset],
+                radius=corner_radius,
+                fill=shadow_color
+            )
+            # 블러 효과 (간단하게 여러 레이어로 구현)
+            from PIL import ImageFilter
+            shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(radius=self.card_shadow_blur * 0.5))
+            image = Image.alpha_composite(image, shadow_layer)
 
         # 반투명 카드 레이어 생성
         card_layer = Image.new('RGBA', image.size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(card_layer, 'RGBA')
 
+        # 글래스 이펙트 (glass_effect가 True인 경우)
+        if self.glass_effect:
+            # 글래스모피즘: 더 투명하고 흐린 배경
+            fill_color = (*bg_color, int(255 * opacity * 0.7))
+        else:
+            fill_color = (*bg_color, int(255 * opacity))
+
         # 라운드 사각형 그리기
-        fill_color = (*bg_color, int(255 * opacity))
         draw.rounded_rectangle(
             [x, y, x + width, y + height],
             radius=corner_radius,
             fill=fill_color
         )
 
+        # 테두리 (border_width가 있는 경우)
+        if self.border_width > 0 and self.border_color:
+            border_color = self._parse_decoration_color(self.border_color)
+            draw.rounded_rectangle(
+                [x, y, x + width, y + height],
+                radius=corner_radius,
+                outline=border_color,
+                width=int(self.border_width * self.scale)
+            )
+
         # 합성
-        return Image.alpha_composite(image.convert('RGBA'), card_layer)
+        result = Image.alpha_composite(image.convert('RGBA'), card_layer)
+
+        # 장식 요소 추가
+        result = self._draw_decoration(result, x, y, width, height)
+
+        return result
 
     def build_content_page(
         self,
@@ -1555,13 +2006,13 @@ class CardNewsBuilder:
             # 그라데이션 배경 (primary → 약간 어두운 색)
             end_color = tuple(max(0, c - 40) for c in bg_color)
             card = BackgroundProcessor.create_fast_gradient(
-                RENDER_WIDTH, RENDER_HEIGHT,
+                self.render_width, self.render_height,
                 bg_color, end_color,
                 direction=self.theme.get("gradient_type", "vertical")
             )
         else:
             # 단색 배경
-            card = Image.new('RGB', (RENDER_WIDTH, RENDER_HEIGHT), bg_color)
+            card = Image.new('RGB', (self.render_width, self.render_height), bg_color)
 
         # 로고 추가 (선택적)
         if show_logo:
@@ -1579,32 +2030,34 @@ class CardNewsBuilder:
             content_lines=content_lines,
             is_first_page=False
         )
-        title_size = font_sizes['title_size']
-        bullet_size = font_sizes['bullet_size']
+        # 디자인 템플릿의 사이즈 비율 적용
+        title_size = int(font_sizes['title_size'] * self.title_size_ratio)
+        bullet_size = int(font_sizes['bullet_size'] * self.content_size_ratio)
 
-        # 폰트 설정 (2x 스케일 적용) - 동적 사이즈 사용
-        title_font = FontManager.get_font(self.font_style, title_size * self.scale, weight='bold')
-        bullet_font = FontManager.get_font(self.font_style, bullet_size * self.scale, weight='regular')
+        # 폰트 설정 (2x 스케일 적용) - 동적 사이즈 + 템플릿 weight 사용
+        title_font = FontManager.get_font(self.font_style, title_size * self.scale, weight=self.title_weight)
+        bullet_font = FontManager.get_font(self.font_style, bullet_size * self.scale, weight=self.content_weight)
 
-        # 2x 스케일 기준 치수
-        margin_x = 80 * self.scale
-        card_padding = 50 * self.scale
-        max_width = RENDER_WIDTH - margin_x * 2 - card_padding * 2
+        # 2x 스케일 기준 치수 (템플릿 패딩 비율 적용)
+        margin_x = int(80 * self.scale * self.padding_ratio)
+        card_padding = int(50 * self.scale * self.padding_ratio)
+        max_width = self.render_width - margin_x * 2 - card_padding * 2
 
         # 로고 영역 (로고 표시 시만 적용)
-        top_margin = (120 * self.scale) if show_logo else (40 * self.scale)
-        bottom_margin = 40 * self.scale
-        available_height = RENDER_HEIGHT - top_margin - bottom_margin
+        top_margin = int((120 * self.scale) if show_logo else (40 * self.scale))
+        bottom_margin = int(40 * self.scale)
+        available_height = self.render_height - top_margin - bottom_margin
 
         # 콘텐츠 높이 사전 계산
         draw = ImageDraw.Draw(card)
         title_lines = TextRenderer.wrap_text(title, title_font, max_width, draw)
-        title_line_height = int((title_size + 16) * self.scale)
+        # 템플릿 line_height_ratio 적용
+        title_line_height = int((title_size + 16) * self.scale * self.line_height_ratio)
         title_height = len(title_lines) * title_line_height
 
         # 불릿 텍스트의 줄바꿈을 고려한 총 높이 계산
         bullet_indent = 35 * RENDER_SCALE // 2
-        bullet_text_max_width = max_width - bullet_indent - 40 * self.scale
+        bullet_text_max_width = max_width - bullet_indent - int(40 * self.scale)
 
         # 각 불릿 라인의 줄바꿈 결과 미리 계산
         wrapped_bullets = []
@@ -1615,12 +2068,12 @@ class CardNewsBuilder:
             lines = TextRenderer.wrap_text(clean_text, bullet_font, bullet_text_max_width, draw)
             wrapped_bullets.append(lines)
 
-        # 불릿 줄 높이 계산
+        # 불릿 줄 높이 계산 (템플릿 line_height_ratio 적용)
         bbox = draw.textbbox((0, 0), "가Ag", font=bullet_font)
-        bullet_single_line_height = int((bbox[3] - bbox[1]) * 1.35)
+        bullet_single_line_height = int((bbox[3] - bbox[1]) * 1.35 * self.line_height_ratio)
 
         # 불릿 간 여백 (각 불릿 항목 사이)
-        bullet_item_gap = int(20 * self.scale)
+        bullet_item_gap = int(20 * self.scale * self.padding_ratio)
 
         # 총 불릿 영역 높이 계산
         total_bullet_height = 0
@@ -1639,7 +2092,7 @@ class CardNewsBuilder:
         if card_height > max_card_height:
             card_height = max_card_height
 
-        card_width = RENDER_WIDTH - margin_x * 2
+        card_width = self.render_width - margin_x * 2
 
         # 카드 Y 위치 (수직 중앙)
         card_y = top_margin + (available_height - card_height) // 2
@@ -1674,7 +2127,7 @@ class CardNewsBuilder:
         line_color = (255, 255, 255, 60) if actual_text_color == "white" else (0, 0, 0, 40)
         line_draw.line(
             [(margin_x + card_padding + 40 * self.scale, line_y),
-             (RENDER_WIDTH - margin_x - card_padding - 40 * self.scale, line_y)],
+             (self.render_width - margin_x - card_padding - 40 * self.scale, line_y)],
             fill=line_color,
             width=2 * self.scale
         )
@@ -1718,19 +2171,207 @@ class CardNewsBuilder:
         final_card.save(buffer, format="PNG", optimize=True)
         return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
+    def build_content_page_with_image(
+        self,
+        background_image: Image.Image,
+        title: str,
+        content_lines: List[str],
+        page_num: int,
+        text_color: str = None,
+        show_logo: bool = False
+    ) -> str:
+        """
+        AI 이미지를 배경으로 사용하는 본문 페이지 렌더링 (심플 모드)
+        - 배경에 블러 효과와 오버레이 적용
+        - 반투명 카드 위에 제목 + 불릿 포인트 표시
+        """
+        # 배경 준비 (블러 + 오버레이 적용)
+        card, color_info = self.prepare_background(
+            background_image,
+            apply_blur=True,
+            blur_radius=8,  # 본문 페이지는 블러 강하게
+            apply_overlay=True,
+            overlay_opacity=0.45,  # 텍스트 가독성을 위해 오버레이 강하게
+            apply_vignette=True,
+            auto_adjust_overlay=True
+        )
+
+        # 로고 추가 (선택적)
+        if show_logo:
+            self.add_logo(card)
+
+        # 텍스트 색상 결정 (이미지 밝기 기반)
+        if text_color:
+            actual_text_color = text_color
+        elif color_info:
+            actual_text_color = color_info["text_color"]
+        else:
+            actual_text_color = "white"
+
+        # 카드 배경색 결정
+        if color_info:
+            card_bg_color = color_info["card_bg_color"]
+            card_opacity = color_info["card_opacity"]
+        else:
+            card_bg_color = (0, 0, 0)
+            card_opacity = 0.35
+
+        # 동적 폰트 사이즈 계산
+        font_sizes = self._calculate_dynamic_font_sizes(
+            title=title,
+            content_lines=content_lines,
+            is_first_page=False
+        )
+        title_size = int(font_sizes['title_size'] * self.title_size_ratio)
+        bullet_size = int(font_sizes['bullet_size'] * self.content_size_ratio)
+
+        # 폰트 설정 (2x 스케일 적용)
+        title_font = FontManager.get_font(self.font_style, title_size * self.scale, weight=self.title_weight)
+        bullet_font = FontManager.get_font(self.font_style, bullet_size * self.scale, weight=self.content_weight)
+
+        # 2x 스케일 기준 치수
+        margin_x = int(80 * self.scale * self.padding_ratio)
+        card_padding = int(50 * self.scale * self.padding_ratio)
+        max_width = self.render_width - margin_x * 2 - card_padding * 2
+
+        # 로고 영역
+        top_margin = int((120 * self.scale) if show_logo else (40 * self.scale))
+        bottom_margin = int(40 * self.scale)
+        available_height = self.render_height - top_margin - bottom_margin
+
+        # 콘텐츠 높이 사전 계산
+        draw = ImageDraw.Draw(card)
+        title_lines = TextRenderer.wrap_text(title, title_font, max_width, draw)
+        title_line_height = int((title_size + 16) * self.scale * self.line_height_ratio)
+        title_height = len(title_lines) * title_line_height
+
+        # 불릿 텍스트 줄바꿈 계산
+        bullet_indent = 35 * RENDER_SCALE // 2
+        bullet_text_max_width = max_width - bullet_indent - int(40 * self.scale)
+
+        wrapped_bullets = []
+        for line in content_lines:
+            clean_text = line.lstrip('•- ').strip()
+            clean_text = strip_markdown(clean_text)
+            clean_text = strip_emojis(clean_text)
+            lines = TextRenderer.wrap_text(clean_text, bullet_font, bullet_text_max_width, draw)
+            wrapped_bullets.append(lines)
+
+        # 불릿 줄 높이 계산
+        bbox = draw.textbbox((0, 0), "가Ag", font=bullet_font)
+        bullet_single_line_height = int((bbox[3] - bbox[1]) * 1.35 * self.line_height_ratio)
+        bullet_item_gap = int(20 * self.scale * self.padding_ratio)
+
+        total_bullet_height = 0
+        for lines in wrapped_bullets:
+            total_bullet_height += len(lines) * bullet_single_line_height + bullet_item_gap
+
+        # 전체 콘텐츠 높이
+        title_bullet_gap = 60 * self.scale
+        total_content_height = title_height + title_bullet_gap + total_bullet_height
+
+        # 카드 높이 계산
+        card_height = total_content_height + card_padding * 2
+        max_card_height = available_height - 20 * self.scale
+        if card_height > max_card_height:
+            card_height = max_card_height
+
+        card_width = self.render_width - margin_x * 2
+        card_y = top_margin + (available_height - card_height) // 2
+
+        # 반투명 카드 배경 그리기
+        card = self._draw_content_card(
+            card.convert('RGBA'),
+            x=margin_x,
+            y=int(card_y),
+            width=card_width,
+            height=int(card_height),
+            bg_color=card_bg_color,
+            opacity=card_opacity,
+            corner_radius=25 * self.scale
+        )
+
+        # 제목 Y 위치
+        title_y = card_y + card_padding
+
+        # 그림자 색상 결정
+        if actual_text_color == "black":
+            title_shadow_color = (255, 255, 255, 100)
+        else:
+            title_shadow_color = (0, 0, 0, 140)
+
+        # 제목 렌더링 (Gaussian Blur 그림자)
+        TextRenderer.draw_text_with_shadow(
+            card, title, (margin_x + card_padding, title_y),
+            title_font, color=actual_text_color,
+            max_width=max_width,
+            align="center", shadow=True,
+            use_gaussian_shadow=True,
+            blur_radius=8 * self.scale,
+            shadow_offset=(4 * self.scale, 4 * self.scale),
+            shadow_color=title_shadow_color,
+            line_spacing=16 * self.scale
+        )
+
+        # 구분선 추가
+        line_y = title_y + title_height + 20 * self.scale
+        line_draw = ImageDraw.Draw(card, 'RGBA')
+        line_color = (255, 255, 255, 60) if actual_text_color == "white" else (0, 0, 0, 40)
+        line_draw.line(
+            [(margin_x + card_padding + 40 * self.scale, line_y),
+             (self.render_width - margin_x - card_padding - 40 * self.scale, line_y)],
+            fill=line_color,
+            width=2 * self.scale
+        )
+
+        # Bullet points 렌더링
+        bullet_y = line_y + 30 * self.scale
+        bullet_start_x = margin_x + card_padding + 20 * self.scale
+        max_bullet_y = card_y + card_height - card_padding
+
+        current_y = bullet_y
+        for i, line in enumerate(content_lines):
+            if current_y >= max_bullet_y:
+                break
+
+            next_y = TextRenderer.draw_bullet_point(
+                card, line, (bullet_start_x, current_y),
+                bullet_font, color=actual_text_color,
+                use_shadow=True,
+                max_width=max_width - 40 * self.scale,
+                line_height=bullet_single_line_height
+            )
+            current_y = next_y + bullet_item_gap
+
+        # 페이지 번호
+        self._add_page_number(card, page_num)
+
+        # RGB로 변환 후 다운스케일
+        if card.mode == 'RGBA':
+            rgb_card = Image.new('RGB', card.size, (0, 0, 0))
+            rgb_card.paste(card, mask=card.split()[3])
+            card = rgb_card
+
+        final_card = self._downscale_to_final(card)
+
+        # Base64 변환
+        buffer = io.BytesIO()
+        final_card.save(buffer, format="PNG", optimize=True)
+        return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+
     def _add_page_number(self, image: Image.Image, page_num: int):
         """페이지 번호 추가 (2x 스케일 대응)"""
         # 현재 이미지 크기에 따라 스케일 결정
         current_width = image.size[0]
-        is_2x = current_width == RENDER_WIDTH
+        is_2x = current_width == self.render_width
         scale = self.scale if is_2x else 1
 
         draw = ImageDraw.Draw(image, 'RGBA')
         page_font = FontManager.get_font(self.font_style, 20 * scale, weight='regular')
 
         page_text = f"{page_num}"
-        target_width = RENDER_WIDTH if is_2x else CARD_WIDTH
-        target_height = RENDER_HEIGHT if is_2x else CARD_HEIGHT
+        target_width = self.render_width if is_2x else self.card_width
+        target_height = self.render_height if is_2x else self.card_height
 
         draw.text(
             (target_width - 50 * scale, target_height - 40 * scale),
@@ -1869,6 +2510,130 @@ async def generate_agentic_cardnews_stream(
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
+# ==================== 디자인 템플릿 API ====================
+
+@router.get("/cardnews/design-templates")
+async def get_design_templates():
+    """
+    카드뉴스 디자인 템플릿 목록 조회 (기존 + 새 템플릿 통합)
+
+    Returns:
+        templates: 사용 가능한 디자인 템플릿 목록
+    """
+    templates = get_design_templates_list()
+    return {
+        "success": True,
+        "templates": templates
+    }
+
+
+@router.get("/cardnews/design-templates-v2")
+async def get_design_templates_v2():
+    """
+    개선된 디자인 템플릿 목록 조회 (카테고리별 그룹화)
+
+    Returns:
+        categories: 카테고리별로 그룹화된 템플릿 목록
+    """
+    categories = get_improved_templates_by_category()
+    return {
+        "success": True,
+        "categories": categories,
+        "total_templates": sum(len(cat["templates"]) for cat in categories)
+    }
+
+
+@router.get("/cardnews/design-templates/{template_id}")
+async def get_template_detail(template_id: str):
+    """
+    특정 템플릿의 상세 정보 조회
+
+    Args:
+        template_id: 템플릿 ID
+
+    Returns:
+        template: 템플릿 상세 정보 (팔레트, 레이아웃 포함)
+    """
+    config = get_all_template_config(template_id)
+
+    if config["type"] == "improved":
+        template = config["template"]
+        palette = config["palette"]
+        layout = config["layout"]
+
+        return {
+            "success": True,
+            "template": {
+                "id": template["id"],
+                "name": template["name"],
+                "category": template["category"],
+                "description": template["description"],
+                "preview_color": template["preview_color"],
+                "palette": {
+                    "primary": palette["primary"],
+                    "secondary": palette["secondary"],
+                    "accent": palette["accent"],
+                    "text_primary": palette["text_primary"],
+                    "text_secondary": palette["text_secondary"],
+                    "gradient": palette.get("gradient", [])
+                },
+                "layout": {
+                    "name": layout["name"],
+                    "description": layout["description"],
+                    "title_position": layout["title_position"],
+                    "content_align": layout["content_align"]
+                },
+                "text_style": template["text_style"],
+                "card_style": template["card_style"],
+                "decoration": template.get("decoration", {}),
+                "text_effect": template.get("text_effect", {})
+            }
+        }
+    else:
+        template = config["template"]
+        return {
+            "success": True,
+            "template": {
+                "id": template["id"],
+                "name": template["name"],
+                "category": "classic",
+                "description": template["description"],
+                "preview_color": template["preview_color"],
+                "text_style": template["text_style"],
+                "background_style": template["background_style"],
+                "layout_style": template["layout_style"],
+                "card_style": template["card_style"],
+                "decoration": template.get("decoration", {}),
+                "text_effect": template.get("text_effect", {})
+            }
+        }
+
+
+@router.get("/cardnews/template-categories")
+async def get_template_categories():
+    """
+    템플릿 카테고리 목록 조회
+
+    Returns:
+        categories: 카테고리 정보 목록
+    """
+    categories = [
+        {
+            "id": cat_id,
+            "name": cat["name"],
+            "description": cat["description"],
+            "icon": cat["icon"],
+            "template_count": len(cat["templates"])
+        }
+        for cat_id, cat in TEMPLATE_CATEGORIES.items()
+    ]
+
+    return {
+        "success": True,
+        "categories": categories
+    }
+
+
 # ==================== AI Agentic 카드뉴스 생성 (Non-streaming) ====================
 
 @router.post("/generate-agentic-cardnews")
@@ -1877,6 +2642,8 @@ async def generate_agentic_cardnews(
     purpose: str = Form(default="info"),
     fontStyle: str = Form(default="pretendard"),  # AI가 자동 선택하므로 기본값만 유지
     colorTheme: str = Form(default="warm"),  # 사용자가 선택한 테마 사용 (기본: warm)
+    designTemplate: str = Form(default="default"),  # 디자인 템플릿 ID
+    aspectRatio: str = Form(default="1:1"),  # 이미지 비율 (1:1 또는 3:4)
     generateImages: bool = Form(default=True),
     layoutType: str = Form(default="bottom"),
     userContext: str = Form(default=None),  # 사용자 컨텍스트 (JSON 문자열)
@@ -2040,14 +2807,57 @@ async def generate_agentic_cardnews(
         }
 
         # Step 4: 최종 카드뉴스 생성
-        print("\n📰 최종 카드뉴스 조립 중...")
-        print(f"   🎨 배경색: RGB{final_bg_color}")
-        print(f"   📝 텍스트색: {text_color}")
-        print(f"   🔤 폰트: {font_pair}")
+        # 디자인 템플릿 로드 (새 템플릿 시스템 사용)
+        import random
 
-        builder = CardNewsBuilder(dynamic_theme, font_pair, purpose, font_weight="regular")
+        # 'none': 템플릿 없이 AI 이미지 + 심플 텍스트
+        # 'auto': 랜덤 템플릿 선택
+        # 기타: 지정된 템플릿 사용
+        use_simple_mode = (designTemplate == 'none')
+
+        if use_simple_mode:
+            # 심플 모드: minimal_white를 기반으로 하되 장식 최소화
+            selected_template_id = 'minimal_white'
+            template_config = IMPROVED_TEMPLATES.get('minimal_white', list(IMPROVED_TEMPLATES.values())[0])
+            template_name = "심플 이미지"
+            cardnews_logger.info(f"🖼️ 심플 모드: 템플릿 없이 AI 이미지 + 텍스트")
+        elif designTemplate == 'auto' or designTemplate not in IMPROVED_TEMPLATES:
+            # 랜덤 템플릿 선택
+            template_ids = list(IMPROVED_TEMPLATES.keys())
+            selected_template_id = random.choice(template_ids)
+            template_config = IMPROVED_TEMPLATES[selected_template_id]
+            cardnews_logger.info(f"🎲 자동 템플릿 선택: {selected_template_id}")
+            template_name = template_config.get("name", "미니멀 화이트")
+        else:
+            template_config = IMPROVED_TEMPLATES[designTemplate]
+            selected_template_id = designTemplate
+            template_name = template_config.get("name", "미니멀 화이트")
+
+        # 콘텐츠 페이지용 조화로운 색상 팔레트 생성
+        content_page_count = len(pages) - 1  # 첫 페이지 제외
+        if content_page_count > 0:
+            color_palette = generate_harmonious_palette(final_bg_color, content_page_count)
+            cardnews_logger.info(f"🎨 조화로운 색상 팔레트 생성: {len(color_palette)}개 색상")
+            for idx, color in enumerate(color_palette):
+                cardnews_logger.info(f"   페이지 {idx + 2}: RGB{color}")
+        else:
+            color_palette = []
+
+        print("\n📰 최종 카드뉴스 조립 중...")
+        print(f"   🎨 기준 배경색: RGB{final_bg_color}")
+        print(f"   🎨 콘텐츠 페이지별 조화로운 색상 팔레트 적용")
+        print(f"   📝 텍스트색: {text_color} (페이지별 동적 조정)")
+        print(f"   🔤 폰트: {font_pair}")
+        print(f"   📐 템플릿: {template_name}")
+        cardnews_logger.info(f"📐 디자인 템플릿 적용: {selected_template_id} ({template_name})")
+
+        builder = CardNewsBuilder(dynamic_theme, font_pair, purpose, font_weight="regular", design_template=selected_template_id, aspect_ratio=aspectRatio)
 
         final_cards = []
+
+        # 심플 모드에서 첫 번째 AI 이미지 저장 (내용 페이지 배경으로 재사용)
+        first_bg_image = None
+
         for i, (page, bg_image_data) in enumerate(zip(pages, background_images)):
             print(f"  🎨 카드 {i+1}/{len(pages)} 생성 중...")
 
@@ -2059,6 +2869,10 @@ async def generate_agentic_cardnews(
                 else:
                     response = requests.get(bg_image_data, timeout=30)
                     bg_image = Image.open(io.BytesIO(response.content))
+
+                # 심플 모드에서 첫 번째 이미지 저장
+                if use_simple_mode:
+                    first_bg_image = bg_image.copy()
 
                 # 첫 페이지 생성 (Agent가 판단한 layout 사용)
                 # 첫 페이지는 AI 이미지가 배경이므로 text_color=None으로 전달하여
@@ -2073,15 +2887,32 @@ async def generate_agentic_cardnews(
                 )
                 final_cards.append(card_base64)
 
-            else:  # 나머지 페이지: 컬러 배경 + 제목 + bullet points
-                # 본문 페이지 생성
-                card_base64 = builder.build_content_page(
-                    bg_color=final_bg_color,
-                    title=page['title'],
-                    content_lines=page.get('content', ["• 내용이 없습니다"]),
-                    page_num=i + 1,
-                    text_color=text_color  # 동적 텍스트 색상
-                )
+            else:  # 나머지 페이지: 컬러 배경 또는 AI 이미지 + 제목 + bullet points
+                if use_simple_mode and first_bg_image:
+                    # 심플 모드: AI 이미지를 배경으로 사용 (블러 처리)
+                    print(f"    📍 페이지 {i+1}: 심플 모드 - AI 이미지 배경 사용")
+                    card_base64 = builder.build_content_page_with_image(
+                        background_image=first_bg_image,
+                        title=page['title'],
+                        content_lines=page.get('content', ["• 내용이 없습니다"]),
+                        page_num=i + 1
+                    )
+                else:
+                    # 일반 모드: 페이지별 조화로운 배경색 적용 (팔레트에서 선택)
+                    page_bg_color = color_palette[i - 1] if i - 1 < len(color_palette) else final_bg_color
+                    # 해당 배경색에 맞는 텍스트 색상 결정
+                    page_text_color = get_text_color_for_background(page_bg_color)
+
+                    print(f"    📍 페이지 {i+1} 배경색: RGB{page_bg_color}, 텍스트: {page_text_color}")
+
+                    # 본문 페이지 생성
+                    card_base64 = builder.build_content_page(
+                        bg_color=page_bg_color,
+                        title=page['title'],
+                        content_lines=page.get('content', ["• 내용이 없습니다"]),
+                        page_num=i + 1,
+                        text_color=page_text_color  # 페이지별 동적 텍스트 색상
+                    )
                 final_cards.append(card_base64)
 
             print(f"  ✅ 카드 {i+1} 완성")

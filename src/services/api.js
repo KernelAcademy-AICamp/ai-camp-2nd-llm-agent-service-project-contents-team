@@ -612,6 +612,35 @@ export const contentSessionAPI = {
 };
 
 // ==========================================
+// 카드뉴스 API
+// ==========================================
+export const cardnewsAPI = {
+  // 디자인 템플릿 목록 조회 (기존 + 새 템플릿 통합)
+  getDesignTemplates: async () => {
+    const response = await api.get('/api/cardnews/design-templates');
+    return response.data;
+  },
+
+  // 카테고리별 그룹화된 개선된 템플릿 목록 조회
+  getDesignTemplatesV2: async () => {
+    const response = await api.get('/api/cardnews/design-templates-v2');
+    return response.data;
+  },
+
+  // 특정 템플릿 상세 정보 조회
+  getTemplateDetail: async (templateId) => {
+    const response = await api.get(`/api/cardnews/design-templates/${templateId}`);
+    return response.data;
+  },
+
+  // 템플릿 카테고리 목록 조회
+  getTemplateCategories: async () => {
+    const response = await api.get('/api/cardnews/template-categories');
+    return response.data;
+  },
+};
+
+// ==========================================
 // SNS 발행 콘텐츠 API
 // ==========================================
 export const snsContentAPI = {
@@ -818,5 +847,71 @@ export const userAPI = {
 
 // 호환성을 위한 별칭 (기존 코드에서 twitterAPI 사용하는 경우)
 export const twitterAPI = xAPI;
+
+// ==========================================
+// 템플릿 갤러리 API
+// ==========================================
+export const templatesAPI = {
+  // 탭 목록 조회
+  getTabs: async () => {
+    const response = await api.get('/templates/tabs');
+    return response.data;
+  },
+
+  // 탭 생성
+  createTab: async (data) => {
+    const response = await api.post('/templates/tabs', data);
+    return response.data;
+  },
+
+  // 탭 수정
+  updateTab: async (tabId, data) => {
+    const response = await api.put(`/templates/tabs/${tabId}`, data);
+    return response.data;
+  },
+
+  // 탭 삭제
+  deleteTab: async (tabId) => {
+    const response = await api.delete(`/templates/tabs/${tabId}`);
+    return response.data;
+  },
+
+  // 템플릿 목록 조회 (탭별 필터링 가능)
+  getTemplates: async (tabId = null) => {
+    const params = tabId ? { tab_id: tabId } : {};
+    const response = await api.get('/templates/', { params });
+    return response.data;
+  },
+
+  // 템플릿 생성
+  createTemplate: async (data) => {
+    const response = await api.post('/templates/', data);
+    return response.data;
+  },
+
+  // 템플릿 수정
+  updateTemplate: async (templateId, data) => {
+    const response = await api.put(`/templates/${templateId}`, data);
+    return response.data;
+  },
+
+  // 템플릿 삭제
+  deleteTemplate: async (templateId) => {
+    const response = await api.delete(`/templates/${templateId}`);
+    return response.data;
+  },
+
+  // 템플릿 사용 (사용 횟수 증가)
+  useTemplate: async (templateId) => {
+    const response = await api.post(`/templates/${templateId}/use`);
+    return response.data;
+  },
+
+  // 템플릿 복제
+  duplicateTemplate: async (templateId) => {
+    const response = await api.post(`/templates/${templateId}/duplicate`);
+    return response.data;
+  },
+};
 
 export default api;

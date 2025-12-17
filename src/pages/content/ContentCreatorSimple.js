@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiCopy, FiArrowRight, FiEdit3 } from 'react-icons/fi';
+import { FiCopy, FiArrowRight, FiEdit3, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
-import api, { contentSessionAPI, creditsAPI, userAPI } from '../../services/api';
+import api, { contentSessionAPI, creditsAPI, userAPI, cardnewsAPI } from '../../services/api';
 import { generateAgenticContent } from '../../services/agenticService';
 import CreditChargeModal from '../../components/credits/CreditChargeModal';
 import './ContentCreatorSimple.css';
@@ -40,6 +40,11 @@ const IMAGE_COUNTS = [1, 2, 3, 4, 5, 6, 7, 8];
 const IMAGE_FORMATS = [
   { id: 'ai-image', label: 'AI 이미지' },
   { id: 'cardnews', label: '카드뉴스' },
+];
+
+const ASPECT_RATIOS = [
+  { id: '1:1', label: '정방형 (1:1)', desc: '인스타그램 피드' },
+  { id: '3:4', label: '세로형 (3:4)', desc: '인스타그램 릴스' },
 ];
 
 const QUICK_TOPICS = ['신제품 출시', '이벤트 안내', '후기 소개', '브랜드 소개'];
@@ -152,6 +157,12 @@ function ContentCreatorSimple() {
   const [imageFormat, setImageFormat] = useState('ai-image'); // 'ai-image' | 'cardnews'
   const [uploadedImages, setUploadedImages] = useState([]);
   const [videoDuration, setVideoDuration] = useState('standard');
+  const [designTemplate, setDesignTemplate] = useState('minimal_white'); // 카드뉴스 디자인 템플릿
+  const [designTemplates, setDesignTemplates] = useState([]); // 사용 가능한 템플릿 목록 (호환성 유지)
+  const [templateCategories, setTemplateCategories] = useState([]); // 카테고리별 그룹화된 템플릿
+  const [selectedCategory, setSelectedCategory] = useState(null); // 선택된 카테고리
+  const [previewSlide, setPreviewSlide] = useState(0); // 템플릿 미리보기 슬라이드 (0: 표지, 1: 내용)
+  const [aspectRatio, setAspectRatio] = useState('1:1'); // 이미지 비율
 
   // 생성 상태
   const [isGenerating, setIsGenerating] = useState(false);
@@ -209,6 +220,31 @@ function ContentCreatorSimple() {
 
     fetchCreditBalance();
     fetchUserContext();
+  }, []);
+
+  // 디자인 템플릿 목록 조회 (카테고리별 - 새 템플릿 시스템만 사용)
+  useEffect(() => {
+    const fetchDesignTemplates = async () => {
+      try {
+        // 카테고리별 그룹화된 템플릿 로드
+        const v2Data = await cardnewsAPI.getDesignTemplatesV2();
+        if (v2Data.success && v2Data.categories) {
+          setTemplateCategories(v2Data.categories);
+          // 첫 번째 카테고리만 선택 (템플릿은 선택하지 않음 - 자동 선택 모드)
+          if (v2Data.categories.length > 0) {
+            setSelectedCategory(v2Data.categories[0].id);
+          }
+          // 전체 템플릿 목록도 설정 (미리보기용)
+          const allTemplates = v2Data.categories.flatMap(cat => cat.templates);
+          setDesignTemplates(allTemplates);
+          console.log('✅ 카테고리별 템플릿 로드:', v2Data.total_templates, '개');
+        }
+      } catch (error) {
+        console.error('디자인 템플릿 조회 실패:', error);
+      }
+    };
+
+    fetchDesignTemplates();
   }, []);
 
   // 필요한 크레딧 계산
@@ -361,6 +397,9 @@ function ContentCreatorSimple() {
             formData.append('fontStyle', 'pretendard');
             formData.append('colorTheme', colorTheme);
             formData.append('generateImages', 'true');
+            // 디자인 템플릿 추가 ('none'이면 템플릿 없이 AI 이미지만)
+            formData.append('designTemplate', designTemplate);
+            formData.append('aspectRatio', aspectRatio); // 이미지 비율 추가
             // 사용자 컨텍스트 전달
             if (userContext) {
               formData.append('userContext', JSON.stringify(userContext));
@@ -595,6 +634,176 @@ function ContentCreatorSimple() {
                           </button>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {/* 이미지 비율 선택 - 카드뉴스 선택 시 */}
+                  {contentType === 'image' && imageFormat === 'cardnews' && (
+                    <div className="creator-option-section">
+                      <label className="creator-label">이미지 비율</label>
+                      <div className="creator-chips">
+                        {ASPECT_RATIOS.map(ratio => (
+                          <button
+                            key={ratio.id}
+                            className={`creator-chip ${aspectRatio === ratio.id ? 'selected' : ''}`}
+                            onClick={() => setAspectRatio(ratio.id)}
+                            title={ratio.desc}
+                          >
+                            {ratio.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 디자인 템플릿 선택 - 카드뉴스 선택 시 */}
+                  {contentType === 'image' && imageFormat === 'cardnews' && templateCategories.length > 0 && (
+                    <div className="creator-option-section">
+                      <label className="creator-label">디자인 템플릿</label>
+
+                      {/* 카테고리 탭 + 선택 안함 */}
+                      <div className="template-category-tabs">
+                        {/* 선택 안함 옵션 */}
+                        <button
+                          className={`category-tab no-template-tab ${designTemplate === 'none' ? 'active' : ''}`}
+                          onClick={() => setDesignTemplate('none')}
+                          title="템플릿 없이 AI 이미지와 텍스트만 사용합니다"
+                        >
+                          <span className="category-icon">🖼️</span>
+                          <span className="category-name">선택 안함</span>
+                        </button>
+                        {templateCategories.map(category => (
+                          <button
+                            key={category.id}
+                            className={`category-tab ${selectedCategory === category.id && designTemplate !== 'none' ? 'active' : ''}`}
+                            onClick={() => {
+                              setSelectedCategory(category.id);
+                              // 선택 안함 상태에서 카테고리 클릭 시 해당 카테고리의 첫 템플릿 선택
+                              if (designTemplate === 'none') {
+                                const firstTemplate = category.templates?.[0];
+                                if (firstTemplate) setDesignTemplate(firstTemplate.id);
+                              }
+                            }}
+                            title={category.description}
+                          >
+                            <span className="category-icon">{category.icon}</span>
+                            <span className="category-name">{category.name}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* 선택된 카테고리의 템플릿 그리드 (선택 안함이 아닐 때만 표시) */}
+                      {designTemplate !== 'none' && (
+                      <div className="creator-template-grid">
+                        {templateCategories
+                          .find(cat => cat.id === selectedCategory)
+                          ?.templates.map(template => (
+                            <button
+                              key={template.id}
+                              className={`creator-template-card ${designTemplate === template.id ? 'selected' : ''}`}
+                              onClick={() => setDesignTemplate(template.id)}
+                              title={template.description}
+                            >
+                              <span
+                                className="template-color-preview"
+                                style={{ backgroundColor: template.preview_color }}
+                              />
+                              <span className="template-name">{template.name}</span>
+                            </button>
+                          ))}
+                      </div>
+                      )}
+
+                      {/* 선택된 템플릿 미리보기 - 이미지 슬라이더 (선택 안함일 때는 표시 안함) */}
+                      {designTemplate && designTemplate !== 'none' && (() => {
+                        const selectedTemplate = designTemplates.find(t => t.id === designTemplate);
+                        const previewImages = selectedTemplate?.preview_images;
+                        const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+                        return (
+                        <div className="template-preview-section">
+                          <label className="creator-label">미리보기</label>
+                          <div className="template-preview-slider">
+                            {/* 좌측 화살표 */}
+                            <button
+                              className="preview-nav-btn prev"
+                              onClick={() => setPreviewSlide(prev => prev === 0 ? 1 : 0)}
+                              aria-label="이전 슬라이드"
+                            >
+                              <FiChevronLeft />
+                            </button>
+
+                            {/* 슬라이드 컨테이너 */}
+                            <div className="preview-slides-container">
+                              <div className="preview-slides" style={{ transform: `translateX(-${previewSlide * 100}%)` }}>
+                                {/* 슬라이드 1: 표지 이미지 */}
+                                <div className="preview-slide">
+                                  <div className="template-preview-card template-preview-image">
+                                    {previewImages?.cover ? (
+                                      <img
+                                        src={`${apiBaseUrl}${previewImages.cover}`}
+                                        alt={`${selectedTemplate?.name} 표지`}
+                                        className="preview-img"
+                                      />
+                                    ) : (
+                                      <div className="preview-placeholder">
+                                        미리보기 없음
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span className="slide-label">표지</span>
+                                </div>
+
+                                {/* 슬라이드 2: 내용 페이지 이미지 */}
+                                <div className="preview-slide">
+                                  <div className="template-preview-card template-preview-image">
+                                    {previewImages?.content ? (
+                                      <img
+                                        src={`${apiBaseUrl}${previewImages.content}`}
+                                        alt={`${selectedTemplate?.name} 내용`}
+                                        className="preview-img"
+                                      />
+                                    ) : (
+                                      <div className="preview-placeholder">
+                                        미리보기 없음
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span className="slide-label">내용</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 우측 화살표 */}
+                            <button
+                              className="preview-nav-btn next"
+                              onClick={() => setPreviewSlide(prev => prev === 1 ? 0 : 1)}
+                              aria-label="다음 슬라이드"
+                            >
+                              <FiChevronRight />
+                            </button>
+                          </div>
+
+                          {/* 슬라이드 인디케이터 */}
+                          <div className="preview-indicators">
+                            <button
+                              className={`indicator ${previewSlide === 0 ? 'active' : ''}`}
+                              onClick={() => setPreviewSlide(0)}
+                              aria-label="표지 보기"
+                            />
+                            <button
+                              className={`indicator ${previewSlide === 1 ? 'active' : ''}`}
+                              onClick={() => setPreviewSlide(1)}
+                              aria-label="내용 보기"
+                            />
+                          </div>
+
+                          <p className="template-description-text">
+                            {selectedTemplate?.description}
+                          </p>
+                        </div>
+                        );
+                      })()}
                     </div>
                   )}
 

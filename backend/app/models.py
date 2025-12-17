@@ -1278,3 +1278,60 @@ class CreditPackage(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+# ============================================
+# 템플릿 갤러리 시스템
+# ============================================
+
+class TemplateTab(Base):
+    """
+    사용자별 템플릿 탭 모델
+    - 사용자가 직접 생성/수정/삭제 가능한 템플릿 카테고리
+    """
+    __tablename__ = "template_tabs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+
+    # 탭 정보
+    tab_key = Column(String(50), nullable=False)  # 고유 키 (영문, 예: promotion, event)
+    label = Column(String(50), nullable=False)  # 표시 이름 (예: 홍보, 이벤트)
+    icon = Column(String(10), nullable=False, default="📁")  # 이모지 아이콘
+    sort_order = Column(Integer, default=0)  # 정렬 순서
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User")
+    templates = relationship("Template", back_populates="tab", cascade="all, delete-orphan")
+
+
+class Template(Base):
+    """
+    사용자별 프롬프트 템플릿 모델
+    - 자주 사용하는 프롬프트를 템플릿으로 저장
+    """
+    __tablename__ = "templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    tab_id = Column(Integer, ForeignKey("template_tabs.id"), nullable=False, index=True)
+
+    # 템플릿 정보
+    name = Column(String(100), nullable=False)  # 템플릿 이름
+    category = Column(String(50), nullable=True)  # 세부 카테고리 (예: 신제품 출시)
+    description = Column(String(255), nullable=True)  # 간단한 설명
+    prompt = Column(Text, nullable=False)  # 프롬프트 내용
+    icon = Column(String(10), nullable=False, default="📝")  # 이모지 아이콘
+
+    # 통계
+    uses = Column(Integer, default=0)  # 사용 횟수
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User")
+    tab = relationship("TemplateTab", back_populates="templates")
