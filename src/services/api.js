@@ -859,6 +859,11 @@ export const userAPI = {
   // 프로필 업데이트
   updateProfile: async (data) => {
     const response = await api.put('/api/user/profile', data);
+    return response.data;
+  },
+};
+
+// ==========================================
 // Generated Videos API
 // ==========================================
 export const generatedVideoAPI = {

@@ -149,13 +149,6 @@ function ContentHistory() {
 
   const handleSelectHistory = async (item) => {
     try {
-      const fullData = await contentSessionAPI.get(item.id);
-      setSelectedHistoryItem(fullData);
-      if (fullData.blog) setHistoryDetailTab('blog');
-      else if (fullData.sns) setHistoryDetailTab('sns');
-      else if (fullData.x) setHistoryDetailTab('x');
-      else if (fullData.threads) setHistoryDetailTab('threads');
-      else if (fullData.cardnews) setHistoryDetailTab('cardnews');
       if (item.type === 'video') {
         // 비디오 아이템은 이미 모든 데이터를 가지고 있음
         setSelectedHistoryItem(item);
@@ -168,6 +161,8 @@ function ContentHistory() {
         else if (fullData.sns) setHistoryDetailTab('sns');
         else if (fullData.x) setHistoryDetailTab('x');
         else if (fullData.threads) setHistoryDetailTab('threads');
+        else if (fullData.cardnews) setHistoryDetailTab('cardnews');
+        else if (fullData.images?.length > 0) setHistoryDetailTab('images');
       }
     } catch (error) {
       console.error('상세 데이터 조회 실패:', error);
@@ -336,20 +331,6 @@ function ContentHistory() {
                     <h4>{item.type === 'video' ? item.product_name : (item.topic || '주제 없음')}</h4>
                     <span className="history-date">{formatDate(item.created_at)}</span>
                   </div>
-                  <div className="history-item-info">
-                    <span className="info-badge type">
-                      {item.content_type === 'text' ? '글만' : item.content_type === 'image' ? '이미지만' : '글+이미지'}
-                    </span>
-                    <span className="info-badge style">{getStyleLabel(item.style)}</span>
-                  </div>
-                  <div className="history-item-meta">
-                    {item.blog && <span className="platform-badge">블로그</span>}
-                    {item.sns && <span className="platform-badge">IG/FB</span>}
-                    {item.x && <span className="platform-badge">X</span>}
-                    {item.threads && <span className="platform-badge">Threads</span>}
-                    {item.cardnews && <span className="platform-badge cardnews">카드뉴스</span>}
-                  </div>
-
                   {item.type === 'content' ? (
                     <>
                       <div className="history-item-info">
@@ -363,6 +344,7 @@ function ContentHistory() {
                         {item.sns && <span className="platform-badge">IG/FB</span>}
                         {item.x && <span className="platform-badge">X</span>}
                         {item.threads && <span className="platform-badge">Threads</span>}
+                        {item.cardnews && <span className="platform-badge cardnews">카드뉴스</span>}
                       </div>
                     </>
                   ) : (
@@ -401,79 +383,6 @@ function ContentHistory() {
                       </div>
                     </div>
 
-                  {/* 플랫폼 탭 */}
-                  <div className="history-detail-tabs">
-                    {['blog', 'sns', 'x', 'threads'].map(platform => (
-                      selectedHistoryItem[platform] && (
-                        <button
-                          key={platform}
-                          className={`history-tab ${historyDetailTab === platform ? 'active' : ''}`}
-                          onClick={() => setHistoryDetailTab(platform)}
-                        >
-                          {platform === 'blog' ? '블로그' : platform === 'sns' ? 'IG/FB' : platform === 'threads' ? 'Threads' : 'X'}
-                        </button>
-                      )
-                    ))}
-                    {selectedHistoryItem.cardnews && (
-                      <button
-                        className={`history-tab ${historyDetailTab === 'cardnews' ? 'active' : ''}`}
-                        onClick={() => setHistoryDetailTab('cardnews')}
-                      >
-                        카드뉴스 ({selectedHistoryItem.cardnews.page_count}장)
-                      </button>
-                    )}
-                    {selectedHistoryItem.images?.length > 0 && (
-                      <button
-                        className={`history-tab ${historyDetailTab === 'images' ? 'active' : ''}`}
-                        onClick={() => setHistoryDetailTab('images')}
-                      >
-                        이미지 ({selectedHistoryItem.images.length})
-                      </button>
-                    )}
-                  </div>
-
-                  {/* 탭 콘텐츠 */}
-                  <div className="history-detail-content">
-                    {historyDetailTab === 'blog' && (
-                      <PlatformContent platform="blog" data={selectedHistoryItem.blog} onCopy={() => handleCopyBlog(selectedHistoryItem)} />
-                    )}
-                    {historyDetailTab === 'sns' && (
-                      <PlatformContent platform="sns" data={selectedHistoryItem.sns} onCopy={() => handleCopySNS(selectedHistoryItem)} />
-                    )}
-                    {historyDetailTab === 'x' && (
-                      <PlatformContent platform="x" data={selectedHistoryItem.x} onCopy={() => handleCopyX(selectedHistoryItem)} />
-                    )}
-                    {historyDetailTab === 'threads' && (
-                      <PlatformContent platform="threads" data={selectedHistoryItem.threads} onCopy={() => handleCopyThreads(selectedHistoryItem)} />
-                    )}
-                    {historyDetailTab === 'cardnews' && selectedHistoryItem.cardnews && (
-                      <div className="result-card result-card-full">
-                        <div className="result-card-header">
-                          <h3>카드뉴스 - {selectedHistoryItem.cardnews.title}</h3>
-                        </div>
-                        <div className="result-card-content">
-                          <div className="cardnews-info">
-                            <span className="info-badge">{selectedHistoryItem.cardnews.purpose === 'promotion' ? '홍보' : selectedHistoryItem.cardnews.purpose === 'menu' ? '메뉴' : selectedHistoryItem.cardnews.purpose === 'info' ? '정보' : selectedHistoryItem.cardnews.purpose === 'event' ? '이벤트' : selectedHistoryItem.cardnews.purpose}</span>
-                            <span className="info-badge">{selectedHistoryItem.cardnews.page_count}페이지</span>
-                          </div>
-                          <div className="images-grid cardnews-grid">
-                            {selectedHistoryItem.cardnews.card_image_urls?.map((url, idx) => (
-                              <div key={idx} className="image-item" onClick={() => setPopupImage(url)}>
-                                <img src={url} alt={`카드뉴스 ${idx + 1}페이지`} />
-                                <div className="image-label">페이지 {idx + 1}</div>
-                                <button
-                                  className="btn-download-single"
-                                  onClick={(e) => { e.stopPropagation(); handleDownloadImage(url, idx); }}
-                                >
-                                  다운로드
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {historyDetailTab === 'images' && selectedHistoryItem.images?.length > 0 && (
                     {/* 비디오 플레이어 */}
                     <div className="history-detail-content">
                       <div className="result-card result-card-full">
@@ -538,6 +447,14 @@ function ContentHistory() {
                           </button>
                         )
                       ))}
+                      {selectedHistoryItem.cardnews && (
+                        <button
+                          className={`history-tab ${historyDetailTab === 'cardnews' ? 'active' : ''}`}
+                          onClick={() => setHistoryDetailTab('cardnews')}
+                        >
+                          카드뉴스 ({selectedHistoryItem.cardnews.page_count}장)
+                        </button>
+                      )}
                       {selectedHistoryItem.images?.length > 0 && (
                         <button
                           className={`history-tab ${historyDetailTab === 'images' ? 'active' : ''}`}
@@ -561,6 +478,33 @@ function ContentHistory() {
                       )}
                       {historyDetailTab === 'threads' && (
                         <PlatformContent platform="threads" data={selectedHistoryItem.threads} onCopy={() => handleCopyThreads(selectedHistoryItem)} />
+                      )}
+                      {historyDetailTab === 'cardnews' && selectedHistoryItem.cardnews && (
+                        <div className="result-card result-card-full">
+                          <div className="result-card-header">
+                            <h3>카드뉴스 - {selectedHistoryItem.cardnews.title}</h3>
+                          </div>
+                          <div className="result-card-content">
+                            <div className="cardnews-info">
+                              <span className="info-badge">{selectedHistoryItem.cardnews.purpose === 'promotion' ? '홍보' : selectedHistoryItem.cardnews.purpose === 'menu' ? '메뉴' : selectedHistoryItem.cardnews.purpose === 'info' ? '정보' : selectedHistoryItem.cardnews.purpose === 'event' ? '이벤트' : selectedHistoryItem.cardnews.purpose}</span>
+                              <span className="info-badge">{selectedHistoryItem.cardnews.page_count}페이지</span>
+                            </div>
+                            <div className="images-grid cardnews-grid">
+                              {selectedHistoryItem.cardnews.card_image_urls?.map((url, idx) => (
+                                <div key={idx} className="image-item" onClick={() => setPopupImage(url)}>
+                                  <img src={url} alt={`카드뉴스 ${idx + 1}페이지`} />
+                                  <div className="image-label">페이지 {idx + 1}</div>
+                                  <button
+                                    className="btn-download-single"
+                                    onClick={(e) => { e.stopPropagation(); handleDownloadImage(url, idx); }}
+                                  >
+                                    다운로드
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       )}
                       {historyDetailTab === 'images' && selectedHistoryItem.images?.length > 0 && (
                         <div className="result-card result-card-full">
