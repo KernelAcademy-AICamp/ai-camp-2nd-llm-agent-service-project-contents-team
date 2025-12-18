@@ -1,9 +1,4 @@
 /* TikTok 페이지 스타일 */
-.tiktok-page {
-  padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
 
 /* TikTok 연동 버튼 */
 .btn-connect-tiktok {
@@ -232,10 +227,6 @@
 
 /* 반응형 */
 @media (max-width: 768px) {
-  .tiktok-page {
-    padding: 16px;
-  }
-
   .video-grid {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 12px;

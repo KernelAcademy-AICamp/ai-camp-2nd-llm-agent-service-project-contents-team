@@ -69,6 +69,17 @@ function ContentEditor() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
 
+  // 카드뉴스 발행 모달
+  const [showCardnewsPublishModal, setShowCardnewsPublishModal] = useState(false);
+  const [cardnewsCaption, setCardnewsCaption] = useState('');
+  const [selectedPublishPlatform, setSelectedPublishPlatform] = useState('instagram');
+  const [isPublishingCardnews, setIsPublishingCardnews] = useState(false);
+  const [cardnewsPublishResult, setCardnewsPublishResult] = useState(null);
+
+  // 카드뉴스 저장 상태
+  const [cardnewsContentId, setCardnewsContentId] = useState(null);
+  const [isCardnewsSaved, setIsCardnewsSaved] = useState(false);
+
   // 초기 데이터 설정
   useEffect(() => {
     if (result?.text) {
@@ -126,6 +137,40 @@ function ContentEditor() {
       navigate('/content/create');
     }
   }, [result, navigate]);
+
+  // 카드뉴스 편집 시 자동으로 콘텐츠 관리에 등록
+  useEffect(() => {
+    const saveCardnewsToContentManagement = async () => {
+      // 텍스트 콘텐츠가 없고 이미지만 있는 경우 = 카드뉴스
+      const isCardnewsOnly = !editedContent || Object.keys(editedContent).length === 0;
+      const hasImages = result?.images?.length > 0;
+
+      if (isCardnewsOnly && hasImages && !isCardnewsSaved && !cardnewsContentId) {
+        try {
+          // 이미지 URL 추출
+          const imageUrls = result.images.map(img => img.url || img.image_url);
+
+          // 카드뉴스를 PublishedContent에 draft로 저장
+          const savedContent = await publishedContentAPI.saveDraft({
+            session_id: sessionId || null,
+            platform: 'cardnews',
+            title: topic || '카드뉴스',
+            content: `카드뉴스 ${result.images.length}장`,
+            tags: ['카드뉴스'],
+            card_image_urls: imageUrls,
+          });
+
+          setCardnewsContentId(savedContent.id);
+          setIsCardnewsSaved(true);
+          console.log('카드뉴스가 콘텐츠 관리에 등록되었습니다:', savedContent.id);
+        } catch (error) {
+          console.error('카드뉴스 저장 실패:', error);
+        }
+      }
+    };
+
+    saveCardnewsToContentManagement();
+  }, [result, editedContent, sessionId, topic, isCardnewsSaved, cardnewsContentId]);
 
   // 변경 감지
   useEffect(() => {
@@ -436,6 +481,66 @@ function ContentEditor() {
     return null;
   };
 
+  // 카드뉴스 발행 모달 열기
+  const openCardnewsPublishModal = () => {
+    setCardnewsCaption(`${topic || '카드뉴스'}\n\n#카드뉴스 #콘텐츠`);
+    setShowCardnewsPublishModal(true);
+    setCardnewsPublishResult(null);
+  };
+
+  // 카드뉴스 발행 핸들러
+  const handlePublishCardnews = async () => {
+    if (!result.images || result.images.length === 0) {
+      alert('발행할 이미지가 없습니다.');
+      return;
+    }
+
+    setIsPublishingCardnews(true);
+    setCardnewsPublishResult(null);
+
+    try {
+      // 이미지 URL 배열 추출
+      const imageUrls = result.images.map(img => img.url || img.image_url);
+
+      // SNS 발행 API 호출
+      const response = await publishedContentAPI.publishCardnews({
+        platform: selectedPublishPlatform,
+        image_urls: imageUrls,
+        caption: cardnewsCaption,
+      });
+
+      const platformName = selectedPublishPlatform === 'instagram' ? 'Instagram' :
+                          selectedPublishPlatform === 'facebook' ? 'Facebook' : 'Threads';
+
+      // 콘텐츠 관리에 저장된 카드뉴스가 있으면 상태를 published로 업데이트
+      if (cardnewsContentId) {
+        try {
+          await publishedContentAPI.update(cardnewsContentId, {
+            content: cardnewsCaption || `카드뉴스 ${result.images.length}장`,
+          });
+          // 발행 상태는 별도 API로 업데이트해야 하므로, 여기서는 캡션만 업데이트
+        } catch (updateError) {
+          console.error('카드뉴스 콘텐츠 업데이트 실패:', updateError);
+        }
+      }
+
+      // 발행 성공 - 알림 표시 후 팝업 닫기
+      alert(`${platformName}에 카드뉴스가 발행되었습니다!`);
+      setShowCardnewsPublishModal(false);
+      setCardnewsCaption('');
+      setSelectedPublishPlatform('instagram');
+
+    } catch (error) {
+      console.error('카드뉴스 발행 실패:', error);
+      setCardnewsPublishResult({
+        success: false,
+        message: error.response?.data?.detail || error.message || '발행에 실패했습니다.',
+      });
+    } finally {
+      setIsPublishingCardnews(false);
+    }
+  };
+
   if (!result) return null;
 
   const currentData = editedContent[activePlatform];
@@ -724,6 +829,26 @@ function ContentEditor() {
               )}
             </>
           )}
+
+          {/* 카드뉴스 이미지만 있는 경우 (텍스트 콘텐츠 없이) */}
+          {!currentData && result?.images?.length > 0 && (
+            <div className="editor-cardnews-only">
+              <div className="cardnews-header">
+                <h3>카드뉴스 이미지 ({result.images.length}장)</h3>
+                <button className="btn-publish-cardnews" onClick={openCardnewsPublishModal}>
+                  <FiSend /> SNS 발행하기
+                </button>
+              </div>
+              <div className="editor-images-grid-h cardnews-grid">
+                {result.images.map((img, idx) => (
+                  <div key={idx} className="editor-image-item-h cardnews-item">
+                    <img src={img.url || img.image_url} alt={`카드뉴스 ${idx + 1}페이지`} />
+                    <span className="cardnews-page-label">{idx + 1}페이지</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -784,6 +909,96 @@ function ContentEditor() {
               >
                 {isScheduling ? '예약 중...' : '예약하기'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 카드뉴스 발행 모달 */}
+      {showCardnewsPublishModal && (
+        <div className="schedule-modal-overlay" onClick={() => setShowCardnewsPublishModal(false)}>
+          <div className="schedule-modal cardnews-publish-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="schedule-modal-header">
+              <h3>카드뉴스 SNS 발행</h3>
+              <button className="btn-close" onClick={() => setShowCardnewsPublishModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="schedule-modal-body">
+              {/* 플랫폼 선택 */}
+              <div className="publish-platform-selector">
+                <label>발행 플랫폼</label>
+                <div className="platform-options">
+                  <button
+                    className={`platform-option ${selectedPublishPlatform === 'instagram' ? 'active' : ''}`}
+                    onClick={() => setSelectedPublishPlatform('instagram')}
+                  >
+                    <span className="platform-icon">📷</span>
+                    <span>Instagram</span>
+                  </button>
+                  <button
+                    className={`platform-option ${selectedPublishPlatform === 'facebook' ? 'active' : ''}`}
+                    onClick={() => setSelectedPublishPlatform('facebook')}
+                  >
+                    <span className="platform-icon">📘</span>
+                    <span>Facebook</span>
+                  </button>
+                  <button
+                    className={`platform-option ${selectedPublishPlatform === 'threads' ? 'active' : ''}`}
+                    onClick={() => setSelectedPublishPlatform('threads')}
+                  >
+                    <span className="platform-icon">🧵</span>
+                    <span>Threads</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 캡션 입력 */}
+              <div className="publish-caption-section">
+                <label>캡션 / 설명</label>
+                <textarea
+                  className="publish-caption-input"
+                  value={cardnewsCaption}
+                  onChange={(e) => setCardnewsCaption(e.target.value)}
+                  placeholder="카드뉴스와 함께 게시할 텍스트를 입력하세요..."
+                  rows={5}
+                />
+              </div>
+
+              {/* 이미지 미리보기 */}
+              <div className="publish-images-preview">
+                <label>발행할 이미지 ({result?.images?.length || 0}장)</label>
+                <div className="publish-images-scroll">
+                  {result?.images?.map((img, idx) => (
+                    <div key={idx} className="publish-image-thumb">
+                      <img src={img.url || img.image_url} alt={`${idx + 1}페이지`} />
+                      <span>{idx + 1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 발행 결과 메시지 */}
+              {cardnewsPublishResult && (
+                <div className={`publish-result-message ${cardnewsPublishResult.success ? 'success' : 'error'}`}>
+                  {cardnewsPublishResult.success ? <FiCheck /> : null}
+                  {cardnewsPublishResult.message}
+                </div>
+              )}
+            </div>
+            <div className="schedule-modal-footer">
+              <button className="btn-cancel" onClick={() => setShowCardnewsPublishModal(false)}>
+                {cardnewsPublishResult?.success ? '닫기' : '취소'}
+              </button>
+              {!cardnewsPublishResult?.success && (
+                <button
+                  className="btn-confirm"
+                  onClick={handlePublishCardnews}
+                  disabled={isPublishingCardnews || !cardnewsCaption.trim()}
+                >
+                  {isPublishingCardnews ? '발행 중...' : '발행하기'}
+                </button>
+              )}
             </div>
           </div>
         </div>

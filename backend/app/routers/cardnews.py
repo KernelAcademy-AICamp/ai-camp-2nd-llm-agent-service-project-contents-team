@@ -413,6 +413,17 @@ CARD_HEIGHT = 1080
 RENDER_WIDTH = CARD_WIDTH * RENDER_SCALE  # 2160px
 RENDER_HEIGHT = CARD_HEIGHT * RENDER_SCALE  # 2160px
 
+# 비율별 카드 크기
+ASPECT_RATIO_SIZES = {
+    "1:1": (1080, 1080),       # 정방형 (인스타그램)
+    "4:5": (1080, 1350),       # 세로형 (인스타그램 피드)
+    "1.91:1": (1200, 628),     # 가로형 (페이스북, 트위터)
+}
+
+def get_card_size(aspect_ratio: str) -> tuple:
+    """비율에 따른 카드 크기 반환"""
+    return ASPECT_RATIO_SIZES.get(aspect_ratio, ASPECT_RATIO_SIZES["1:1"])
+
 # 색상 테마 (확장됨)
 COLOR_THEMES = {
     "warm": {
@@ -1201,9 +1212,12 @@ class CardNewsBuilder:
 
         # 이미지 비율에 따른 크기 설정
         self.aspect_ratio = aspect_ratio
-        if aspect_ratio == "3:4":
+        if aspect_ratio == "4:5":
             self.card_width = 1080
-            self.card_height = 1440  # 3:4 비율
+            self.card_height = 1350  # 4:5 비율 (인스타그램 세로 피드)
+        elif aspect_ratio == "1.91:1":
+            self.card_width = 1200
+            self.card_height = 628  # 1.91:1 비율 (페이스북, 트위터)
         else:  # 기본 1:1
             self.card_width = CARD_WIDTH
             self.card_height = CARD_HEIGHT
@@ -1596,7 +1610,8 @@ class CardNewsBuilder:
         page_num: int = 1,
         layout: str = "center",
         text_color: str = None,  # "white" 또는 "black" (None이면 이미지 밝기로 자동 결정)
-        show_logo: bool = True  # 첫 페이지는 기본적으로 로고 표시
+        show_logo: bool = True,  # 첫 페이지는 기본적으로 로고 표시
+        content_lines: list = None  # 선택적 내용 (커버 페이지에 내용이 있는 경우)
     ) -> str:
         """
         첫 페이지 전용 렌더링 (제목 + 소제목 + AI 배경 + 반투명 카드)
@@ -1604,6 +1619,7 @@ class CardNewsBuilder:
         이미지 밝기에 따라 오버레이/텍스트 색상 자동 결정
         2x 고해상도 렌더링 후 다운스케일
         - 로고는 선택적으로 표시 (첫 페이지는 기본: 표시)
+        - content_lines가 있으면 소제목 아래에 내용 표시
         """
         # 배경 준비 (2x 해상도) + 이미지 밝기 분석 (템플릿 설정 적용)
         card, color_info = self.prepare_background(
@@ -1636,6 +1652,9 @@ class CardNewsBuilder:
             card_bg_color = (0, 0, 0)
             card_opacity = 0.35
 
+        # 내용이 있는지 확인 (빈 배열이 아닌 경우)
+        has_content = content_lines and len(content_lines) > 0 and any(line.strip() for line in content_lines)
+
         # 동적 폰트 사이즈 계산 (텍스트 길이에 따라 자동 조절)
         font_sizes = self._calculate_dynamic_font_sizes(
             title=title,
@@ -1645,10 +1664,13 @@ class CardNewsBuilder:
         # 디자인 템플릿의 사이즈 비율 적용
         title_size = int(font_sizes['title_size'] * self.title_size_ratio)
         subtitle_size = int(font_sizes['subtitle_size'] * self.content_size_ratio)
+        # 내용 폰트 사이즈 (소제목보다 약간 작게)
+        content_size = int(subtitle_size * 0.85) if has_content else 0
 
         # 폰트 설정 (2x 스케일 적용) - 동적 사이즈 + 템플릿 weight 사용
         title_font = FontManager.get_font(self.font_style, title_size * self.scale, weight=self.title_weight)
         subtitle_font = FontManager.get_font(self.font_style, subtitle_size * self.scale, weight=self.content_weight)
+        content_font = FontManager.get_font(self.font_style, content_size * self.scale, weight=self.content_weight) if has_content else None
 
         # 2x 스케일 기준 치수 (템플릿 패딩 비율 적용)
         margin_x = int(80 * self.scale * self.padding_ratio)
@@ -1668,12 +1690,26 @@ class CardNewsBuilder:
         # 라인 높이도 폰트 사이즈에 비례하여 조절 (템플릿 line_height_ratio 적용)
         title_line_height = int((title_size + 18) * self.scale * self.line_height_ratio)
         subtitle_line_height = int((subtitle_size + 14) * self.scale * self.line_height_ratio)
+        content_line_height = int((content_size + 10) * self.scale * self.line_height_ratio) if has_content else 0
         title_height = len(title_lines) * title_line_height
         subtitle_height = len(subtitle_lines) * subtitle_line_height
         gap = int(25 * self.scale * self.padding_ratio)  # 제목-부제목 간격
 
+        # 내용 높이 계산 (있는 경우)
+        content_height = 0
+        wrapped_content_lines = []
+        if has_content:
+            for line in content_lines:
+                if line.strip():
+                    wrapped = TextRenderer.wrap_text(line, content_font, max_width, draw)
+                    wrapped_content_lines.extend(wrapped)
+            content_height = len(wrapped_content_lines) * content_line_height
+            content_gap = int(20 * self.scale * self.padding_ratio)  # 소제목-내용 간격
+        else:
+            content_gap = 0
+
         # 전체 콘텐츠 높이
-        total_content_height = title_height + gap + subtitle_height
+        total_content_height = title_height + gap + subtitle_height + (content_gap + content_height if has_content else 0)
 
         # 카드 높이 계산 (사용 가능한 전체 높이 사용)
         card_height = total_content_height + card_padding * 2
@@ -1742,6 +1778,25 @@ class CardNewsBuilder:
             shadow_color=subtitle_shadow_color,
             line_spacing=12 * self.scale
         )
+
+        # 내용 렌더링 (소제목 아래, 있는 경우에만)
+        if has_content and wrapped_content_lines:
+            content_y = subtitle_y + subtitle_height + content_gap
+            content_shadow_color = subtitle_shadow_color  # 소제목과 동일한 그림자
+
+            # 내용을 줄바꿈된 텍스트로 합쳐서 렌더링
+            content_text = '\n'.join(wrapped_content_lines)
+            TextRenderer.draw_text_with_shadow(
+                card, content_text, (margin_x + card_padding, content_y),
+                content_font, color=actual_text_color,
+                max_width=max_width,
+                align="center", shadow=True,
+                use_gaussian_shadow=True,
+                blur_radius=4 * self.scale,
+                shadow_offset=(2 * self.scale, 2 * self.scale),
+                shadow_color=content_shadow_color,
+                line_spacing=10 * self.scale
+            )
 
         # 페이지 번호
         self._add_page_number(card, page_num)
@@ -2634,6 +2689,535 @@ async def get_template_categories():
     }
 
 
+# ==================== 카드뉴스 텍스트 미리보기 API ====================
+
+@router.post("/preview-cardnews-content")
+async def preview_cardnews_content(
+    prompt: str = Form(...),
+    purpose: str = Form(default="info"),
+    userContext: str = Form(default=None),
+    generateImages: bool = Form(default=True),  # 이미지도 함께 생성할지 여부
+    fontStyle: str = Form(default="pretendard"),
+    colorTheme: str = Form(default="warm"),
+    designTemplate: str = Form(default="none"),
+    aspectRatio: str = Form(default="1:1"),
+    _current_user: User = Depends(get_current_user)  # 인증 확인용
+):
+    """
+    카드뉴스 텍스트 콘텐츠와 미리보기 이미지를 생성하여 반환합니다.
+    사용자가 내용을 확인하고 수정할 수 있습니다.
+
+    Returns:
+        pages: 각 페이지의 제목, 소제목, 내용
+        analysis: AI 분석 결과
+        design_settings: 디자인 설정 (폰트, 스타일 등)
+        preview_images: 미리보기 이미지 (generateImages=True인 경우)
+    """
+    try:
+        # 사용자 컨텍스트 파싱
+        user_context_data = None
+        if userContext:
+            try:
+                user_context_data = json.loads(userContext)
+                cardnews_logger.info(f"📋 사용자 컨텍스트 로드: {user_context_data.get('brand_name', 'N/A')}")
+            except json.JSONDecodeError:
+                cardnews_logger.warning("⚠️ 사용자 컨텍스트 파싱 실패")
+
+        log_msg = f"\n{'='*80}\n📝 카드뉴스 텍스트 미리보기 생성 시작\n📝 프롬프트: {prompt}\n🎯 목적: {purpose}\n{'='*80}\n"
+        print(log_msg)
+        cardnews_logger.info(log_msg)
+
+        # AI Agentic 워크플로우 실행 (텍스트 콘텐츠만 생성)
+        workflow = AgenticCardNewsWorkflow()
+        result = await workflow.execute(prompt, purpose, user_context=user_context_data)
+
+        if not result.get('success'):
+            error_msg = f"AI 워크플로우 실패: {result.get('error', '알 수 없는 오류')}"
+            cardnews_logger.error(error_msg)
+            raise HTTPException(
+                status_code=500,
+                detail=error_msg
+            )
+
+        analysis = result['analysis']
+        pages = result['pages']
+        quality_report = result['quality_report']
+        design_settings = result.get('design_settings', {})
+
+        # AI가 선택한 폰트 사용
+        font_pair = design_settings.get('font_pair', 'pretendard') or fontStyle
+        selected_style = design_settings.get('style', 'modern')
+
+        cardnews_logger.info(f"✅ 텍스트 미리보기 생성 완료: {len(pages)}페이지")
+
+        # 이미지 미리보기 생성 (generateImages=True인 경우)
+        preview_images = []
+        if generateImages:
+            cardnews_logger.info(f"🖼️ 미리보기 이미지 생성 시작...")
+
+            # 사용자 선택 테마 로드
+            user_selected_theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
+
+            # 배경 이미지 및 색상 생성
+            background_images = []
+            dominant_color = None
+            adjusted_color = None
+            text_color = "white"
+
+            google_api_key = os.getenv('GOOGLE_API_KEY')
+            if google_api_key and len(pages) > 0:
+                try:
+                    cardnews_logger.info("📸 첫 페이지 AI 이미지 생성 중...")
+                    first_page = pages[0]
+                    thumbnail_url = await generate_background_image_with_gemini(
+                        first_page.get('visual_concept', prompt),
+                        aspect_ratio=aspectRatio
+                    )
+                    background_images.append(thumbnail_url)
+                    cardnews_logger.info("✅ 첫 페이지 AI 이미지 생성 완료")
+
+                    # 썸네일에서 주요 색상 추출
+                    dominant_color = extract_dominant_color_from_image(thumbnail_url)
+                    adjusted_color = adjust_color_for_harmony(dominant_color, selected_style)
+                    text_color = get_text_color_for_background(adjusted_color)
+
+                    # 나머지 페이지는 단색 배경
+                    for i in range(1, len(pages)):
+                        bg_base64 = create_solid_color_background(adjusted_color, aspect_ratio=aspectRatio)
+                        background_images.append(bg_base64)
+
+                except Exception as e:
+                    cardnews_logger.warning(f"⚠️ 이미지 생성/색상 추출 실패: {e}")
+                    for _ in pages:
+                        background_images.append(create_fallback_background(colorTheme, aspect_ratio=aspectRatio))
+                    dominant_color = user_selected_theme["primary"]
+            else:
+                for _ in pages:
+                    background_images.append(create_fallback_background(colorTheme, aspect_ratio=aspectRatio))
+                dominant_color = user_selected_theme["primary"]
+
+            # 최종 배경색 결정
+            if dominant_color and adjusted_color:
+                final_bg_color = adjusted_color
+            else:
+                final_bg_color = user_selected_theme["primary"]
+
+            text_color = get_text_color_for_background(final_bg_color)
+
+            # 동적 테마 생성
+            dynamic_theme = {
+                "primary": final_bg_color,
+                "secondary": tuple(min(255, c + 30) for c in final_bg_color),
+                "accent": tuple(max(0, c - 20) for c in final_bg_color),
+                "text": text_color,
+                "shadow": user_selected_theme.get("shadow", (0, 0, 0, 120)),
+                "gradient_type": user_selected_theme.get("gradient_type", "vertical")
+            }
+
+            # 디자인 템플릿 로드
+            import random
+            use_simple_mode = (designTemplate == 'none')
+
+            if use_simple_mode:
+                selected_template_id = 'minimal_white'
+            elif designTemplate == 'auto' or designTemplate not in IMPROVED_TEMPLATES:
+                template_ids = list(IMPROVED_TEMPLATES.keys())
+                selected_template_id = random.choice(template_ids)
+            else:
+                selected_template_id = designTemplate
+
+            # 카드뉴스 빌더 생성
+            builder = CardNewsBuilder(
+                dynamic_theme, font_pair, purpose,
+                font_weight="regular",
+                design_template=selected_template_id,
+                aspect_ratio=aspectRatio
+            )
+
+            # 각 페이지 이미지 생성
+            for i, (page, bg_image_data) in enumerate(zip(pages, background_images)):
+                try:
+                    if i == 0:  # 첫 페이지
+                        if bg_image_data.startswith('data:image'):
+                            image_data = bg_image_data.split(',')[1]
+                            bg_image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+                        else:
+                            response = requests.get(bg_image_data, timeout=30)
+                            bg_image = Image.open(io.BytesIO(response.content))
+
+                        card_base64 = builder.build_first_page(
+                            background_image=bg_image,
+                            title=page['title'],
+                            subtitle=page.get('subtitle', ''),
+                            page_num=i + 1,
+                            layout=page.get('layout', 'center'),
+                            text_color=None,
+                            content_lines=page.get('content', None)
+                        )
+                    else:  # 나머지 페이지
+                        page_text_color = get_text_color_for_background(final_bg_color)
+                        card_base64 = builder.build_content_page(
+                            bg_color=final_bg_color,
+                            title=page['title'],
+                            content_lines=page.get('content', ["• 내용이 없습니다"]),
+                            page_num=i + 1,
+                            text_color=page_text_color
+                        )
+                    preview_images.append(card_base64)
+                except Exception as img_err:
+                    cardnews_logger.warning(f"⚠️ 페이지 {i+1} 이미지 생성 실패: {img_err}")
+                    preview_images.append(None)
+
+            cardnews_logger.info(f"✅ 미리보기 이미지 생성 완료: {len(preview_images)}장")
+
+        return {
+            "success": True,
+            "pages": [
+                {
+                    "page": p['page'],
+                    "title": p['title'],
+                    "subtitle": p.get('subtitle', ''),
+                    "content": p.get('content', []),
+                    "visual_concept": p.get('visual_concept', ''),
+                    "layout": p.get('layout', 'center')
+                }
+                for p in pages
+            ],
+            "preview_images": preview_images if generateImages else [],
+            "background_images": background_images if generateImages else [],  # 배경 이미지 (텍스트 없는 원본)
+            "analysis": {
+                "page_count": analysis.get('page_count'),
+                "target_audience": analysis.get('target_audience'),
+                "tone": analysis.get('tone'),
+                "style": analysis.get('style'),
+                "key_message": analysis.get('key_message', '')
+            },
+            "design_settings": {
+                "font_pair": font_pair,
+                "style": selected_style,
+                "font_korean": FONT_PAIRS.get(font_pair, {}).get('korean', 'Pretendard'),
+                "font_english": FONT_PAIRS.get(font_pair, {}).get('english', 'Inter'),
+                "color_theme": colorTheme,
+                "design_template": designTemplate if not generateImages else selected_template_id,
+                "aspect_ratio": aspectRatio,
+                "bg_color": list(final_bg_color) if generateImages and 'final_bg_color' in dir() else None,
+                "text_color": text_color if generateImages else None
+            },
+            "quality_score": quality_report.get('overall_score') if quality_report else None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"텍스트 미리보기 생성 실패: {str(e)}"
+        cardnews_logger.error(error_msg)
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=error_msg
+        )
+
+
+# ==================== 확정된 텍스트로 카드뉴스 이미지 생성 API ====================
+
+@router.post("/generate-cardnews-from-content")
+async def generate_cardnews_from_content(
+    pages: str = Form(...),  # JSON 문자열로 전달된 페이지 데이터
+    prompt: str = Form(...),  # 원본 프롬프트 (이미지 생성용)
+    purpose: str = Form(default="info"),
+    fontStyle: str = Form(default="pretendard"),
+    colorTheme: str = Form(default="warm"),
+    designTemplate: str = Form(default="default"),
+    aspectRatio: str = Form(default="1:1"),
+    previewImages: str = Form(default=None),  # 미리보기에서 생성된 이미지 (JSON 배열)
+    saveToDb: bool = Form(default=True),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    사용자가 확정한 텍스트 콘텐츠를 기반으로 카드뉴스 이미지를 생성합니다.
+
+    Args:
+        pages: 사용자가 수정한 페이지 데이터 (JSON 문자열)
+        prompt: 원본 프롬프트 (첫 페이지 이미지 생성용)
+        purpose: 목적 (promotion/menu/info/event)
+        fontStyle: 폰트 스타일
+        colorTheme: 색상 테마
+        designTemplate: 디자인 템플릿 ID
+        aspectRatio: 이미지 비율 (1:1, 4:5, 1.91:1)
+        previewImages: 미리보기에서 생성된 이미지 (JSON 배열, base64)
+        saveToDb: DB 저장 여부
+    """
+    try:
+        # 페이지 데이터 파싱
+        try:
+            pages_data = json.loads(pages)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="페이지 데이터 파싱 실패")
+
+        if not pages_data or len(pages_data) == 0:
+            raise HTTPException(status_code=400, detail="페이지 데이터가 비어있습니다")
+
+        # 미리보기 이미지 파싱 (있는 경우)
+        preview_images_data = None
+        if previewImages:
+            try:
+                preview_images_data = json.loads(previewImages)
+                cardnews_logger.info(f"📸 미리보기 이미지 {len(preview_images_data)}장 재사용")
+            except json.JSONDecodeError:
+                cardnews_logger.warning("⚠️ 미리보기 이미지 파싱 실패, 새로 생성합니다")
+
+        log_msg = f"\n{'='*80}\n🖼️ 확정된 콘텐츠로 카드뉴스 이미지 생성 시작\n📄 페이지 수: {len(pages_data)}\n{'='*80}\n"
+        print(log_msg)
+        cardnews_logger.info(log_msg)
+
+        # 사용자가 선택한 테마 로드
+        user_selected_theme = COLOR_THEMES.get(colorTheme, COLOR_THEMES["warm"])
+
+        # 배경 이미지 생성
+        background_images = []
+        dominant_color = None
+        adjusted_color = None
+        text_color = "white"
+        selected_style = "modern"
+
+        # 미리보기 이미지가 있으면 재사용
+        if preview_images_data and len(preview_images_data) >= len(pages_data):
+            cardnews_logger.info("✅ 미리보기 이미지를 재사용합니다")
+            background_images = preview_images_data[:len(pages_data)]
+
+            # 첫 번째 이미지에서 색상 추출
+            if background_images[0]:
+                try:
+                    dominant_color = extract_dominant_color_from_image(background_images[0])
+                    adjusted_color = adjust_color_for_harmony(dominant_color, selected_style)
+                    text_color = get_text_color_for_background(adjusted_color)
+                except Exception as e:
+                    cardnews_logger.warning(f"⚠️ 미리보기 이미지에서 색상 추출 실패: {e}")
+                    dominant_color = user_selected_theme["primary"]
+        else:
+            # 미리보기 이미지가 없으면 새로 생성
+            google_api_key = os.getenv('GOOGLE_API_KEY')
+            if google_api_key and len(pages_data) > 0:
+                # 첫 페이지 AI 이미지 생성
+                try:
+                    cardnews_logger.info("📸 페이지 1 AI 이미지 생성 중...")
+                    first_page = pages_data[0]
+                    thumbnail_url = await generate_background_image_with_gemini(
+                        first_page.get('visual_concept', prompt),
+                        aspect_ratio=aspectRatio
+                    )
+                    background_images.append(thumbnail_url)
+                    cardnews_logger.info("✅ 페이지 1 AI 이미지 생성 완료")
+
+                    # 썸네일에서 주요 색상 추출
+                    dominant_color = extract_dominant_color_from_image(thumbnail_url)
+                    adjusted_color = adjust_color_for_harmony(dominant_color, selected_style)
+                    text_color = get_text_color_for_background(adjusted_color)
+
+                    # 나머지 페이지는 단색 배경
+                    for i in range(1, len(pages_data)):
+                        bg_base64 = create_solid_color_background(adjusted_color, aspect_ratio=aspectRatio)
+                        background_images.append(bg_base64)
+
+                except Exception as e:
+                    cardnews_logger.warning(f"⚠️ 이미지 생성/색상 추출 실패: {e}")
+                    for _ in pages_data:
+                        background_images.append(create_fallback_background(colorTheme, aspect_ratio=aspectRatio))
+                    dominant_color = user_selected_theme["primary"]
+            else:
+                for _ in pages_data:
+                    background_images.append(create_fallback_background(colorTheme, aspect_ratio=aspectRatio))
+                dominant_color = user_selected_theme["primary"]
+
+        # 최종 배경색 결정
+        if dominant_color and adjusted_color:
+            final_bg_color = adjusted_color
+        else:
+            final_bg_color = user_selected_theme["primary"]
+
+        text_color = get_text_color_for_background(final_bg_color)
+
+        # 동적 테마 생성
+        dynamic_theme = {
+            "primary": final_bg_color,
+            "secondary": tuple(min(255, c + 30) for c in final_bg_color),
+            "accent": tuple(max(0, c - 20) for c in final_bg_color),
+            "text": text_color,
+            "shadow": user_selected_theme.get("shadow", (0, 0, 0, 120)),
+            "gradient_type": user_selected_theme.get("gradient_type", "vertical")
+        }
+
+        # 디자인 템플릿 로드
+        import random
+        use_simple_mode = (designTemplate == 'none')
+
+        if use_simple_mode:
+            selected_template_id = 'minimal_white'
+            template_config = IMPROVED_TEMPLATES.get('minimal_white', list(IMPROVED_TEMPLATES.values())[0])
+            template_name = "심플 이미지"
+        elif designTemplate == 'auto' or designTemplate not in IMPROVED_TEMPLATES:
+            template_ids = list(IMPROVED_TEMPLATES.keys())
+            selected_template_id = random.choice(template_ids)
+            template_config = IMPROVED_TEMPLATES[selected_template_id]
+            template_name = template_config.get("name", "미니멀 화이트")
+        else:
+            template_config = IMPROVED_TEMPLATES[designTemplate]
+            selected_template_id = designTemplate
+            template_name = template_config.get("name", "미니멀 화이트")
+
+        # 카드뉴스 빌더 생성
+        builder = CardNewsBuilder(
+            dynamic_theme, fontStyle, purpose,
+            font_weight="regular",
+            design_template=selected_template_id,
+            aspect_ratio=aspectRatio
+        )
+
+        final_cards = []
+
+        for i, (page, bg_image_data) in enumerate(zip(pages_data, background_images)):
+            print(f"  🎨 카드 {i+1}/{len(pages_data)} 생성 중...")
+
+            if i == 0:  # 첫 페이지: AI 이미지 + 제목 + 소제목
+                if bg_image_data.startswith('data:image'):
+                    image_data = bg_image_data.split(',')[1]
+                    bg_image = Image.open(io.BytesIO(base64.b64decode(image_data)))
+                else:
+                    response = requests.get(bg_image_data, timeout=30)
+                    bg_image = Image.open(io.BytesIO(response.content))
+
+                card_base64 = builder.build_first_page(
+                    background_image=bg_image,
+                    title=page['title'],
+                    subtitle=page.get('subtitle', ''),
+                    page_num=i + 1,
+                    layout=page.get('layout', 'center'),
+                    text_color=None,
+                    content_lines=page.get('content', None)  # 커버 페이지 내용 (있는 경우)
+                )
+                final_cards.append(card_base64)
+
+            else:  # 나머지 페이지: 단색 배경
+                page_text_color = get_text_color_for_background(final_bg_color)
+
+                card_base64 = builder.build_content_page(
+                    bg_color=final_bg_color,
+                    title=page['title'],
+                    content_lines=page.get('content', ["• 내용이 없습니다"]),
+                    page_num=i + 1,
+                    text_color=page_text_color
+                )
+                final_cards.append(card_base64)
+
+            print(f"  ✅ 카드 {i+1} 완성")
+
+        # DB 저장 로직
+        session_id = None
+        card_image_urls = []
+
+        if saveToDb:
+            try:
+                cardnews_logger.info(f"💾 DB 저장 시작: user_id={current_user.id}")
+
+                session = ContentGenerationSession(
+                    user_id=current_user.id,
+                    topic=prompt,
+                    content_type="cardnews",
+                    style=selected_style,
+                    selected_platforms=["cardnews"],
+                    analysis_data={},
+                    status="generated"
+                )
+                db.add(session)
+                db.flush()
+                session_id = session.id
+
+                # Supabase Storage 업로드
+                supabase_url = os.getenv('SUPABASE_URL')
+                supabase_key = os.getenv('SUPABASE_KEY')
+
+                if supabase_url and supabase_key:
+                    supabase: Client = create_client(supabase_url, supabase_key)
+
+                    for idx, card_base64 in enumerate(final_cards):
+                        try:
+                            if card_base64.startswith('data:image'):
+                                image_data = card_base64.split(',')[1]
+                            else:
+                                image_data = card_base64
+
+                            image_bytes = base64.b64decode(image_data)
+                            file_name = f"cardnews/{current_user.id}/{session_id}/card_{idx+1}.png"
+
+                            supabase.storage.from_('contents').upload(
+                                file_name,
+                                image_bytes,
+                                {"content-type": "image/png"}
+                            )
+
+                            public_url = supabase.storage.from_('contents').get_public_url(file_name)
+                            card_image_urls.append(public_url)
+
+                        except Exception as upload_err:
+                            cardnews_logger.warning(f"이미지 업로드 실패: {upload_err}")
+                            card_image_urls.append(card_base64)
+
+                # GeneratedCardnewsContent 저장 (전체 카드뉴스를 하나의 레코드로)
+                first_page = pages_data[0] if pages_data else {}
+                cardnews_content = GeneratedCardnewsContent(
+                    session_id=session_id,
+                    user_id=current_user.id,
+                    title=first_page.get('title', '카드뉴스'),
+                    prompt=prompt,
+                    purpose=purpose,
+                    page_count=len(pages_data),
+                    card_image_urls=card_image_urls if card_image_urls else final_cards,
+                    pages_data=pages_data,
+                    design_settings={
+                        "bg_color": list(final_bg_color) if isinstance(final_bg_color, tuple) else final_bg_color,
+                        "text_color": text_color,
+                        "font_style": fontStyle,
+                        "template": selected_template_id,
+                        "aspect_ratio": aspectRatio
+                    }
+                )
+                db.add(cardnews_content)
+                db.commit()
+                cardnews_logger.info(f"✅ DB 저장 완료: session_id={session_id}, cardnews_id={cardnews_content.id}")
+
+            except Exception as db_err:
+                cardnews_logger.error(f"❌ DB 저장 실패: {db_err}")
+                db.rollback()
+
+        cardnews_logger.info(f"✅ 카드뉴스 이미지 생성 완료: {len(final_cards)}장")
+
+        return {
+            "success": True,
+            "cards": final_cards if not card_image_urls else card_image_urls,
+            "session_id": session_id,
+            "count": len(final_cards),
+            "design_settings": {
+                "bg_color": final_bg_color,
+                "text_color": text_color,
+                "template": template_name
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"카드뉴스 이미지 생성 실패: {str(e)}"
+        cardnews_logger.error(error_msg)
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=error_msg
+        )
+
+
 # ==================== AI Agentic 카드뉴스 생성 (Non-streaming) ====================
 
 @router.post("/generate-agentic-cardnews")
@@ -2643,7 +3227,7 @@ async def generate_agentic_cardnews(
     fontStyle: str = Form(default="pretendard"),  # AI가 자동 선택하므로 기본값만 유지
     colorTheme: str = Form(default="warm"),  # 사용자가 선택한 테마 사용 (기본: warm)
     designTemplate: str = Form(default="default"),  # 디자인 템플릿 ID
-    aspectRatio: str = Form(default="1:1"),  # 이미지 비율 (1:1 또는 3:4)
+    aspectRatio: str = Form(default="1:1"),  # 이미지 비율 (1:1, 4:5, 1.91:1)
     generateImages: bool = Form(default=True),
     layoutType: str = Form(default="bottom"),
     userContext: str = Form(default=None),  # 사용자 컨텍스트 (JSON 문자열)
@@ -2730,7 +3314,8 @@ async def generate_agentic_cardnews(
                     print(f"  📸 페이지 1 AI 이미지 생성 중...")
                     first_page = pages[0]
                     thumbnail_url = await generate_background_image_with_gemini(
-                        first_page.get('image_prompt', first_page.get('visual_concept', 'modern background'))
+                        first_page.get('image_prompt', first_page.get('visual_concept', 'modern background')),
+                        aspect_ratio=aspectRatio
                     )
                     background_images.append(thumbnail_url)
                     cardnews_logger.info("✅ 페이지 1 AI 이미지 생성 완료")
@@ -2756,7 +3341,7 @@ async def generate_agentic_cardnews(
                     # 나머지 페이지는 추출된 색상 기반 단색 배경
                     for i in range(1, len(pages)):
                         print(f"  🎨 페이지 {i+1} 컬러 배경 생성 중 (추출된 색상 기반)...")
-                        bg_base64 = create_solid_color_background(adjusted_color)
+                        bg_base64 = create_solid_color_background(adjusted_color, aspect_ratio=aspectRatio)
                         background_images.append(bg_base64)
                         print(f"  ✅ 페이지 {i+1} 컬러 배경 생성 완료")
 
@@ -2765,14 +3350,14 @@ async def generate_agentic_cardnews(
                     print(f"  ⚠️ 이미지 생성/색상 추출 실패: {e}")
                     # 폴백: 사용자가 선택한 테마 사용
                     for _ in pages:
-                        background_images.append(create_fallback_background(colorTheme))
+                        background_images.append(create_fallback_background(colorTheme, aspect_ratio=aspectRatio))
                     dominant_color = user_selected_theme["primary"]
                     cardnews_logger.info(f"  🎨 사용자 선택 테마 적용: {colorTheme}")
             else:
                 cardnews_logger.warning("⚠️ Google API Key 없음, 사용자 테마 사용")
                 print("  ⚠️ Google API Key 없음, 사용자 테마 사용")
                 for _ in pages:
-                    background_images.append(create_fallback_background(colorTheme))
+                    background_images.append(create_fallback_background(colorTheme, aspect_ratio=aspectRatio))
                 dominant_color = user_selected_theme["primary"]
                 cardnews_logger.info(f"  🎨 사용자 선택 테마 적용: {colorTheme}")
         else:
@@ -2780,7 +3365,7 @@ async def generate_agentic_cardnews(
             cardnews_logger.info(f"ℹ️ 이미지 생성 비활성화, 사용자 테마 사용: {colorTheme}")
             print(f"  ℹ️ 이미지 생성 비활성화, 사용자 테마 사용: {colorTheme}")
             for _ in pages:
-                background_images.append(create_fallback_background(colorTheme))
+                background_images.append(create_fallback_background(colorTheme, aspect_ratio=aspectRatio))
             dominant_color = user_selected_theme["primary"]
 
         # 최종 배경색 결정 - 사용자 선택 테마 우선
@@ -2855,9 +3440,6 @@ async def generate_agentic_cardnews(
 
         final_cards = []
 
-        # 심플 모드에서 첫 번째 AI 이미지 저장 (내용 페이지 배경으로 재사용)
-        first_bg_image = None
-
         for i, (page, bg_image_data) in enumerate(zip(pages, background_images)):
             print(f"  🎨 카드 {i+1}/{len(pages)} 생성 중...")
 
@@ -2869,10 +3451,6 @@ async def generate_agentic_cardnews(
                 else:
                     response = requests.get(bg_image_data, timeout=30)
                     bg_image = Image.open(io.BytesIO(response.content))
-
-                # 심플 모드에서 첫 번째 이미지 저장
-                if use_simple_mode:
-                    first_bg_image = bg_image.copy()
 
                 # 첫 페이지 생성 (Agent가 판단한 layout 사용)
                 # 첫 페이지는 AI 이미지가 배경이므로 text_color=None으로 전달하여
@@ -2887,32 +3465,20 @@ async def generate_agentic_cardnews(
                 )
                 final_cards.append(card_base64)
 
-            else:  # 나머지 페이지: 컬러 배경 또는 AI 이미지 + 제목 + bullet points
-                if use_simple_mode and first_bg_image:
-                    # 심플 모드: AI 이미지를 배경으로 사용 (블러 처리)
-                    print(f"    📍 페이지 {i+1}: 심플 모드 - AI 이미지 배경 사용")
-                    card_base64 = builder.build_content_page_with_image(
-                        background_image=first_bg_image,
-                        title=page['title'],
-                        content_lines=page.get('content', ["• 내용이 없습니다"]),
-                        page_num=i + 1
-                    )
-                else:
-                    # 일반 모드: 페이지별 조화로운 배경색 적용 (팔레트에서 선택)
-                    page_bg_color = color_palette[i - 1] if i - 1 < len(color_palette) else final_bg_color
-                    # 해당 배경색에 맞는 텍스트 색상 결정
-                    page_text_color = get_text_color_for_background(page_bg_color)
+            else:  # 나머지 페이지: 단색 배경 + 제목 + bullet points
+                # 모든 내용 페이지는 동일한 배경색 사용
+                page_text_color = get_text_color_for_background(final_bg_color)
 
-                    print(f"    📍 페이지 {i+1} 배경색: RGB{page_bg_color}, 텍스트: {page_text_color}")
+                print(f"    📍 페이지 {i+1} 배경색: RGB{final_bg_color}, 텍스트: {page_text_color}")
 
-                    # 본문 페이지 생성
-                    card_base64 = builder.build_content_page(
-                        bg_color=page_bg_color,
-                        title=page['title'],
-                        content_lines=page.get('content', ["• 내용이 없습니다"]),
-                        page_num=i + 1,
-                        text_color=page_text_color  # 페이지별 동적 텍스트 색상
-                    )
+                # 본문 페이지 생성 (단색 배경)
+                card_base64 = builder.build_content_page(
+                    bg_color=final_bg_color,
+                    title=page['title'],
+                    content_lines=page.get('content', ["• 내용이 없습니다"]),
+                    page_num=i + 1,
+                    text_color=page_text_color  # 페이지별 동적 텍스트 색상
+                )
                 final_cards.append(card_base64)
 
             print(f"  ✅ 카드 {i+1} 완성")
@@ -3057,8 +3623,47 @@ async def generate_agentic_cardnews(
         )
 
 
-async def generate_background_image_with_gemini(prompt: str) -> str:
-    """Gemini 2.5 Flash Image로 배경 이미지 생성 (image.py와 동일)"""
+def resize_image_to_aspect_ratio(image_data: str, aspect_ratio: str) -> str:
+    """이미지를 비율에 맞게 crop 후 resize"""
+    target_width, target_height = get_card_size(aspect_ratio)
+
+    # base64 디코딩
+    if image_data.startswith('data:'):
+        header, data = image_data.split(',', 1)
+        img_bytes = base64.b64decode(data)
+    else:
+        img_bytes = base64.b64decode(image_data)
+
+    img = Image.open(io.BytesIO(img_bytes))
+
+    # 원본 이미지 비율과 타겟 비율 계산
+    orig_width, orig_height = img.size
+    target_ratio = target_width / target_height
+    orig_ratio = orig_width / orig_height
+
+    # 비율에 맞게 crop (center crop)
+    if orig_ratio > target_ratio:
+        # 원본이 더 넓음 → 좌우를 자름
+        new_width = int(orig_height * target_ratio)
+        left = (orig_width - new_width) // 2
+        img = img.crop((left, 0, left + new_width, orig_height))
+    elif orig_ratio < target_ratio:
+        # 원본이 더 높음 → 상하를 자름
+        new_height = int(orig_width / target_ratio)
+        top = (orig_height - new_height) // 2
+        img = img.crop((0, top, orig_width, top + new_height))
+
+    # 타겟 크기로 resize
+    img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+
+    # base64로 인코딩
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG", optimize=True)
+    return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
+
+
+async def generate_background_image_with_gemini(prompt: str, aspect_ratio: str = "1:1") -> str:
+    """Gemini 2.5 Flash Image로 배경 이미지 생성 (비율에 맞게 resize)"""
     google_api_key = os.getenv('REACT_APP_GEMINI_API_KEY')  # image.py와 동일한 키 사용
 
     # 텍스트 없는 배경 이미지 생성을 위한 강화된 프롬프트
@@ -3095,28 +3700,32 @@ async def generate_background_image_with_gemini(prompt: str) -> str:
                 if part.get("inlineData") and part["inlineData"].get("data"):
                     mime_type = part["inlineData"].get("mimeType", "image/png")
                     image_data = part["inlineData"]["data"]
-                    return f"data:{mime_type};base64,{image_data}"
+                    raw_image = f"data:{mime_type};base64,{image_data}"
+
+                    # 비율에 맞게 resize
+                    return resize_image_to_aspect_ratio(raw_image, aspect_ratio)
 
     raise Exception("Gemini에서 이미지를 추출할 수 없습니다")
 
 
-def create_fallback_background(color_theme: str, use_gradient: bool = True) -> str:
-    """폴백용 배경 생성 (그라데이션 또는 단색)"""
+def create_fallback_background(color_theme: str, use_gradient: bool = True, aspect_ratio: str = "1:1") -> str:
+    """폴백용 배경 생성 (그라데이션 또는 단색, 비율 지원)"""
     theme = COLOR_THEMES.get(color_theme, COLOR_THEMES["warm"])
     primary = theme["primary"]
+    width, height = get_card_size(aspect_ratio)
 
     if use_gradient:
         # 그라데이션 배경 (primary → 약간 어두운 색)
         end_color = tuple(max(0, c - 40) for c in primary)
         direction = theme.get("gradient_type", "vertical")
         img = BackgroundProcessor.create_fast_gradient(
-            CARD_WIDTH, CARD_HEIGHT,
+            width, height,
             primary, end_color,
             direction=direction
         )
     else:
         # 단색 배경
-        img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color=primary)
+        img = Image.new('RGB', (width, height), color=primary)
 
     # Base64 변환
     buffer = io.BytesIO()
@@ -3124,19 +3733,21 @@ def create_fallback_background(color_theme: str, use_gradient: bool = True) -> s
     return f"data:image/png;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
 
-def create_solid_color_background(color: tuple, use_gradient: bool = True, gradient_type: str = "vertical") -> str:
-    """RGB 튜플로 배경 생성 (그라데이션 또는 단색)"""
+def create_solid_color_background(color: tuple, use_gradient: bool = True, gradient_type: str = "vertical", aspect_ratio: str = "1:1") -> str:
+    """RGB 튜플로 배경 생성 (그라데이션 또는 단색, 비율 지원)"""
+    width, height = get_card_size(aspect_ratio)
+
     if use_gradient:
         # 그라데이션 배경 (primary → 약간 어두운 색)
         end_color = tuple(max(0, c - 40) for c in color)
         img = BackgroundProcessor.create_fast_gradient(
-            CARD_WIDTH, CARD_HEIGHT,
+            width, height,
             color, end_color,
             direction=gradient_type
         )
     else:
         # 단색 배경
-        img = Image.new('RGB', (CARD_WIDTH, CARD_HEIGHT), color=color)
+        img = Image.new('RGB', (width, height), color=color)
 
     # Base64 변환
     buffer = io.BytesIO()

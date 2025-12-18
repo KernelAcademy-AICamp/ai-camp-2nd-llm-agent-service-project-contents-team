@@ -1,9 +1,4 @@
 /* WordPress 페이지 스타일 */
-.wordpress-page {
-  padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
 
 /* WordPress 연동 카드 */
 .connect-card {
@@ -620,10 +615,6 @@
 
 /* 반응형 */
 @media (max-width: 768px) {
-  .wordpress-page {
-    padding: 16px;
-  }
-
   .connect-card {
     padding: 24px;
   }

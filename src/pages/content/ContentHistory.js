@@ -245,6 +245,19 @@ function ContentHistory() {
   // 편집 페이지로 이동
   const handleGoToEditor = (item) => {
     // ContentEditor가 기대하는 형식으로 데이터 변환
+    // 카드뉴스 이미지가 있으면 카드뉴스 이미지 사용, 없으면 일반 이미지 사용
+    let images = [];
+    if (item.cardnews?.card_image_urls?.length > 0) {
+      // 카드뉴스 이미지 (base64 또는 URL)
+      images = item.cardnews.card_image_urls.map((url, idx) => ({
+        url: url,
+        prompt: `카드뉴스 ${idx + 1}페이지`
+      }));
+    } else if (item.images?.length > 0) {
+      // 일반 AI 생성 이미지
+      images = item.images.map(img => ({ url: img.image_url }));
+    }
+
     const result = {
       text: {
         blog: item.blog,
@@ -252,7 +265,7 @@ function ContentHistory() {
         x: item.x,
         threads: item.threads,
       },
-      images: item.images?.map(img => ({ url: img.image_url })) || [],
+      images: images,
     };
 
     navigate('/editor', {

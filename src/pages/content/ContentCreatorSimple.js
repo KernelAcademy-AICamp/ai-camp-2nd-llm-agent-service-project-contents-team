@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiCopy, FiArrowRight, FiEdit3, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiCopy, FiArrowRight, FiEdit3, FiChevronLeft, FiChevronRight, FiPlus, FiTrash2, FiMove } from 'react-icons/fi';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import api, { contentSessionAPI, creditsAPI, userAPI, cardnewsAPI } from '../../services/api';
@@ -43,8 +44,9 @@ const IMAGE_FORMATS = [
 ];
 
 const ASPECT_RATIOS = [
-  { id: '1:1', label: '정방형 (1:1)', desc: '인스타그램 피드' },
-  { id: '3:4', label: '세로형 (3:4)', desc: '인스타그램 릴스' },
+  { id: '1:1', label: '정사각형 (1:1)', desc: '인스타그램 피드' },
+  { id: '4:5', label: '세로형 (4:5)', desc: '인스타그램 세로 피드' },
+  { id: '1.91:1', label: '가로형 (1.91:1)', desc: '페이스북, 트위터' },
 ];
 
 const QUICK_TOPICS = ['신제품 출시', '이벤트 안내', '후기 소개', '브랜드 소개'];
@@ -163,6 +165,11 @@ function ContentCreatorSimple() {
   const [selectedCategory, setSelectedCategory] = useState(null); // 선택된 카테고리
   const [previewSlide, setPreviewSlide] = useState(0); // 템플릿 미리보기 슬라이드 (0: 표지, 1: 내용)
   const [aspectRatio, setAspectRatio] = useState('1:1'); // 이미지 비율
+
+  // 카드뉴스 텍스트 미리보기 상태
+  const [cardnewsPreview, setCardnewsPreview] = useState(null); // 미리보기 데이터
+  const [isPreviewMode, setIsPreviewMode] = useState(false); // 미리보기 모드 여부
+  const [editingPageIndex, setEditingPageIndex] = useState(null); // 현재 편집 중인 페이지 인덱스
 
   // 생성 상태
   const [isGenerating, setIsGenerating] = useState(false);
@@ -385,45 +392,45 @@ function ContentCreatorSimple() {
       // 이미지 생성
       if (contentType === 'image' || contentType === 'both') {
         if (imageFormat === 'cardnews') {
-          // 카드뉴스 생성
-          setProgress('AI가 카드뉴스를 생성하고 있습니다...');
+          // 카드뉴스 생성 - 1단계: 텍스트 + 이미지 미리보기 생성
+          setProgress('AI가 카드뉴스 내용과 이미지를 생성하고 있습니다...');
           try {
-            const colorTheme = 'warm';
-
-            // FormData 생성 (백엔드가 Form 데이터를 받음)
-            const formData = new FormData();
-            formData.append('prompt', topic);
-            formData.append('purpose', 'info');
-            formData.append('fontStyle', 'pretendard');
-            formData.append('colorTheme', colorTheme);
-            formData.append('generateImages', 'true');
-            // 디자인 템플릿 추가 ('none'이면 템플릿 없이 AI 이미지만)
-            formData.append('designTemplate', designTemplate);
-            formData.append('aspectRatio', aspectRatio); // 이미지 비율 추가
-            // 사용자 컨텍스트 전달
+            // FormData 생성 (텍스트 + 이미지 미리보기 API 호출)
+            const previewFormData = new FormData();
+            previewFormData.append('prompt', topic);
+            previewFormData.append('purpose', 'info');
+            previewFormData.append('generateImages', 'true');  // 이미지도 함께 생성
+            previewFormData.append('fontStyle', 'pretendard');
+            previewFormData.append('colorTheme', 'warm');
+            previewFormData.append('designTemplate', 'none');
+            previewFormData.append('aspectRatio', aspectRatio);  // 선택한 비율 전달
             if (userContext) {
-              formData.append('userContext', JSON.stringify(userContext));
+              previewFormData.append('userContext', JSON.stringify(userContext));
             }
 
-            const cardnewsResponse = await api.post('/api/generate-agentic-cardnews', formData, {
+            const previewResponse = await api.post('/api/preview-cardnews-content', previewFormData, {
               headers: {
                 'Content-Type': 'multipart/form-data',
               },
             });
 
-            if (cardnewsResponse.data.success && cardnewsResponse.data.cards) {
-              // 생성된 카드뉴스 이미지들을 결과에 추가
-              cardnewsResponse.data.cards.forEach((card, index) => {
-                generatedResult.images.push({
-                  url: card,
-                  prompt: `${topic} - 카드 ${index + 1}`
-                });
+            if (previewResponse.data.success && previewResponse.data.pages) {
+              // 미리보기 모드로 전환 (이미지 포함)
+              setCardnewsPreview({
+                pages: previewResponse.data.pages,
+                preview_images: previewResponse.data.preview_images || [],
+                analysis: previewResponse.data.analysis,
+                design_settings: previewResponse.data.design_settings,
+                prompt: topic  // 원본 프롬프트 저장
               });
-              setProgress(`카드뉴스 ${cardnewsResponse.data.cards.length}장 생성 완료!`);
+              setIsPreviewMode(true);
+              setIsGenerating(false);
+              setProgress('');
+              return; // 여기서 중단하고 사용자 확인을 기다림
             }
           } catch (cardnewsError) {
-            console.error('카드뉴스 생성 실패:', cardnewsError);
-            alert('카드뉴스 생성 중 오류가 발생했습니다.');
+            console.error('카드뉴스 미리보기 생성 실패:', cardnewsError);
+            alert('카드뉴스 내용 생성 중 오류가 발생했습니다.');
           }
         } else {
           // AI 이미지 생성 (기존 로직)
@@ -570,6 +577,208 @@ function ContentCreatorSimple() {
     setResult(null);
     setTopic('');
     setProgress('');
+    setCardnewsPreview(null);
+    setIsPreviewMode(false);
+    setEditingPageIndex(null);
+  };
+
+  // ========== 카드뉴스 미리보기 관련 함수 ==========
+
+  // 페이지 내용 수정
+  const handlePageEdit = (pageIndex, field, value) => {
+    if (!cardnewsPreview) return;
+
+    const updatedPages = [...cardnewsPreview.pages];
+    if (field === 'content') {
+      // content는 배열이므로 문자열을 배열로 변환 (입력 중에는 빈 줄 유지)
+      updatedPages[pageIndex] = {
+        ...updatedPages[pageIndex],
+        content: value.split('\n')
+      };
+    } else {
+      updatedPages[pageIndex] = {
+        ...updatedPages[pageIndex],
+        [field]: value
+      };
+    }
+
+    setCardnewsPreview({
+      ...cardnewsPreview,
+      pages: updatedPages
+    });
+  };
+
+  // 페이지 추가
+  const handleAddPage = (afterIndex) => {
+    if (!cardnewsPreview) return;
+
+    const newPage = {
+      title: '새 페이지',
+      content: ['내용을 입력하세요']
+    };
+
+    const updatedPages = [...cardnewsPreview.pages];
+    updatedPages.splice(afterIndex + 1, 0, newPage);
+
+    setCardnewsPreview({
+      ...cardnewsPreview,
+      pages: updatedPages
+    });
+
+    // 새로 추가된 페이지를 편집 모드로 전환
+    setEditingPageIndex(afterIndex + 1);
+  };
+
+  // 페이지 삭제
+  const handleDeletePage = (pageIndex) => {
+    if (!cardnewsPreview) return;
+
+    // 최소 2장은 유지 (표지 + 내용 1장)
+    if (cardnewsPreview.pages.length <= 2) {
+      alert('카드뉴스는 최소 2장 이상이어야 합니다.');
+      return;
+    }
+
+    // 표지(0번 페이지)는 삭제 불가
+    if (pageIndex === 0) {
+      alert('표지는 삭제할 수 없습니다.');
+      return;
+    }
+
+    if (!window.confirm(`${pageIndex}페이지를 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    const updatedPages = cardnewsPreview.pages.filter((_, idx) => idx !== pageIndex);
+
+    setCardnewsPreview({
+      ...cardnewsPreview,
+      pages: updatedPages
+    });
+
+    // 편집 중인 페이지가 삭제되면 편집 모드 해제
+    if (editingPageIndex === pageIndex) {
+      setEditingPageIndex(null);
+    } else if (editingPageIndex > pageIndex) {
+      // 삭제된 페이지보다 뒤에 있는 페이지를 편집 중이면 인덱스 조정
+      setEditingPageIndex(editingPageIndex - 1);
+    }
+  };
+
+  // 페이지 순서 변경 (드래그 앤 드롭)
+  const handleDragEnd = (result) => {
+    if (!cardnewsPreview) return;
+
+    const { destination, source } = result;
+
+    // 드롭 대상이 없거나 같은 위치면 무시
+    if (!destination) return;
+    if (destination.index === source.index) return;
+
+    // 표지(0번)는 이동 불가
+    if (source.index === 0 || destination.index === 0) {
+      return;
+    }
+
+    const updatedPages = Array.from(cardnewsPreview.pages);
+    const [movedPage] = updatedPages.splice(source.index, 1);
+    updatedPages.splice(destination.index, 0, movedPage);
+
+    setCardnewsPreview({
+      ...cardnewsPreview,
+      pages: updatedPages
+    });
+
+    // 편집 중인 페이지 인덱스도 조정
+    if (editingPageIndex !== null) {
+      if (editingPageIndex === source.index) {
+        setEditingPageIndex(destination.index);
+      } else if (source.index < editingPageIndex && destination.index >= editingPageIndex) {
+        setEditingPageIndex(editingPageIndex - 1);
+      } else if (source.index > editingPageIndex && destination.index <= editingPageIndex) {
+        setEditingPageIndex(editingPageIndex + 1);
+      }
+    }
+  };
+
+  // 미리보기 취소
+  const handleCancelPreview = () => {
+    setCardnewsPreview(null);
+    setIsPreviewMode(false);
+    setEditingPageIndex(null);
+  };
+
+  // 미리보기 확정 및 이미지 생성
+  const handleConfirmPreview = async () => {
+    if (!cardnewsPreview) return;
+
+    setIsGenerating(true);
+    setProgress('카드뉴스 이미지를 생성하고 있습니다...');
+
+    try {
+      const colorTheme = 'warm';
+
+      // 빈 줄 필터링된 페이지 데이터 생성
+      const cleanedPages = cardnewsPreview.pages.map(page => ({
+        ...page,
+        content: (page.content || []).filter(line => line.trim())
+      }));
+
+      // FormData 생성 (확정된 내용으로 이미지 생성)
+      const formData = new FormData();
+      formData.append('pages', JSON.stringify(cleanedPages));
+      formData.append('prompt', cardnewsPreview.prompt);
+      formData.append('purpose', 'info');
+      formData.append('fontStyle', cardnewsPreview.design_settings?.font_pair || 'pretendard');
+      formData.append('colorTheme', colorTheme);
+      formData.append('designTemplate', designTemplate);
+      formData.append('aspectRatio', aspectRatio);
+
+      // 미리보기에서 생성된 배경 이미지가 있으면 전달 (재사용)
+      if (cardnewsPreview.background_images && cardnewsPreview.background_images.length > 0) {
+        formData.append('previewImages', JSON.stringify(cardnewsPreview.background_images));
+      }
+
+      const cardnewsResponse = await api.post('/api/generate-cardnews-from-content', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (cardnewsResponse.data.success && cardnewsResponse.data.cards) {
+        const generatedResult = { text: null, images: [] };
+
+        cardnewsResponse.data.cards.forEach((card, index) => {
+          generatedResult.images.push({
+            url: card,
+            prompt: `${cardnewsPreview.prompt} - 카드 ${index + 1}`
+          });
+        });
+
+        // 크레딧 차감
+        const requiredCredits = CREDIT_COSTS.cardnews;
+        if (requiredCredits > 0) {
+          try {
+            await creditsAPI.use(requiredCredits, '카드뉴스 생성', 'cardnews_generation');
+            setCreditBalance(prev => prev - requiredCredits);
+          } catch (creditError) {
+            console.error('크레딧 차감 실패:', creditError);
+          }
+        }
+
+        setResult(generatedResult);
+        setCardnewsPreview(null);
+        setIsPreviewMode(false);
+        setEditingPageIndex(null);
+        setProgress(`카드뉴스 ${cardnewsResponse.data.cards.length}장 생성 완료!`);
+      }
+    } catch (error) {
+      console.error('카드뉴스 이미지 생성 실패:', error);
+      alert('카드뉴스 이미지 생성 중 오류가 발생했습니다.');
+    } finally {
+      setIsGenerating(false);
+      setProgress('');
+    }
   };
 
   // ========== 플랫폼 토글 ==========
@@ -606,8 +815,192 @@ function ContentCreatorSimple() {
   // ========== 렌더링 ==========
   return (
     <div className="content-creator">
-      {/* 결과가 없을 때: 생성 폼 */}
-      {!result ? (
+      {/* 카드뉴스 텍스트 미리보기 모드 */}
+      {isPreviewMode && cardnewsPreview ? (
+        <div className="creator-container">
+          <div className="page-header">
+            <h2>카드뉴스 내용 확인</h2>
+            <p className="page-description">AI가 생성한 내용을 확인하고 수정한 후 이미지로 변환합니다</p>
+          </div>
+
+          <div className="cardnews-preview-container">
+            {/* 미리보기 헤더 */}
+            <div className="preview-header">
+              <div className="preview-info">
+                <span className="preview-badge">📝 미리보기</span>
+                <span className="preview-count">{cardnewsPreview.pages.length}장의 카드뉴스</span>
+              </div>
+              <div className="preview-actions">
+                <button
+                  className="preview-cancel-btn"
+                  onClick={handleCancelPreview}
+                  disabled={isGenerating}
+                >
+                  취소
+                </button>
+                <button
+                  className="preview-confirm-btn"
+                  onClick={handleConfirmPreview}
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? (
+                    <><span className="spinner"></span>{progress}</>
+                  ) : (
+                    <>이미지 생성하기 <FiArrowRight /></>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* 페이지별 편집 카드 */}
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="cardnews-pages" direction="vertical">
+                {(provided) => (
+                  <div
+                    className="preview-pages"
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                  >
+                    {cardnewsPreview.pages.map((page, index) => (
+                      <Draggable
+                        key={`page-${index}`}
+                        draggableId={`page-${index}`}
+                        index={index}
+                        isDragDisabled={index === 0}
+                      >
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            className={`preview-page-card ${editingPageIndex === index ? 'editing' : ''} ${snapshot.isDragging ? 'dragging' : ''}`}
+                          >
+                            <div className="page-card-header">
+                              <div className="page-header-left">
+                                {index > 0 && (
+                                  <span
+                                    className="drag-handle"
+                                    {...provided.dragHandleProps}
+                                    title="드래그하여 순서 변경"
+                                  >
+                                    <FiMove />
+                                  </span>
+                                )}
+                                <span className="preview-page-label">
+                                  {index === 0 ? '📌 표지' : `📄 ${index}페이지`}
+                                </span>
+                              </div>
+                              <div className="page-card-actions">
+                                <button
+                                  className="page-edit-btn"
+                                  onClick={() => setEditingPageIndex(editingPageIndex === index ? null : index)}
+                                >
+                                  <FiEdit3 /> {editingPageIndex === index ? '완료' : '수정'}
+                                </button>
+                                {index > 0 && (
+                                  <button
+                                    className="page-delete-btn"
+                                    onClick={() => handleDeletePage(index)}
+                                    title="페이지 삭제"
+                                  >
+                                    <FiTrash2 />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {editingPageIndex === index ? (
+                              // 편집 모드
+                              <div className="page-edit-form">
+                                <div className="edit-field">
+                                  <label>제목</label>
+                                  <input
+                                    type="text"
+                                    value={page.title}
+                                    onChange={(e) => handlePageEdit(index, 'title', e.target.value)}
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                    placeholder="제목을 입력하세요"
+                                  />
+                                </div>
+                                {index === 0 && (
+                                  <div className="edit-field">
+                                    <label>소제목</label>
+                                    <textarea
+                                      value={page.subtitle || ''}
+                                      onChange={(e) => handlePageEdit(index, 'subtitle', e.target.value)}
+                                      onKeyDown={(e) => e.stopPropagation()}
+                                      placeholder="소제목을 입력하세요"
+                                      rows={3}
+                                    />
+                                  </div>
+                                )}
+                                <div className="edit-field">
+                                  <label>{index === 0 ? '내용 (선택사항)' : '내용'} (줄바꿈으로 구분)</label>
+                                  <textarea
+                                    value={(page.content || []).join('\n')}
+                                    onChange={(e) => handlePageEdit(index, 'content', e.target.value)}
+                                    onKeyDown={(e) => e.stopPropagation()}
+                                    placeholder="• 내용 1&#10;• 내용 2&#10;• 내용 3"
+                                    rows={6}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              // 미리보기 모드 (이미지 + 텍스트)
+                              <div className="page-preview-content">
+                                {/* 이미지 미리보기 */}
+                                {cardnewsPreview.preview_images && cardnewsPreview.preview_images[index] && (
+                                  <div className="preview-image-container">
+                                    <img
+                                      src={cardnewsPreview.preview_images[index]}
+                                      alt={`페이지 ${index + 1} 미리보기`}
+                                      className="preview-card-image"
+                                    />
+                                  </div>
+                                )}
+                                {/* 텍스트 미리보기 */}
+                                <div className="preview-text-content">
+                                  <h4 className="preview-title">{page.title}</h4>
+                                  {page.subtitle && (
+                                    <p className="preview-subtitle">{page.subtitle}</p>
+                                  )}
+                                  {page.content && page.content.length > 0 && (
+                                    <ul className="preview-content-list">
+                                      {page.content.map((item, i) => (
+                                        <li key={i}>{item}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+
+                    {/* 카드 추가 버튼 */}
+                    <button
+                      className="add-page-card"
+                      onClick={() => handleAddPage(cardnewsPreview.pages.length - 1)}
+                    >
+                      <FiPlus />
+                      <span>페이지 추가</span>
+                    </button>
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
+
+            {/* 하단 안내 */}
+            <div className="preview-footer">
+              <p className="preview-tip">
+                💡 카드를 드래그하여 순서를 변경할 수 있습니다. '수정' 버튼으로 내용을 편집하세요.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : !result ? (
         <div className="creator-container">
           {/* 페이지 헤더 */}
           <div className="page-header">

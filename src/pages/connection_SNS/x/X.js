@@ -13,14 +13,12 @@ import {
   SyncButton,
   DisconnectButton,
   CharCounter,
-  MediaPreview
+  MediaPreview,
+  XIcon
 } from '../common/SNSComponents';
 import { formatNumber, formatDate, API_URL } from '../common/utils';
 import '../common/SNSCommon.css';
 import './X.css';
-
-// X 아이콘 SVG path
-const X_ICON_PATH = "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z";
 
 // X 탭 설정
 const X_TABS = [
@@ -35,13 +33,6 @@ const X_FEATURES = [
   '이미지/미디어 포스트 게시',
   '팔로워 및 참여도 통계 확인'
 ];
-
-// X 아이콘 컴포넌트
-const XIcon = ({ size = 64 }) => (
-  <svg viewBox="0 0 24 24" width={size} height={size}>
-    <path fill="currentColor" d={X_ICON_PATH} />
-  </svg>
-);
 
 function X() {
   const { user } = useAuth();

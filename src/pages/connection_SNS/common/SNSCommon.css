@@ -3,8 +3,15 @@
    ======================================== */
 
 /* ===== 페이지 레이아웃 ===== */
-.sns-page {
-  padding: var(--space-lg);
+.sns-page,
+.tiktok-page,
+.wordpress-page,
+.facebook-page,
+.instagram-page,
+.youtube-page,
+.threads-page,
+.x-page {
+  padding: 24px;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -764,8 +771,15 @@
 
 /* ===== 반응형 ===== */
 @media (max-width: 768px) {
-  .sns-page {
-    padding: var(--space-md);
+  .sns-page,
+  .tiktok-page,
+  .wordpress-page,
+  .facebook-page,
+  .instagram-page,
+  .youtube-page,
+  .threads-page,
+  .x-page {
+    padding: 16px;
   }
 
   .connect-card {

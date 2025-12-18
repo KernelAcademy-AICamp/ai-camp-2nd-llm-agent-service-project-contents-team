@@ -10,6 +10,7 @@ const PLATFORM_CONFIG = {
   sns: { name: 'IG/FB', icon: '📷' },
   x: { name: 'X', icon: '𝕏' },
   threads: { name: 'Threads', icon: '🧵' },
+  cardnews: { name: '카드뉴스', icon: '🖼️' },
 };
 
 // 상태 설정
@@ -131,7 +132,28 @@ function ContentList() {
   // 편집 페이지로 이동
   const handleEdit = (content, e) => {
     e.stopPropagation();
-    // 기존 데이터를 편집 형식으로 변환하여 전달
+
+    // 카드뉴스인 경우
+    if (content.platform === 'cardnews') {
+      const result = {
+        text: {},
+        images: (content.card_image_urls || []).map((url, idx) => ({
+          url: url,
+          image_url: url,
+        })),
+      };
+
+      navigate('/editor', {
+        state: {
+          result,
+          topic: content.title || '카드뉴스',
+          publishedContentId: content.id,
+        },
+      });
+      return;
+    }
+
+    // 일반 콘텐츠인 경우
     const result = {
       text: {
         [content.platform]: {
@@ -269,7 +291,14 @@ function ContentList() {
                       </div>
                     </td>
                     <td className="content-title-cell">
-                      {content.title ? (
+                      {content.platform === 'cardnews' ? (
+                        <>
+                          <strong>{content.title || '카드뉴스'}</strong>
+                          <span className="content-preview">
+                            {content.card_image_urls?.length || 0}장의 이미지
+                          </span>
+                        </>
+                      ) : content.title ? (
                         <>
                           <strong>{content.title}</strong>
                           <span className="content-preview">

@@ -276,6 +276,61 @@ class FacebookService:
         )
         return result is not None and result.get('success', False)
 
+    async def create_multi_photo_post(
+        self,
+        page_id: str,
+        photo_urls: List[str],
+        message: str = None
+    ) -> Optional[Dict]:
+        """
+        페이지에 여러 사진이 포함된 게시물 작성
+        1. 각 사진을 published=false로 업로드하여 photo_id 획득
+        2. 모든 photo_id를 attached_media로 묶어서 feed에 게시
+        """
+        if not photo_urls:
+            return None
+
+        # 1. 각 사진을 unpublished로 업로드
+        photo_ids = []
+        for idx, photo_url in enumerate(photo_urls):
+            logger.info(f"Uploading photo {idx + 1}/{len(photo_urls)}: {photo_url[:80]}...")
+            result = await self._make_request(
+                'POST',
+                f'{page_id}/photos',
+                data={
+                    'url': photo_url,
+                    'published': 'false'  # 게시하지 않고 ID만 획득
+                },
+                use_page_token=True
+            )
+            if result and 'id' in result:
+                photo_ids.append(result['id'])
+                logger.info(f"Photo {idx + 1} uploaded: {result['id']}")
+            else:
+                logger.error(f"Failed to upload photo {idx + 1}")
+                # 실패 시 계속 진행 (일부만 성공해도 게시)
+
+        if not photo_ids:
+            logger.error("No photos were uploaded successfully")
+            return None
+
+        # 2. 모든 사진을 하나의 게시물로 묶어서 발행
+        data = {}
+        if message:
+            data['message'] = message
+
+        # attached_media 파라미터로 사진들 연결
+        for idx, photo_id in enumerate(photo_ids):
+            data[f'attached_media[{idx}]'] = f'{{"media_fbid":"{photo_id}"}}'
+
+        logger.info(f"Creating multi-photo post with {len(photo_ids)} photos")
+        return await self._make_request(
+            'POST',
+            f'{page_id}/feed',
+            data=data,
+            use_page_token=True
+        )
+
     # ===== 토큰 관리 =====
 
     async def exchange_token_for_long_lived(
