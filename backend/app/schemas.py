@@ -351,6 +351,7 @@ class PublishedContentCreate(PublishedContentBase):
     session_id: Optional[int] = None  # 원본 세션 ID
     image_ids: Optional[List[int]] = None  # 이미지 ID 목록
     uploaded_image_url: Optional[str] = None  # 직접 업로드한 이미지 URL
+    card_image_urls: Optional[List[str]] = None  # 카드뉴스 이미지 URL 배열
 
 
 class PublishedContentSchedule(PublishedContentCreate):
@@ -365,6 +366,7 @@ class PublishedContentUpdate(BaseModel):
     tags: Optional[List[str]] = None
     image_ids: Optional[List[int]] = None
     uploaded_image_url: Optional[str] = None  # 직접 업로드한 이미지 URL
+    card_image_urls: Optional[List[str]] = None  # 카드뉴스 이미지 URL 배열
     scheduled_at: Optional[datetime] = None
 
 
@@ -375,6 +377,7 @@ class PublishedContentResponse(PublishedContentBase):
     session_id: Optional[int] = None
     image_ids: Optional[List[int]] = None
     uploaded_image_url: Optional[str] = None  # 직접 업로드한 이미지 URL
+    card_image_urls: Optional[List[str]] = None  # 카드뉴스 이미지 URL 배열
     status: str  # 'draft', 'scheduled', 'published', 'failed'
     scheduled_at: Optional[datetime] = None
     published_at: Optional[datetime] = None
@@ -395,6 +398,7 @@ class PublishedContentListResponse(BaseModel):
     platform: str
     title: Optional[str] = None
     content: str  # 본문 미리보기용
+    card_image_urls: Optional[List[str]] = None  # 카드뉴스 이미지 URL 배열
     status: str
     scheduled_at: Optional[datetime] = None
     published_at: Optional[datetime] = None

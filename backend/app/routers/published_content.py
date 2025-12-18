@@ -8,13 +8,16 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import Optional, List
 from datetime import datetime
+from pydantic import BaseModel
 import logging
 import os
 import uuid
+import base64
 from google.cloud import storage
+from supabase import create_client, Client
 
 from ..database import get_db
-from ..models import User, PublishedContent, ContentGenerationSession, GeneratedImage, XConnection, ThreadsConnection, InstagramConnection
+from ..models import User, PublishedContent, ContentGenerationSession, GeneratedImage, XConnection, ThreadsConnection, InstagramConnection, FacebookConnection, YouTubeConnection, TikTokConnection, WordPressConnection
 from ..auth import get_current_user
 from ..schemas import (
     PublishedContentCreate,
@@ -26,6 +29,8 @@ from ..schemas import (
 from ..services.x_service import XService, XTokenExpiredError, XAPIError
 from ..services.threads_service import ThreadsService
 from ..services.instagram_service import InstagramService
+from ..services.facebook_service import FacebookService
+from ..services.youtube_service import YouTubeService
 
 router = APIRouter(prefix="/api/published-contents", tags=["published-contents"])
 logger = logging.getLogger(__name__)
@@ -64,6 +69,92 @@ def init_gcs():
         gcs_bucket = None
 
 
+# Supabase 설정 (카드뉴스 이미지 업로드용)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+_supabase_client: Client = None
+
+
+def _get_supabase_client() -> Client:
+    """Supabase 클라이언트 반환 (lazy initialization)"""
+    global _supabase_client
+    if _supabase_client is None:
+        if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+            _supabase_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+            logger.info("Supabase client initialized for published_content")
+        else:
+            logger.warning("Supabase credentials not found")
+    return _supabase_client
+
+
+async def upload_cardnews_image_to_supabase(
+    base64_data_url: str,
+    user_id: int,
+    session_id: int,
+    page_number: int
+) -> str:
+    """
+    Base64 이미지를 Supabase Storage에 업로드하고 공개 URL 반환
+    """
+    client = _get_supabase_client()
+    if not client:
+        raise Exception("Supabase client not initialized")
+
+    # base64 데이터 추출
+    if ',' in base64_data_url:
+        header, data = base64_data_url.split(',', 1)
+        # 이미지 타입 추출
+        if 'png' in header:
+            ext = 'png'
+            content_type = 'image/png'
+        elif 'gif' in header:
+            ext = 'gif'
+            content_type = 'image/gif'
+        elif 'webp' in header:
+            ext = 'webp'
+            content_type = 'image/webp'
+        else:
+            ext = 'jpg'
+            content_type = 'image/jpeg'
+    else:
+        data = base64_data_url
+        ext = 'png'
+        content_type = 'image/png'
+
+    # base64 디코딩
+    image_bytes = base64.b64decode(data)
+
+    # 파일 경로 생성
+    file_path = f"cardnews/{user_id}/{session_id}/page_{page_number}.{ext}"
+
+    # Supabase Storage에 업로드
+    bucket_name = "cardnews"
+
+    try:
+        # 기존 파일 삭제 시도 (있으면)
+        try:
+            client.storage.from_(bucket_name).remove([file_path])
+        except Exception:
+            pass  # 파일이 없으면 무시
+
+        # 업로드
+        client.storage.from_(bucket_name).upload(
+            file_path,
+            image_bytes,
+            {"content-type": content_type}
+        )
+
+        # 공개 URL 생성
+        public_url = client.storage.from_(bucket_name).get_public_url(file_path)
+
+        logger.info(f"Image uploaded to Supabase: {public_url[:80]}...")
+        return public_url
+
+    except Exception as e:
+        logger.error(f"Supabase upload failed: {e}")
+        raise Exception(f"이미지 업로드 실패: {str(e)}")
+
+
 @router.post("/draft", response_model=PublishedContentResponse)
 async def save_draft(
     request: PublishedContentCreate,
@@ -91,6 +182,7 @@ async def save_draft(
             existing.tags = request.tags
             existing.image_ids = request.image_ids
             existing.uploaded_image_url = request.uploaded_image_url
+            existing.card_image_urls = request.card_image_urls
             # session_id와 platform은 변경하지 않음
 
             db.commit()
@@ -109,6 +201,7 @@ async def save_draft(
                 tags=request.tags,
                 image_ids=request.image_ids,
                 uploaded_image_url=request.uploaded_image_url,
+                card_image_urls=request.card_image_urls,
                 status="draft"
             )
             db.add(published)
@@ -155,6 +248,7 @@ async def schedule_publish(
             existing.tags = request.tags
             existing.image_ids = request.image_ids
             existing.uploaded_image_url = request.uploaded_image_url
+            existing.card_image_urls = request.card_image_urls
             existing.status = "scheduled"
             existing.scheduled_at = request.scheduled_at
 
@@ -174,6 +268,7 @@ async def schedule_publish(
                 tags=request.tags,
                 image_ids=request.image_ids,
                 uploaded_image_url=request.uploaded_image_url,
+                card_image_urls=request.card_image_urls,
                 status="scheduled",
                 scheduled_at=request.scheduled_at
             )
@@ -245,8 +340,51 @@ async def publish_content(
                 db, current_user, published.content, published.tags, image_url
             )
 
-        # TODO: 다른 플랫폼 발행 로직 추가
-        # - blog: 네이버 블로그 API
+        # Facebook 발행
+        elif published.platform == "facebook":
+            # 이미지가 있으면 사진 게시물, 없으면 텍스트 게시물
+            image_url = published.uploaded_image_url
+            if not image_url and published.image_ids and len(published.image_ids) > 0:
+                image = db.query(GeneratedImage).filter(
+                    GeneratedImage.id == published.image_ids[0]
+                ).first()
+                if image:
+                    image_url = image.image_url
+
+            publish_url, platform_post_id = await _publish_to_facebook(
+                db, current_user, published.content, published.tags, image_url
+            )
+
+        # YouTube 발행
+        elif published.platform == "youtube":
+            # YouTube는 동영상 파일이 필수 - 현재는 video_file_path 지원 안 함
+            # TODO: GeneratedVideo 테이블에서 동영상 경로 가져오기
+            raise HTTPException(
+                status_code=400,
+                detail="YouTube 발행은 동영상 파일이 필요합니다. 현재 이 기능은 개발 중입니다."
+            )
+
+        # TikTok 발행
+        elif published.platform == "tiktok":
+            # TikTok은 동영상 URL이 필수
+            # TODO: GeneratedVideo 테이블에서 동영상 URL 가져오기
+            raise HTTPException(
+                status_code=400,
+                detail="TikTok 발행은 동영상 URL이 필요합니다. 현재 이 기능은 개발 중입니다."
+            )
+
+        # WordPress 발행
+        elif published.platform == "wordpress":
+            publish_url, platform_post_id = await _publish_to_wordpress(
+                db, current_user, published.title, published.content, published.tags
+            )
+
+        # 지원하지 않는 플랫폼
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"지원하지 않는 플랫폼입니다: {published.platform}"
+            )
 
         # 발행 성공 - 상태 업데이트
         published.status = "published"
@@ -491,6 +629,289 @@ async def _publish_to_instagram(db: Session, user: User, content: str, tags: lis
         raise HTTPException(status_code=500, detail=f"Instagram 발행 중 오류가 발생했습니다: {str(e)}")
 
 
+async def _publish_to_facebook(db: Session, user: User, content: str, tags: list = None, image_url: str = None) -> tuple:
+    """
+    Facebook 페이지에 콘텐츠 발행
+    Returns: (publish_url, post_id)
+    """
+    # Facebook 연동 확인
+    connection = db.query(FacebookConnection).filter(
+        FacebookConnection.user_id == user.id,
+        FacebookConnection.is_active == True
+    ).first()
+
+    if not connection:
+        raise HTTPException(
+            status_code=400,
+            detail="Facebook 페이지가 연동되어 있지 않습니다. 설정에서 Facebook 페이지를 연동해주세요."
+        )
+
+    if not connection.page_id or not connection.page_access_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Facebook 페이지가 선택되어 있지 않습니다. 설정에서 페이지를 선택해주세요."
+        )
+
+    logger.info(f"Facebook 발행 시작: user_id={user.id}, page={connection.page_name}")
+
+    # 메시지 준비 (태그 포함)
+    message = content
+    if tags and len(tags) > 0:
+        hashtags = " ".join([f"#{tag}" if not tag.startswith("#") else tag for tag in tags])
+        message = f"{message}\n\n{hashtags}"
+
+    logger.info(f"Facebook 메시지 준비 완료: {len(message)}자")
+
+    try:
+        service = FacebookService(connection.user_access_token, connection.page_access_token)
+
+        if image_url:
+            # 사진 게시물
+            result = await service.create_photo_post(
+                page_id=connection.page_id,
+                photo_url=image_url,
+                caption=message
+            )
+        else:
+            # 텍스트 게시물
+            result = await service.create_post(
+                page_id=connection.page_id,
+                message=message
+            )
+
+        await service.close()
+
+        if not result or "id" not in result:
+            logger.error("Facebook 발행 실패: API 응답 없음")
+            raise HTTPException(status_code=500, detail="Facebook 발행에 실패했습니다.")
+
+        post_id = result.get("id")
+        # Facebook 게시물 URL 형식: https://www.facebook.com/{page_id}/posts/{post_id}
+        # post_id는 보통 "{page_id}_{actual_post_id}" 형식
+        actual_post_id = post_id.split("_")[-1] if "_" in post_id else post_id
+        publish_url = f"https://www.facebook.com/{connection.page_id}/posts/{actual_post_id}"
+
+        logger.info(f"Facebook 발행 성공: user_id={user.id}, post_id={post_id}")
+        return publish_url, post_id
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Facebook 발행 중 예외 발생: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Facebook 발행 중 오류가 발생했습니다: {str(e)}")
+
+
+async def _publish_to_youtube(db: Session, user: User, title: str, content: str, tags: list = None, video_file_path: str = None) -> tuple:
+    """
+    YouTube에 동영상 업로드
+    Returns: (publish_url, video_id)
+    Note: YouTube는 동영상 파일이 필수입니다.
+    """
+    # YouTube 연동 확인
+    connection = db.query(YouTubeConnection).filter(
+        YouTubeConnection.user_id == user.id,
+        YouTubeConnection.is_active == True
+    ).first()
+
+    if not connection:
+        raise HTTPException(
+            status_code=400,
+            detail="YouTube 계정이 연동되어 있지 않습니다. 설정에서 YouTube 계정을 연동해주세요."
+        )
+
+    if not video_file_path:
+        raise HTTPException(
+            status_code=400,
+            detail="YouTube 발행에는 동영상 파일이 필요합니다."
+        )
+
+    logger.info(f"YouTube 발행 시작: user_id={user.id}, channel={connection.channel_title}")
+
+    try:
+        service = YouTubeService(connection.access_token, connection.refresh_token)
+
+        result = await service.upload_video(
+            video_file_path=video_file_path,
+            title=title or "Untitled Video",
+            description=content or "",
+            tags=tags or [],
+            privacy_status="public"
+        )
+
+        if not result or "id" not in result:
+            logger.error("YouTube 업로드 실패: API 응답 없음")
+            raise HTTPException(status_code=500, detail="YouTube 업로드에 실패했습니다.")
+
+        video_id = result.get("id")
+        publish_url = f"https://www.youtube.com/watch?v={video_id}"
+
+        logger.info(f"YouTube 발행 성공: user_id={user.id}, video_id={video_id}")
+        return publish_url, video_id
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"YouTube 발행 중 예외 발생: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"YouTube 발행 중 오류가 발생했습니다: {str(e)}")
+
+
+async def _publish_to_tiktok(db: Session, user: User, title: str, content: str, video_url: str = None) -> tuple:
+    """
+    TikTok에 동영상 업로드
+    Returns: (publish_url, publish_id)
+    Note: TikTok은 동영상 URL이 필수입니다.
+    """
+    import httpx
+
+    # TikTok 연동 확인
+    connection = db.query(TikTokConnection).filter(
+        TikTokConnection.user_id == user.id,
+        TikTokConnection.is_active == True
+    ).first()
+
+    if not connection:
+        raise HTTPException(
+            status_code=400,
+            detail="TikTok 계정이 연동되어 있지 않습니다. 설정에서 TikTok 계정을 연동해주세요."
+        )
+
+    if not video_url:
+        raise HTTPException(
+            status_code=400,
+            detail="TikTok 발행에는 동영상 URL이 필요합니다."
+        )
+
+    logger.info(f"TikTok 발행 시작: user_id={user.id}, username={connection.username}")
+
+    try:
+        TIKTOK_VIDEO_UPLOAD_URL = "https://open.tiktokapis.com/v2/post/publish/video/init/"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                TIKTOK_VIDEO_UPLOAD_URL,
+                json={
+                    "post_info": {
+                        "title": title or "",
+                        "privacy_level": "PUBLIC_TO_EVERYONE",
+                        "disable_duet": False,
+                        "disable_comment": False,
+                        "disable_stitch": False
+                    },
+                    "source_info": {
+                        "source": "PULL_FROM_URL",
+                        "video_url": video_url
+                    }
+                },
+                headers={
+                    "Authorization": f"Bearer {connection.access_token}",
+                    "Content-Type": "application/json"
+                }
+            )
+
+        if response.status_code != 200:
+            error_data = response.json() if response.content else {}
+            error_msg = error_data.get("error", {}).get("message", "Upload failed")
+            logger.error(f"TikTok 발행 실패: {error_msg}")
+            raise HTTPException(status_code=response.status_code, detail=f"TikTok 발행 실패: {error_msg}")
+
+        result = response.json()
+        publish_id = result.get("data", {}).get("publish_id")
+        # TikTok은 업로드 후 처리 시간이 필요하여 즉시 URL을 알 수 없음
+        publish_url = connection.profile_deep_link or f"https://www.tiktok.com/@{connection.username}"
+
+        logger.info(f"TikTok 발행 성공: user_id={user.id}, publish_id={publish_id}")
+        return publish_url, publish_id
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"TikTok 발행 중 예외 발생: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"TikTok 발행 중 오류가 발생했습니다: {str(e)}")
+
+
+async def _publish_to_wordpress(db: Session, user: User, title: str, content: str, tags: list = None, status: str = "publish") -> tuple:
+    """
+    WordPress에 게시물 발행
+    Returns: (publish_url, post_id)
+    """
+    import httpx
+    import base64
+
+    # WordPress 연동 확인
+    connection = db.query(WordPressConnection).filter(
+        WordPressConnection.user_id == user.id,
+        WordPressConnection.is_active == True
+    ).first()
+
+    if not connection:
+        raise HTTPException(
+            status_code=400,
+            detail="WordPress 사이트가 연동되어 있지 않습니다. 설정에서 WordPress 사이트를 연동해주세요."
+        )
+
+    if not connection.wp_app_password:
+        raise HTTPException(
+            status_code=400,
+            detail="WordPress Application Password가 설정되어 있지 않습니다."
+        )
+
+    logger.info(f"WordPress 발행 시작: user_id={user.id}, site={connection.site_name}")
+
+    # Basic Auth 헤더 생성
+    credentials = f"{connection.wp_username}:{connection.wp_app_password}"
+    encoded = base64.b64encode(credentials.encode()).decode()
+    auth_header = f"Basic {encoded}"
+
+    # 게시물 데이터 준비
+    post_payload = {
+        "title": title or "Untitled Post",
+        "content": content or "",
+        "status": status  # publish, draft, pending, private
+    }
+
+    # 태그가 있으면 문자열로 변환해서 콘텐츠에 추가 (WordPress 태그는 ID 기반이므로)
+    if tags and len(tags) > 0:
+        hashtags = " ".join([f"#{tag}" if not tag.startswith("#") else tag for tag in tags])
+        post_payload["content"] = f"{content}\n\n{hashtags}"
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{connection.site_url}/wp-json/wp/v2/posts",
+                json=post_payload,
+                headers={
+                    "Authorization": auth_header,
+                    "Content-Type": "application/json"
+                }
+            )
+
+        if response.status_code not in [200, 201]:
+            error_detail = response.json() if response.content else "Unknown error"
+            logger.error(f"WordPress 발행 실패: {error_detail}")
+            raise HTTPException(status_code=response.status_code, detail=f"WordPress 발행 실패: {error_detail}")
+
+        created_post = response.json()
+        post_id = created_post.get("id")
+        publish_url = created_post.get("link")
+
+        logger.info(f"WordPress 발행 성공: user_id={user.id}, post_id={post_id}, url={publish_url}")
+        return publish_url, str(post_id)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"WordPress 발행 중 예외 발생: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"WordPress 발행 중 오류가 발생했습니다: {str(e)}")
+
+
 @router.get("", response_model=List[PublishedContentListResponse])
 async def list_published_contents(
     status: Optional[str] = Query(None, description="필터: draft, scheduled, published, failed"),
@@ -609,6 +1030,8 @@ async def update_published_content(
             content.image_ids = request.image_ids
         if request.uploaded_image_url is not None:
             content.uploaded_image_url = request.uploaded_image_url
+        if request.card_image_urls is not None:
+            content.card_image_urls = request.card_image_urls
         if request.scheduled_at is not None:
             content.scheduled_at = request.scheduled_at
             content.status = "scheduled"
@@ -740,6 +1163,278 @@ async def create_from_session(
 
     logger.info(f"세션에서 발행 콘텐츠 생성: user_id={current_user.id}, session_id={session_id}, platform={platform}")
     return published
+
+
+class CardnewsPublishRequest(BaseModel):
+    """카드뉴스 SNS 발행 요청"""
+    platform: str  # instagram, facebook, threads
+    image_urls: List[str]  # 카드뉴스 이미지 URL 배열
+    caption: str  # 캡션/설명
+
+
+@router.post("/publish-cardnews")
+async def publish_cardnews(
+    request: CardnewsPublishRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    카드뉴스 SNS 발행 (Instagram 캐러셀 / Facebook 앨범 / Threads)
+    - Instagram: 캐러셀 포스트로 발행 (최대 10장)
+    - Facebook: 사진 게시물로 발행 (첫 번째 이미지만)
+    - Threads: 텍스트 포스트로 발행 (이미지 미지원 또는 첫 번째만)
+    """
+    platform = request.platform.lower()
+    image_urls = request.image_urls
+    caption = request.caption
+
+    logger.info(f"카드뉴스 발행 요청: user_id={current_user.id}, platform={platform}, images={len(image_urls) if image_urls else 0}")
+
+    if not image_urls or len(image_urls) == 0:
+        raise HTTPException(status_code=400, detail="이미지가 필요합니다.")
+
+    logger.info(f"카드뉴스 발행 시작: platform={platform}, images={len(image_urls)}")
+
+    # base64 이미지를 Supabase Storage에 업로드하여 URL로 변환
+    converted_urls = []
+    for idx, img_url in enumerate(image_urls):
+        if img_url.startswith('data:image'):
+            # base64 데이터 URL -> Supabase Storage 업로드
+            logger.info(f"이미지 {idx + 1}: base64 형식, Supabase 업로드 필요")
+            try:
+                # 기존 upload_cardnews_image_to_supabase 함수 사용
+                # session_id 대신 타임스탬프 사용
+                import time
+                session_id = int(time.time())
+                public_url = await upload_cardnews_image_to_supabase(
+                    img_url,
+                    current_user.id,
+                    session_id,
+                    idx + 1
+                )
+                logger.info(f"이미지 {idx + 1} Supabase 업로드 완료: {public_url[:80]}...")
+                converted_urls.append(public_url)
+            except Exception as e:
+                logger.error(f"이미지 {idx + 1} 업로드 실패: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"이미지 {idx + 1} 업로드에 실패했습니다: {str(e)}"
+                )
+        else:
+            # 이미 HTTP URL인 경우 그대로 사용
+            logger.info(f"이미지 {idx + 1}: HTTP URL 형식")
+            converted_urls.append(img_url)
+
+    # 변환된 URL 사용
+    image_urls = converted_urls
+    logger.info(f"최종 이미지 URL 수: {len(image_urls)}")
+
+    try:
+        publish_url = None
+        platform_post_id = None
+
+        # Instagram 캐러셀 발행
+        if platform == "instagram":
+            publish_url, platform_post_id = await _publish_cardnews_to_instagram(
+                db, current_user, image_urls, caption
+            )
+
+        # Facebook 발행 (여러 이미지 지원)
+        elif platform == "facebook":
+            publish_url, platform_post_id = await _publish_cardnews_to_facebook(
+                db, current_user, image_urls, caption
+            )
+
+        # Threads 발행 (텍스트만)
+        elif platform == "threads":
+            publish_url, platform_post_id = await _publish_to_threads(
+                db, current_user, caption, None
+            )
+
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"지원하지 않는 플랫폼입니다: {platform}"
+            )
+
+        logger.info(f"카드뉴스 발행 완료: platform={platform}, url={publish_url}")
+
+        return {
+            "success": True,
+            "platform": platform,
+            "publish_url": publish_url,
+            "platform_post_id": platform_post_id,
+            "message": f"{platform}에 카드뉴스가 발행되었습니다."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"카드뉴스 발행 실패: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"발행에 실패했습니다: {str(e)}")
+
+
+async def _publish_cardnews_to_instagram(
+    db: Session,
+    user: User,
+    image_urls: List[str],
+    caption: str
+) -> tuple:
+    """
+    Instagram에 캐러셀 포스트로 카드뉴스 발행
+    Returns: (publish_url, post_id)
+    """
+    # Instagram 연동 확인
+    connection = db.query(InstagramConnection).filter(
+        InstagramConnection.user_id == user.id,
+        InstagramConnection.is_active == True
+    ).first()
+
+    if not connection:
+        raise HTTPException(
+            status_code=400,
+            detail="Instagram 계정이 연동되어 있지 않습니다. 설정에서 Instagram 계정을 연동해주세요."
+        )
+
+    if len(image_urls) < 2:
+        # 단일 이미지는 일반 발행으로 처리
+        return await _publish_to_instagram(db, user, caption, None, image_urls[0])
+
+    if len(image_urls) > 10:
+        raise HTTPException(
+            status_code=400,
+            detail="Instagram 캐러셀은 최대 10장까지 가능합니다."
+        )
+
+    logger.info(f"Instagram 캐러셀 발행 시작: user_id={user.id}, images={len(image_urls)}")
+
+    try:
+        service = InstagramService(connection.page_access_token)
+        instagram_user_id = connection.instagram_account_id
+
+        # 1. 각 이미지에 대해 캐러셀 아이템 컨테이너 생성
+        children_ids = []
+        for idx, img_url in enumerate(image_urls):
+            logger.info(f"캐러셀 아이템 생성 중: {idx + 1}/{len(image_urls)}")
+            container = await service.create_media_container(
+                instagram_user_id=instagram_user_id,
+                image_url=img_url,
+                is_carousel_item=True
+            )
+            if not container or "id" not in container:
+                logger.error(f"캐러셀 아이템 {idx + 1} 생성 실패")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"이미지 {idx + 1} 컨테이너 생성에 실패했습니다."
+                )
+            children_ids.append(container["id"])
+            logger.info(f"캐러셀 아이템 생성됨: {container['id']}")
+
+        # 2. 캐러셀 컨테이너 생성
+        logger.info(f"캐러셀 컨테이너 생성 중: children={children_ids}")
+        carousel_container = await service.create_carousel_container(
+            instagram_user_id=instagram_user_id,
+            children_ids=children_ids,
+            caption=caption
+        )
+
+        if not carousel_container or "id" not in carousel_container:
+            logger.error("캐러셀 컨테이너 생성 실패")
+            raise HTTPException(status_code=500, detail="캐러셀 컨테이너 생성에 실패했습니다.")
+
+        carousel_id = carousel_container["id"]
+        logger.info(f"캐러셀 컨테이너 생성됨: {carousel_id}")
+
+        # 3. 캐러셀 발행
+        result = await service.publish_media(
+            instagram_user_id=instagram_user_id,
+            creation_id=carousel_id
+        )
+
+        await service.close()
+
+        if not result or "id" not in result:
+            logger.error("Instagram 캐러셀 발행 실패")
+            raise HTTPException(status_code=500, detail="Instagram 캐러셀 발행에 실패했습니다.")
+
+        post_id = result.get("id")
+        username = connection.instagram_username
+        publish_url = f"https://www.instagram.com/p/{post_id}/" if post_id else None
+
+        logger.info(f"Instagram 캐러셀 발행 성공: user_id={user.id}, post_id={post_id}")
+        return publish_url, post_id
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Instagram 캐러셀 발행 중 예외 발생: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Instagram 캐러셀 발행 중 오류가 발생했습니다: {str(e)}")
+
+
+async def _publish_cardnews_to_facebook(
+    db: Session,
+    user: User,
+    image_urls: List[str],
+    caption: str
+) -> tuple:
+    """
+    Facebook 페이지에 여러 이미지가 포함된 카드뉴스 발행
+    Returns: (publish_url, post_id)
+    """
+    # Facebook 연동 확인
+    connection = db.query(FacebookConnection).filter(
+        FacebookConnection.user_id == user.id,
+        FacebookConnection.is_active == True
+    ).first()
+
+    if not connection:
+        raise HTTPException(
+            status_code=400,
+            detail="Facebook 페이지가 연동되어 있지 않습니다. 설정에서 Facebook 페이지를 연동해주세요."
+        )
+
+    if not connection.page_id or not connection.page_access_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Facebook 페이지가 선택되어 있지 않습니다. 설정에서 페이지를 선택해주세요."
+        )
+
+    logger.info(f"Facebook 카드뉴스 발행 시작: user_id={user.id}, page={connection.page_name}, images={len(image_urls)}")
+
+    try:
+        service = FacebookService(connection.user_access_token, connection.page_access_token)
+
+        # 여러 이미지 게시물 생성
+        result = await service.create_multi_photo_post(
+            page_id=connection.page_id,
+            photo_urls=image_urls,
+            message=caption
+        )
+
+        await service.close()
+
+        if not result or "id" not in result:
+            logger.error("Facebook 카드뉴스 발행 실패: API 응답 없음")
+            raise HTTPException(status_code=500, detail="Facebook 카드뉴스 발행에 실패했습니다.")
+
+        post_id = result.get("id")
+        actual_post_id = post_id.split("_")[-1] if "_" in post_id else post_id
+        publish_url = f"https://www.facebook.com/{connection.page_id}/posts/{actual_post_id}"
+
+        logger.info(f"Facebook 카드뉴스 발행 성공: user_id={user.id}, post_id={post_id}")
+        return publish_url, post_id
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Facebook 카드뉴스 발행 중 예외 발생: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Facebook 카드뉴스 발행 중 오류가 발생했습니다: {str(e)}")
 
 
 @router.post("/upload-image")

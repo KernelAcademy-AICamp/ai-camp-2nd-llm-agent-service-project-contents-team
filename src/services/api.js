@@ -767,6 +767,12 @@ export const publishedContentAPI = {
     });
     return response.data;
   },
+
+  // 카드뉴스 SNS 발행 (Instagram/Facebook/Threads)
+  publishCardnews: async (data) => {
+    const response = await api.post('/api/published-contents/publish-cardnews', data);
+    return response.data;
+  },
 };
 
 // ==========================================

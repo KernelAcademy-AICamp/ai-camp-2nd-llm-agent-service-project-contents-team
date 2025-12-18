@@ -982,6 +982,7 @@ class PublishedContent(Base):
     # 이미지 참조
     image_ids = Column(JSON, nullable=True)  # generated_images ID 목록
     uploaded_image_url = Column(String(500), nullable=True)  # 직접 업로드한 이미지 URL
+    card_image_urls = Column(JSON, nullable=True)  # 카드뉴스 이미지 URL 배열
 
     # 상태 관리
     status = Column(String(20), nullable=False, default="draft")
