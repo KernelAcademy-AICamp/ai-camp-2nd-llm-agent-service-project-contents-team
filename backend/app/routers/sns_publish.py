@@ -1,6 +1,6 @@
 """
 SNS 통합 발행 API Router
-- Instagram과 Facebook에 동시 발행
+- Instagram, Facebook, Threads에 동시 발행
 - 이미지 업로드 지원
 """
 from typing import Optional, List, Dict
@@ -15,6 +15,7 @@ from .. import models, auth
 from ..database import get_db
 from ..services.instagram_service import InstagramService
 from ..services.facebook_service import FacebookService
+from ..services.threads_service import ThreadsService
 from ..logger import get_logger
 
 logger = get_logger(__name__)
@@ -33,12 +34,14 @@ IMGBB_API_KEY = os.getenv("IMGBB_API_KEY", "")
 class PlatformSelection(BaseModel):
     instagram: bool = False
     facebook: bool = False
+    threads: bool = False
 
 
 class PublishContent(BaseModel):
     type: str = "text"  # "text" or "image"
     instagramCaption: Optional[str] = None
     facebookPost: Optional[str] = None
+    threadsText: Optional[str] = None
     hashtags: Optional[List[str]] = []
     images: Optional[List[str]] = []  # base64 또는 URL
 
@@ -58,6 +61,7 @@ class PlatformStatus(BaseModel):
 class SNSStatusResponse(BaseModel):
     instagram: PlatformStatus
     facebook: PlatformStatus
+    threads: PlatformStatus
 
 
 # ===== Helper Functions =====
@@ -233,6 +237,46 @@ async def publish_to_facebook(
         return {"success": False, "error": str(e)}
 
 
+async def publish_to_threads(
+    connection: models.ThreadsConnection,
+    text: str,
+    hashtags: List[str],
+    image_url: Optional[str] = None
+) -> Dict:
+    """Threads에 게시물 발행"""
+    try:
+        threads_service = ThreadsService(
+            connection.access_token,
+            connection.threads_user_id
+        )
+
+        # 해시태그를 텍스트에 추가
+        full_text = text
+        if hashtags:
+            hashtag_text = ' '.join([f'#{tag}' if not tag.startswith('#') else tag for tag in hashtags])
+            full_text = f"{text}\n\n{hashtag_text}"
+
+        # 500자 제한 체크
+        if len(full_text) > 500:
+            full_text = full_text[:497] + "..."
+
+        # 발행
+        result = await threads_service.create_and_publish_thread(
+            user_id=connection.threads_user_id,
+            text=full_text,
+            image_url=image_url
+        )
+
+        if result and 'id' in result:
+            return {"success": True, "post_id": result['id']}
+        else:
+            return {"success": False, "error": "Failed to create Threads post"}
+
+    except Exception as e:
+        logger.error(f"Threads publish error: {e}")
+        return {"success": False, "error": str(e)}
+
+
 # ===== API Endpoints =====
 
 @router.get('/status', response_model=SNSStatusResponse)
@@ -240,7 +284,7 @@ async def get_sns_status(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_active_user)
 ):
-    """Instagram과 Facebook 연동 상태 확인"""
+    """Instagram, Facebook, Threads 연동 상태 확인"""
 
     # Instagram 연동 상태
     ig_connection = db.query(models.InstagramConnection).filter(
@@ -269,9 +313,23 @@ async def get_sns_status(
         profile_picture_url=fb_connection.page_picture_url if fb_connection else None
     )
 
+    # Threads 연동 상태
+    threads_connection = db.query(models.ThreadsConnection).filter(
+        models.ThreadsConnection.user_id == current_user.id,
+        models.ThreadsConnection.is_active == True
+    ).first()
+
+    threads_status = PlatformStatus(
+        connected=threads_connection is not None and threads_connection.threads_user_id is not None,
+        username=threads_connection.username if threads_connection else None,
+        name=threads_connection.name if threads_connection else None,
+        profile_picture_url=threads_connection.threads_profile_picture_url if threads_connection else None
+    )
+
     return SNSStatusResponse(
         instagram=instagram_status,
-        facebook=facebook_status
+        facebook=facebook_status,
+        threads=threads_status
     )
 
 
@@ -281,12 +339,13 @@ async def publish_to_sns(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_active_user)
 ):
-    """Instagram과 Facebook에 콘텐츠 발행"""
+    """Instagram, Facebook, Threads에 콘텐츠 발행"""
 
     results = {
         "success": False,
         "instagram": None,
-        "facebook": None
+        "facebook": None,
+        "threads": None
     }
 
     # 이미지 URL 준비 (base64인 경우 호스팅 서비스에 업로드)
@@ -337,9 +396,48 @@ async def publish_to_sns(
                 image_urls
             )
 
-    # 전체 성공 여부 판단
+    # Threads 발행
+    if request.platforms.threads:
+        threads_connection = db.query(models.ThreadsConnection).filter(
+            models.ThreadsConnection.user_id == current_user.id,
+            models.ThreadsConnection.is_active == True
+        ).first()
+
+        if not threads_connection or not threads_connection.threads_user_id:
+            results["threads"] = {"success": False, "error": "Threads not connected"}
+        else:
+            # Threads 텍스트 (없으면 Instagram 캡션 또는 Facebook 포스트 사용)
+            threads_text = (
+                request.content.threadsText or
+                request.content.instagramCaption or
+                request.content.facebookPost or
+                ""
+            )
+
+            # Threads는 이미지 1개만 지원
+            threads_image = image_urls[0] if image_urls else None
+
+            results["threads"] = await publish_to_threads(
+                threads_connection,
+                threads_text,
+                request.content.hashtags or [],
+                threads_image
+            )
+
+    # 전체 성공 여부 판단 (하나라도 성공하면 success)
     instagram_success = results.get("instagram", {}).get("success", True) if results.get("instagram") else True
     facebook_success = results.get("facebook", {}).get("success", True) if results.get("facebook") else True
-    results["success"] = instagram_success or facebook_success
+    threads_success = results.get("threads", {}).get("success", True) if results.get("threads") else True
+
+    # 선택된 플랫폼 중 하나라도 성공하면 전체 성공
+    selected_platforms = []
+    if request.platforms.instagram:
+        selected_platforms.append(results.get("instagram", {}).get("success", False))
+    if request.platforms.facebook:
+        selected_platforms.append(results.get("facebook", {}).get("success", False))
+    if request.platforms.threads:
+        selected_platforms.append(results.get("threads", {}).get("success", False))
+
+    results["success"] = any(selected_platforms) if selected_platforms else False
 
     return results
