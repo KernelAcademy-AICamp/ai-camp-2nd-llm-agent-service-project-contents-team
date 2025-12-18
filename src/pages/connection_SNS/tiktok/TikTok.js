@@ -14,7 +14,7 @@ import {
   SyncButton,
   DisconnectButton
 } from '../common/SNSComponents';
-import { formatNumber, formatDate, API_URL } from '../common/utils';
+import { formatNumber, formatDate, formatDuration, API_URL } from '../common/utils';
 import '../common/SNSCommon.css';
 import './TikTok.css';
 
@@ -261,14 +261,6 @@ function VideoCard({ video }) {
       </div>
     </div>
   );
-}
-
-// 동영상 시간 포맷
-function formatDuration(seconds) {
-  if (!seconds) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 // 동영상 업로드 폼 컴포넌트
