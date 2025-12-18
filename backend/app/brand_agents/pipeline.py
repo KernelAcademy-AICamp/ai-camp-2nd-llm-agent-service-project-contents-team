@@ -8,7 +8,7 @@ import logging
 import asyncio
 from typing import Dict, Optional, List
 from datetime import datetime
-from .collectors import BlogCollectorAgent, InstagramCollectorAgent, YouTubeCollectorAgent
+from .collectors import InstagramCollectorAgent, YouTubeCollectorAgent, ThreadsCollectorAgent
 from .normalizer import DataNormalizer
 from .analyzers import TextAnalyzerAgent, VisualAnalyzerAgent, EngagementAnalyzerAgent
 from .synthesizer import BrandProfileSynthesizer
@@ -31,15 +31,12 @@ class BrandAnalysisPipeline:
     def __init__(self, db=None):
         """
         Args:
-            db: Database session (YouTube Collector에 필요)
+            db: Database session (YouTube, Instagram, Threads Collector에 필요)
         """
         self.db = db
 
-        # Layer 1: Collectors (YouTube는 런타임에 생성)
-        self.collectors = {
-            'blog': BlogCollectorAgent(),
-            'instagram': InstagramCollectorAgent()
-        }
+        # Layer 1: Collectors (모든 Collector는 런타임에 생성)
+        # Instagram, YouTube, Threads는 OAuth 연동 기반으로 런타임에 생성됨
 
         # Layer 2: Normalizer
         self.normalizer = DataNormalizer()
@@ -67,9 +64,9 @@ class BrandAnalysisPipeline:
             user_id: 사용자 ID (int)
             platform_urls: 플랫폼별 URL
                 {
-                    'blog': 'https://blog.naver.com/example',
-                    'instagram': 'https://instagram.com/example',
-                    'youtube': 'connected'  # YouTube는 OAuth 연동 기반
+                    'instagram': 'connected',  # Instagram은 OAuth 연동 기반
+                    'youtube': 'connected',    # YouTube는 OAuth 연동 기반
+                    'threads': 'connected'     # Threads는 OAuth 연동 기반
                 }
             max_items: 각 플랫폼당 최대 수집 아이템 수
 
@@ -89,17 +86,12 @@ class BrandAnalysisPipeline:
             platforms_to_analyze = []
 
             # 입력된 플랫폼에 대해서만 collector 실행
-            if 'blog' in platform_urls and platform_urls['blog']:
-                logger.info(f"  ✓ 블로그 수집 예정: {platform_urls['blog']}")
-                collection_tasks.append(
-                    self.collectors['blog'].collect(platform_urls['blog'], max_items)
-                )
-                platforms_to_analyze.append('naver_blog')
-
+            # Instagram은 OAuth 연동 기반으로 수집
             if 'instagram' in platform_urls and platform_urls['instagram']:
-                logger.info(f"  ✓ 인스타그램 수집 예정: {platform_urls['instagram']}")
+                logger.info(f"  ✓ Instagram 수집 예정 (OAuth 연동 기반)")
+                instagram_collector = InstagramCollectorAgent(db=self.db, user_id=user_id)
                 collection_tasks.append(
-                    self.collectors['instagram'].collect(platform_urls['instagram'], max_items)
+                    instagram_collector.collect(max_items=max_items)
                 )
                 platforms_to_analyze.append('instagram')
 
@@ -111,6 +103,15 @@ class BrandAnalysisPipeline:
                     youtube_collector.collect(max_items=max_items)
                 )
                 platforms_to_analyze.append('youtube')
+
+            # Threads는 OAuth 연동 기반으로 수집
+            if 'threads' in platform_urls and platform_urls['threads']:
+                logger.info(f"  ✓ Threads 수집 예정 (OAuth 연동 기반)")
+                threads_collector = ThreadsCollectorAgent(db=self.db, user_id=user_id)
+                collection_tasks.append(
+                    threads_collector.collect(max_items=max_items)
+                )
+                platforms_to_analyze.append('threads')
 
             if not collection_tasks:
                 raise ValueError("분석할 플랫폼이 없습니다")

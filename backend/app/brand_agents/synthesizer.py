@@ -124,21 +124,39 @@ class BrandProfileSynthesizer:
 
 {{
   "brand_name": "브랜드명 (콘텐츠에서 반복 언급되는 이름, 없으면 null)",
-  "business_type": "업종 (예: 카페/베이커리, IT/소프트웨어)",
+  "business_type": "업종 - 반드시 다음 중 하나만 선택: food, fashion, health, education, tech, retail, service",
   "brand_personality": "브랜드 성격을 2-3문장으로 설명",
   "brand_values": ["브랜드 가치 1", "가치 2", "가치 3"],
   "target_audience": "타겟 고객 - 반드시 구체적으로 (예: 20-30대 직장인 여성)",
   "emotional_tone": "감정적 톤 (예: 따뜻한, 유머러스한, 진지한)"
 }}
 
-**중요**: target_audience는 '전체', '모든 연령' 같은 모호한 답변 금지. 반드시 연령대나 특성을 포함하세요.
+**업종 분류 기준:**
+- food: 음식점, 카페, 베이커리, 식음료 관련
+- fashion: 패션, 뷰티, 화장품, 의류 관련
+- health: 헬스, 피트니스, 요가, 운동, 건강 관련
+- education: 학원, 교육, 강의, 학습 관련
+- tech: IT, 소프트웨어, 기술, 개발 관련
+- retail: 소매, 유통, 쇼핑몰, 제품 판매 관련
+- service: 서비스업 전반 (위 카테고리에 해당하지 않는 모든 서비스)
+
+**중요 규칙:**
+1. business_type은 반드시 위 7개 중 하나의 영문 코드만 사용
+2. target_audience는 '전체', '모든 연령' 같은 모호한 답변 금지. 반드시 연령대나 특성을 포함하세요.
 """
 
             identity_data = await self.vertex_client.generate_json(prompt, temperature=0.3)
 
+            # 업종 검증: 허용된 카테고리만 사용
+            valid_business_types = ['food', 'fashion', 'health', 'education', 'tech', 'retail', 'service']
+            business_type = identity_data.get("business_type", "service")
+            if business_type not in valid_business_types:
+                logger.warning(f"⚠️ 유효하지 않은 업종: {business_type}, 기본값 'service'로 설정")
+                business_type = "service"
+
             return BrandIdentity(
                 brand_name=identity_data.get("brand_name"),
-                business_type=identity_data.get("business_type"),
+                business_type=business_type,
                 brand_personality=identity_data.get("brand_personality", ""),
                 brand_values=identity_data.get("brand_values", []),
                 target_audience=identity_data.get("target_audience", "일반 대중"),
@@ -149,7 +167,7 @@ class BrandProfileSynthesizer:
             logger.error(f"❌ Identity 생성 실패: {e}")
             return BrandIdentity(
                 brand_name=None,
-                business_type="일반",
+                business_type="service",
                 brand_personality="정의되지 않음",
                 brand_values=[],
                 target_audience="일반 대중",

@@ -45,9 +45,9 @@
   --border-light: rgba(230, 230, 250, 0.5);  /* Subtle border */
 
   /* Status Colors - Meaningful colors */
-  --success-color: #22c55e;        /* Green */
-  --success-light: #dcfce7;        /* Light Green */
-  --success-dark: #16a34a;         /* Dark Green */
+  --success-color: #8b5cf6;        /* Purple (Brand Color) */
+  --success-light: #F5F0FF;        /* Light Purple (Brand Color) */
+  --success-dark: #5f27cd;         /* Dark Purple (Brand Color) */
 
   --warning-color: #f59e0b;        /* Amber */
   --warning-light: #fef3c7;        /* Light Amber */

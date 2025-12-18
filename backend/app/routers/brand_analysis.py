@@ -11,9 +11,8 @@ import logging
 import asyncio
 
 from ..database import get_db, SessionLocal
-from ..models import User, BrandAnalysis, YouTubeConnection
+from ..models import User, BrandAnalysis, YouTubeConnection, InstagramConnection, ThreadsConnection
 from ..auth import get_current_user
-from ..services.naver_blog_service import NaverBlogService
 from ..services.brand_analyzer_service import BrandAnalyzerService
 from ..brand_agents import BrandAnalysisPipeline
 
@@ -23,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 class MultiPlatformAnalysisRequest(BaseModel):
     """멀티 플랫폼 분석 요청"""
-    blog_url: Optional[str] = None
     instagram_url: Optional[str] = None
     youtube_url: Optional[str] = None
+    threads_url: Optional[str] = None
     max_posts: int = 10  # 각 플랫폼당 최대 포스트 수
 
 
@@ -50,30 +49,6 @@ class AnalysisResponse(BaseModel):
     status: str
     message: str
     analysis: Optional[Dict[str, Any]] = None
-
-
-async def analyze_blog_platform(blog_url: str, max_posts: int) -> Dict[str, Any]:
-    """블로그 플랫폼 분석"""
-    try:
-        logger.info(f"블로그 분석 시작: {blog_url}")
-        blog_service = NaverBlogService()
-        posts = await blog_service.collect_blog_posts(blog_url, max_posts)
-
-        if not posts:
-            return None
-
-        # 블로그 분석 (BrandAnalyzerService 사용)
-        analyzer = BrandAnalyzerService()
-        result = await analyzer.analyze_brand(posts, {})
-
-        return {
-            "url": blog_url,
-            "analyzed_posts": len(posts),
-            "analysis": result
-        }
-    except Exception as e:
-        logger.error(f"블로그 분석 실패: {e}")
-        return None
 
 
 async def analyze_instagram_platform(instagram_url: str, max_posts: int) -> Dict[str, Any]:
@@ -124,9 +99,9 @@ async def analyze_youtube_platform(youtube_url: str, max_videos: int) -> Dict[st
 
 async def multi_platform_analysis_background(
     user_id: int,
-    blog_url: Optional[str],
     instagram_url: Optional[str],
     youtube_url: Optional[str],
+    threads_url: Optional[str],
     max_posts: int
 ):
     """
@@ -159,10 +134,6 @@ async def multi_platform_analysis_background(
 
         # 플랫폼 URL 구성
         platform_urls = {}
-        if blog_url:
-            platform_urls['blog'] = blog_url
-            brand_analysis.blog_analysis_status = "analyzing"
-            brand_analysis.blog_url = blog_url
         if instagram_url:
             platform_urls['instagram'] = instagram_url
             brand_analysis.instagram_analysis_status = "analyzing"
@@ -171,6 +142,21 @@ async def multi_platform_analysis_background(
             platform_urls['youtube'] = youtube_url
             brand_analysis.youtube_analysis_status = "analyzing"
             brand_analysis.youtube_url = youtube_url
+        if threads_url:
+            platform_urls['threads'] = threads_url
+            # Note: BrandAnalysis 모델에 threads_* 필드가 추가되면 여기에 매핑 추가 필요
+
+        # Instagram Connection 자동 감지 (OAuth 연동 기반)
+        instagram_connection = db.query(InstagramConnection).filter(
+            InstagramConnection.user_id == user_id,
+            InstagramConnection.is_active == True
+        ).first()
+
+        if instagram_connection:
+            logger.info(f"✅ Instagram 계정 연동 확인됨: @{instagram_connection.instagram_username}")
+            platform_urls['instagram'] = 'connected'  # OAuth 연동 표시
+            brand_analysis.instagram_analysis_status = "analyzing"
+            brand_analysis.instagram_url = f"https://instagram.com/{instagram_connection.instagram_username}"
 
         # YouTube Connection 자동 감지 (OAuth 연동 기반)
         youtube_connection = db.query(YouTubeConnection).filter(
@@ -183,6 +169,17 @@ async def multi_platform_analysis_background(
             platform_urls['youtube'] = 'connected'  # OAuth 연동 표시
             brand_analysis.youtube_analysis_status = "analyzing"
             brand_analysis.youtube_url = f"https://youtube.com/@{youtube_connection.channel_custom_url or youtube_connection.channel_id}"
+
+        # Threads Connection 자동 감지 (OAuth 연동 기반)
+        threads_connection = db.query(ThreadsConnection).filter(
+            ThreadsConnection.user_id == user_id,
+            ThreadsConnection.is_active == True
+        ).first()
+
+        if threads_connection:
+            logger.info(f"✅ Threads 계정 연동 확인됨: @{threads_connection.username}")
+            platform_urls['threads'] = 'connected'  # OAuth 연동 표시
+            # Note: BrandAnalysis 모델에 threads_* 필드가 추가되면 여기에 매핑 추가 필요
 
         if not platform_urls:
             logger.error("분석할 플랫폼이 없습니다")
@@ -208,16 +205,6 @@ async def multi_platform_analysis_background(
         brand_analysis.brand_personality = brand_profile.identity.brand_personality
         brand_analysis.key_themes = brand_profile.content_strategy.primary_topics
         brand_analysis.emotional_tone = brand_profile.identity.emotional_tone
-
-        # Blog 데이터 (blog 플랫폼이 분석되었으면)
-        if 'naver_blog' in brand_profile.analyzed_platforms:
-            brand_analysis.blog_writing_style = brand_profile.content_strategy.content_structure
-            brand_analysis.blog_content_structure = brand_profile.content_strategy.content_structure
-            brand_analysis.blog_call_to_action = brand_profile.content_strategy.call_to_action_style
-            brand_analysis.blog_keyword_usage = brand_profile.content_strategy.keyword_usage
-            brand_analysis.blog_analyzed_posts = brand_profile.total_contents_analyzed
-            brand_analysis.blog_analyzed_at = datetime.utcnow()
-            brand_analysis.blog_analysis_status = "completed"
 
         # Instagram 데이터
         if 'instagram' in brand_profile.analyzed_platforms:
@@ -255,12 +242,12 @@ async def multi_platform_analysis_background(
         try:
             brand_analysis = db.query(BrandAnalysis).filter(BrandAnalysis.user_id == user_id).first()
             if brand_analysis:
-                if blog_url:
-                    brand_analysis.blog_analysis_status = "failed"
                 if instagram_url:
                     brand_analysis.instagram_analysis_status = "failed"
                 if youtube_url:
                     brand_analysis.youtube_analysis_status = "failed"
+                if threads_url:
+                    pass  # Note: BrandAnalysis 모델에 threads_* 필드가 추가되면 여기에 상태 업데이트 추가
                 db.commit()
         except:
             pass
@@ -279,16 +266,14 @@ async def analyze_multi_platform(
     """
     멀티 플랫폼 브랜드 분석 시작 (비동기)
 
-    - 블로그, 인스타그램, 유튜브 중 제공된 플랫폼만 분석
+    - 인스타그램, 유튜브, Threads 중 제공된 플랫폼만 분석 (OAuth 연동 기반)
     - 백그라운드에서 처리되며, 완료 후 DB에 저장
     """
     try:
-        # 최소 1개 플랫폼 URL 필요
-        if not any([request.blog_url, request.instagram_url, request.youtube_url]):
-            raise HTTPException(
-                status_code=400,
-                detail="최소 1개 이상의 플랫폼 URL이 필요합니다."
-            )
+        # 최소 1개 플랫폼 URL 필요 (실제로는 OAuth 연동 확인)
+        if not any([request.instagram_url, request.youtube_url, request.threads_url]):
+            # OAuth 연동된 플랫폼이 있는지 확인
+            pass  # OAuth 연동은 백그라운드 함수에서 자동 감지
 
         # BrandAnalysis 레코드 확인
         brand_analysis = db.query(BrandAnalysis).filter(BrandAnalysis.user_id == current_user.id).first()
@@ -296,7 +281,6 @@ async def analyze_multi_platform(
         # 이미 분석 중인지 확인
         if brand_analysis:
             analyzing = (
-                (request.blog_url and brand_analysis.blog_analysis_status == "analyzing") or
                 (request.instagram_url and brand_analysis.instagram_analysis_status == "analyzing") or
                 (request.youtube_url and brand_analysis.youtube_analysis_status == "analyzing")
             )
@@ -310,19 +294,19 @@ async def analyze_multi_platform(
         background_tasks.add_task(
             multi_platform_analysis_background,
             current_user.id,
-            request.blog_url,
             request.instagram_url,
             request.youtube_url,
+            request.threads_url,
             request.max_posts
         )
 
         platforms = []
-        if request.blog_url:
-            platforms.append("블로그")
         if request.instagram_url:
             platforms.append("인스타그램")
         if request.youtube_url:
             platforms.append("유튜브")
+        if request.threads_url:
+            platforms.append("Threads")
 
         return AnalysisResponse(
             status="started",
@@ -466,16 +450,6 @@ async def manual_content_analysis_background(
         brand_analysis.emotional_tone = brand_profile.identity.emotional_tone
         brand_analysis.brand_tone = brand_profile.tone_of_voice.sentence_style
         brand_analysis.key_themes = brand_profile.content_strategy.primary_topics
-
-        # Blog 필드 (텍스트 샘플 분석 결과)
-        if text_samples:
-            brand_analysis.blog_writing_style = brand_profile.content_strategy.content_structure
-            brand_analysis.blog_content_structure = brand_profile.tone_of_voice.sentence_style
-            brand_analysis.blog_call_to_action = brand_profile.content_strategy.call_to_action_style
-            brand_analysis.blog_keyword_usage = brand_profile.content_strategy.keyword_usage
-            brand_analysis.blog_analyzed_posts = len(text_samples)
-            brand_analysis.blog_analyzed_at = datetime.utcnow()
-            brand_analysis.blog_analysis_status = "completed"
 
         # Instagram 필드 (이미지 샘플 분석 결과)
         if image_samples:

@@ -1065,6 +1065,13 @@
   transform: none;
 }
 
+/* 긴 텍스트 스타일 버튼 (유머러스한, 신뢰감있는) */
+.style-option-button.style-long-text {
+  font-size: 11px;
+  white-space: nowrap;
+  padding: var(--space-sm) var(--space-xs);
+}
+
 /* Style Preview Card */
 .style-preview-card {
   flex: 1;
