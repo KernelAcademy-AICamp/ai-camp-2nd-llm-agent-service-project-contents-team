@@ -4,7 +4,8 @@ from typing import List
 from pydantic import BaseModel
 from .. import models, auth
 from ..database import get_db
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel
 import os
 import json
 
@@ -13,8 +14,11 @@ router = APIRouter(
     tags=["ai-recommendations"]
 )
 
-# Gemini 설정
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# Vertex AI 설정
+vertexai.init(
+    project=os.getenv("GCP_PROJECT_ID"),
+    location=os.getenv("GCP_LOCATION", "us-central1")
+)
 
 class InterestRecommendationRequest(BaseModel):
     brand_name: str
@@ -37,7 +41,7 @@ async def recommend_interests(
     AI가 비즈니스 정보를 기반으로 타겟 고객의 관심사를 추천
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = GenerativeModel('gemini-2.5-flash')
 
         prompt = f"""
 당신은 마케팅 전문가입니다. 다음 비즈니스 정보를 분석하고 타겟 고객이 가질 만한 관심사 5개를 추천해주세요.

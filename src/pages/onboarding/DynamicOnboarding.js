@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
+import PlatformConsentModal from '../../components/PlatformConsentModal';
 import './DynamicOnboarding.css';
 
 // 스타일별 콘텐츠 예시
@@ -76,15 +77,10 @@ function DynamicOnboarding() {
 
   // SNS 분석 (멀티 플랫폼)
   const [platformUrls, setPlatformUrls] = useState({
-    blog: '',
     instagram: '',
-    youtube: ''
+    youtube: '',
+    threads: ''
   });
-
-  // 블로그 분석 (기존 - 레거시)
-  const [blogUrl, setBlogUrl] = useState('');
-  const [blogAnalysisStatus, setBlogAnalysisStatus] = useState('idle'); // idle, analyzing, completed, failed
-  const [blogAnalysisResult, setBlogAnalysisResult] = useState(null);
 
   // 멀티 플랫폼 분석 상태
   const [multiPlatformAnalysisStatus, setMultiPlatformAnalysisStatus] = useState('idle'); // idle, analyzing, completed, failed
@@ -95,9 +91,23 @@ function DynamicOnboarding() {
   const [youtubeConnection, setYoutubeConnection] = useState(null);
   const [youtubeConnectionLoading, setYoutubeConnectionLoading] = useState(false);
 
+  // Instagram 연동 상태
+  const [instagramConnection, setInstagramConnection] = useState(null);
+  const [instagramConnectionLoading, setInstagramConnectionLoading] = useState(false);
+
+  // Threads 연동 상태
+  const [threadsConnection, setThreadsConnection] = useState(null);
+  const [threadsConnectionLoading, setThreadsConnectionLoading] = useState(false);
+
   // 수동 입력 분석 상태
   const [manualAnalysisStatus, setManualAnalysisStatus] = useState('idle'); // idle, analyzing, completed, failed
   const [manualAnalysisResult, setManualAnalysisResult] = useState(null);
+
+  // 동의 모달 상태
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [consentPlatform, setConsentPlatform] = useState(null); // 'youtube', 'instagram', 'threads'
+  const [consentPlatformUrl, setConsentPlatformUrl] = useState('');
+  const [userConsents, setUserConsents] = useState(null);
 
   // Step 2: 콘텐츠 선호도
   const [preferences, setPreferences] = useState({
@@ -168,9 +178,11 @@ function DynamicOnboarding() {
     }
   }, [multiPlatformAnalysisStatus]);
 
-  // YouTube 연동 상태 확인
+  // YouTube/Instagram/Threads 연동 상태 확인
   useEffect(() => {
     checkYouTubeConnection();
+    checkInstagramConnection();
+    checkThreadsConnection();
   }, []);
 
   const checkOnboardingStatus = async () => {
@@ -225,6 +237,74 @@ function DynamicOnboarding() {
     }
   };
 
+  // Instagram 연동 상태 확인
+  const checkInstagramConnection = async () => {
+    try {
+      const response = await api.get('/api/instagram/status');
+      if (response.data) {
+        setInstagramConnection(response.data);
+        // Instagram 연동되어 있으면 platformUrls에 표시
+        setPlatformUrls(prev => ({ ...prev, instagram: 'connected' }));
+      }
+    } catch (error) {
+      console.log('Instagram 연동 없음:', error.response?.status === 404 ? '연동되지 않음' : error.message);
+      setInstagramConnection(null);
+    }
+  };
+
+  // Instagram 계정 연동
+  const handleInstagramConnect = async () => {
+    try {
+      setInstagramConnectionLoading(true);
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.id) {
+        alert('로그인이 필요합니다.');
+        return;
+      }
+
+      // Instagram OAuth 연동 페이지로 이동 (user_id 전달)
+      window.location.href = `http://localhost:8000/api/instagram/connect?user_id=${user.id}`;
+    } catch (error) {
+      console.error('Instagram 연동 실패:', error);
+      alert('Instagram 연동에 실패했습니다.');
+      setInstagramConnectionLoading(false);
+    }
+  };
+
+  // Threads 연동 상태 확인
+  const checkThreadsConnection = async () => {
+    try {
+      const response = await api.get('/api/threads/status');
+      if (response.data) {
+        setThreadsConnection(response.data);
+        // Threads 연동되어 있으면 platformUrls에 표시
+        setPlatformUrls(prev => ({ ...prev, threads: 'connected' }));
+      }
+    } catch (error) {
+      console.log('Threads 연동 없음:', error.response?.status === 404 ? '연동되지 않음' : error.message);
+      setThreadsConnection(null);
+    }
+  };
+
+  // Threads 계정 연동
+  const handleThreadsConnect = async () => {
+    try {
+      setThreadsConnectionLoading(true);
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.id) {
+        alert('로그인이 필요합니다.');
+        return;
+      }
+
+      // Threads OAuth 연동 페이지로 이동 (user_id 전달)
+      window.location.href = `http://localhost:8000/api/threads/connect?user_id=${user.id}`;
+    } catch (error) {
+      console.error('Threads 연동 실패:', error);
+      alert('Threads 연동에 실패했습니다.');
+      setThreadsConnectionLoading(false);
+    }
+  };
+
   const loadCustomQuestions = async () => {
     setLoadingQuestions(true);
     try {
@@ -264,58 +344,57 @@ function DynamicOnboarding() {
     }
   };
 
-  const analyzeBlog = async () => {
-    if (!blogUrl.trim()) {
-      alert('네이버 블로그 URL을 입력해주세요.');
+  // 동의 모달 표시 핸들러
+  const handleShowConsentModal = () => {
+    const hasAtLeastOne = platformUrls.instagram || platformUrls.youtube || platformUrls.threads || youtubeConnection || instagramConnection || threadsConnection;
+    if (!hasAtLeastOne) {
+      alert('최소 1개 이상의 플랫폼 URL을 입력해주세요.');
       return;
     }
 
-    setBlogAnalysisStatus('analyzing');
-    try {
-      // 분석 시작
-      await api.post('/api/blog/analyze', {
-        blog_url: blogUrl,
-        max_posts: 10
-      });
+    // 연결된 모든 플랫폼 수집
+    const connectedPlatforms = [];
 
-      // 분석 상태 폴링 (3초마다 체크)
-      const pollInterval = setInterval(async () => {
-        try {
-          const statusResponse = await api.get('/api/blog/analysis-status');
-          const status = statusResponse.data.status;
-
-          if (status === 'completed') {
-            clearInterval(pollInterval);
-            setBlogAnalysisStatus('completed');
-            setBlogAnalysisResult(statusResponse.data.analysis);
-          } else if (status === 'failed') {
-            clearInterval(pollInterval);
-            setBlogAnalysisStatus('failed');
-            alert('블로그 분석에 실패했습니다. 다시 시도해주세요.');
-          }
-        } catch (error) {
-          console.error('분석 상태 확인 실패:', error);
-        }
-      }, 3000);
-
-      // 최대 2분 후 타임아웃
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        if (blogAnalysisStatus === 'analyzing') {
-          setBlogAnalysisStatus('failed');
-          alert('분석 시간이 초과되었습니다. 다시 시도해주세요.');
-        }
-      }, 120000);
-
-    } catch (error) {
-      console.error('블로그 분석 실패:', error);
-      setBlogAnalysisStatus('failed');
-      alert('블로그 분석 요청에 실패했습니다.');
+    if (platformUrls.youtube || youtubeConnection) {
+      connectedPlatforms.push('YouTube');
     }
+    if (platformUrls.instagram || instagramConnection) {
+      connectedPlatforms.push('Instagram');
+    }
+    if (platformUrls.threads || threadsConnection) {
+      connectedPlatforms.push('Threads');
+    }
+
+    // 플랫폼명 조합 (예: "YouTube, Instagram")
+    const platformTitle = connectedPlatforms.join(', ');
+
+    // 우선순위에 따라 대표 플랫폼 선택 (동의 항목 표시용)
+    let platform = null;
+    if (platformUrls.youtube || youtubeConnection) {
+      platform = 'youtube';
+    } else if (platformUrls.instagram || instagramConnection) {
+      platform = 'instagram';
+    } else if (platformUrls.threads || threadsConnection) {
+      platform = 'threads';
+    }
+
+    setConsentPlatform(platform);
+    setConsentPlatformUrl(platformTitle); // 모든 플랫폼명을 전달
+    setShowConsentModal(true);
   };
 
-  const analyzeMultiPlatform = async () => {
-    const hasAtLeastOne = platformUrls.blog || platformUrls.instagram || platformUrls.youtube;
+  // 동의 완료 핸들러
+  const handleConsentAccept = (consents) => {
+    console.log('사용자 동의 완료:', consents);
+    setUserConsents(consents);
+    setShowConsentModal(false);
+
+    // 동의 후 즉시 분석 시작
+    analyzeMultiPlatform(consents);
+  };
+
+  const analyzeMultiPlatform = async (consents = null) => {
+    const hasAtLeastOne = platformUrls.instagram || platformUrls.youtube || platformUrls.threads;
     if (!hasAtLeastOne) {
       alert('최소 1개 이상의 플랫폼 URL을 입력해주세요.');
       return;
@@ -328,10 +407,16 @@ function DynamicOnboarding() {
     try {
       // 분석 시작
       const requestData = {};
-      if (platformUrls.blog) requestData.blog_url = platformUrls.blog;
       if (platformUrls.instagram) requestData.instagram_url = platformUrls.instagram;
       if (platformUrls.youtube) requestData.youtube_url = platformUrls.youtube;
+      if (platformUrls.threads) requestData.threads_url = platformUrls.threads;
       requestData.max_posts = 10;
+
+      // 동의 정보 추가 (있을 경우)
+      if (consents) {
+        requestData.consents = consents;
+        requestData.consent_timestamp = new Date().toISOString();
+      }
 
       const response = await api.post('/api/brand-analysis/multi-platform', requestData);
       console.log('멀티 플랫폼 분석 시작:', response.data);
@@ -460,6 +545,17 @@ function DynamicOnboarding() {
             setManualAnalysisStatus('completed');
             setManualAnalysisResult(statusResponse.data);
             setIsLoading(false);
+
+            // ✅ AI 분석 결과를 businessInfo에 반영
+            setBusinessInfo(prev => ({
+              ...prev,
+              brand_name: overall.brand_name || prev.brand_name,
+              business_type: overall.business_type || prev.business_type,
+              target_audience: {
+                ...prev.target_audience,
+                age_range: overall.target_audience || prev.target_audience.age_range
+              }
+            }));
 
             // 완료 페이지로 이동
             setShowSuccess(true);
@@ -837,7 +933,7 @@ function DynamicOnboarding() {
               <div className="choice-icon">✅</div>
               <div className="choice-title">예, 있습니다</div>
               <div className="choice-description">
-                블로그, 인스타그램, 유튜브 등 운영 중인 SNS를 분석하여
+                인스타그램, 유튜브, Threads 등 운영 중인 SNS를 분석하여
                 <br />
                 브랜드 특성을 자동으로 파악합니다
               </div>
@@ -901,8 +997,7 @@ function DynamicOnboarding() {
                 <option value="education">교육</option>
                 <option value="tech">IT/기술</option>
                 <option value="retail">소매/유통</option>
-                <option value="service">서비스</option>
-                <option value="other">기타</option>
+                <option value="service">서비스/기타</option>
               </select>
               {validation.business_type.message && (
                 <span className={`validation-message ${validation.business_type.valid ? 'success' : 'error'}`}>
@@ -986,15 +1081,15 @@ function DynamicOnboarding() {
                     <span>AI가 분석 중...</span>
                   </>
                 ) : (
-                  <>✨ AI가 관심사 추천</>
+                  <>✨ AI가 타겟 고객 관심사 추천</>
                 )}
               </button>
             )}
 
-            {/* AI 추천 관심사 */}
+            {/* AI 추천 타겟 고객 관심사 */}
             {recommendedInterests.length > 0 && (
               <div className="ai-recommendations fade-in">
-                <h4>🤖 AI 추천 관심사</h4>
+                <h4>🤖 AI 추천 타겟 고객 관심사</h4>
                 {aiReasoning && <p className="ai-reasoning">{aiReasoning}</p>}
                 <div className="recommended-tags">
                   {recommendedInterests.map((interest, index) => (
@@ -1012,7 +1107,7 @@ function DynamicOnboarding() {
             )}
 
             <div className="form-group">
-              <label>관심사 (최대 10개)</label>
+              <label>타겟 고객 관심사 (최대 10개)</label>
               <div className="interest-input-container">
                 <input
                   type="text"
@@ -1068,7 +1163,7 @@ function DynamicOnboarding() {
                     <button
                       key={style}
                       type="button"
-                      className={`style-option-button ${businessInfo.selected_styles?.includes(style) ? 'selected' : ''} ${selectedStyleForPreview === style ? 'previewing' : ''}`}
+                      className={`style-option-button ${businessInfo.selected_styles?.includes(style) ? 'selected' : ''} ${selectedStyleForPreview === style ? 'previewing' : ''} ${(style === '유머러스한' || style === '신뢰감있는') ? 'style-long-text' : ''}`}
                       onClick={() => toggleStyle(style)}
                       disabled={businessInfo.selected_styles?.length >= 3 && !businessInfo.selected_styles?.includes(style)}
                     >
@@ -1174,27 +1269,126 @@ function DynamicOnboarding() {
 
           <div className="onboarding-form-section">
             <div className="platform-input-group">
-              <h3>📝 네이버 블로그 (선택)</h3>
-              <input
-                type="text"
-                value={platformUrls.blog}
-                onChange={(e) => setPlatformUrls(prev => ({ ...prev, blog: e.target.value }))}
-                placeholder="예: https://blog.naver.com/your_blog_id"
-                className="platform-url-input"
-              />
-              <small>블로그 URL을 입력하시면 글쓰기 스타일과 브랜드 톤을 분석합니다</small>
+              <h3>📸 인스타그램 (선택)</h3>
+              {instagramConnection ? (
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: '#faf5ff',
+                  borderRadius: '8px',
+                  border: '2px solid #e9d5ff'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {instagramConnection.instagram_profile_picture_url && (
+                      <img
+                        src={instagramConnection.instagram_profile_picture_url}
+                        alt="Profile"
+                        style={{ width: '48px', height: '48px', borderRadius: '50%' }}
+                      />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                        @{instagramConnection.instagram_username}
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#666' }}>
+                        팔로워 {instagramConnection.followers_count?.toLocaleString()}명 ·
+                        게시물 {instagramConnection.media_count}개
+                      </div>
+                    </div>
+                    <div style={{ color: '#4CAF50', fontWeight: 'bold' }}>✓ 연동됨</div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleInstagramConnect}
+                  disabled={instagramConnectionLoading}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: instagramConnectionLoading ? '#ccc' : 'linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: instagramConnectionLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {instagramConnectionLoading ? '연동 중...' : (
+                    <>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                      </svg>
+                      Instagram 계정 연동
+                    </>
+                  )}
+                </button>
+              )}
+              <small>Instagram 계정을 연동하면 게시물 이미지와 캡션 스타일을 자동으로 분석합니다</small>
             </div>
 
             <div className="platform-input-group">
-              <h3>📸 인스타그램 (선택)</h3>
-              <input
-                type="text"
-                value={platformUrls.instagram}
-                onChange={(e) => setPlatformUrls(prev => ({ ...prev, instagram: e.target.value }))}
-                placeholder="예: https://instagram.com/your_account"
-                className="platform-url-input"
-              />
-              <small>인스타그램 URL을 입력하시면 이미지 스타일과 캡션 특성을 분석합니다</small>
+              <h3>🧵 Threads (선택)</h3>
+              {threadsConnection ? (
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: '#f0f0f0',
+                  borderRadius: '8px',
+                  border: '2px solid #d0d0d0'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {threadsConnection.threads_profile_picture_url && (
+                      <img
+                        src={threadsConnection.threads_profile_picture_url}
+                        alt="Profile"
+                        style={{ width: '48px', height: '48px', borderRadius: '50%' }}
+                      />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                        @{threadsConnection.username}
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#666' }}>
+                        {threadsConnection.name}
+                      </div>
+                    </div>
+                    <div style={{ color: '#4CAF50', fontWeight: 'bold' }}>✓ 연동됨</div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleThreadsConnect}
+                  disabled={threadsConnectionLoading}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: threadsConnectionLoading ? '#ccc' : '#000000',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: threadsConnectionLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {threadsConnectionLoading ? '연동 중...' : (
+                    <>
+                      <svg width="24" height="24" viewBox="0 0 192 192" fill="white">
+                        <path d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.7731 51.1409 62.102 62.7807L75.881 72.2328C81.6116 63.5383 90.6052 61.6848 97.2286 61.6848C97.3051 61.6848 97.3819 61.6848 97.4576 61.6855C105.707 61.7381 111.932 64.1366 115.961 68.814C118.893 72.2193 120.854 76.925 121.825 82.8638C114.511 81.6207 106.601 81.2385 98.145 81.7233C74.3247 83.0954 59.0111 96.9879 60.0396 116.292C60.5615 126.084 65.4397 134.508 73.775 140.011C80.8224 144.663 89.899 146.938 99.3323 146.423C111.79 145.74 121.563 140.987 128.381 132.296C133.559 125.696 136.834 117.143 138.28 106.366C144.217 109.949 148.617 114.664 151.047 120.332C155.179 129.967 155.42 145.8 142.501 158.708C131.182 170.016 117.576 174.908 97.0135 175.059C74.2042 174.89 56.9538 167.575 45.7381 153.317C35.2355 139.966 29.8077 120.682 29.6052 96C29.8077 71.3178 35.2355 52.0336 45.7381 38.6827C56.9538 24.4249 74.2039 17.11 97.0132 16.9405C119.988 17.1113 137.539 24.4614 149.184 38.788C154.894 45.8136 159.199 54.6488 162.037 64.9503L178.184 60.6422C174.744 47.9622 169.331 37.0357 161.965 27.974C147.036 9.60668 125.202 0.195148 97.0695 0H96.9569C68.8816 0.19447 47.2921 9.6418 32.7883 28.0793C19.8819 44.4864 13.2244 67.3157 13.0007 95.9325L13 96L13.0007 96.0675C13.2244 124.684 19.8819 147.514 32.7883 163.921C47.2921 182.358 68.8816 191.806 96.9569 192H97.0695C122.03 191.827 139.624 185.292 154.118 170.811C173.081 151.866 172.51 128.119 166.26 113.541C161.776 103.087 153.227 94.5962 141.537 88.9883ZM98.4405 129.507C88.0005 130.095 77.1544 125.409 76.6196 115.372C76.2232 107.93 81.9158 99.626 99.0812 98.6368C101.047 98.5234 102.976 98.468 104.871 98.468C111.106 98.468 116.939 99.0737 122.242 100.233C120.264 124.935 108.662 128.946 98.4405 129.507Z"/>
+                      </svg>
+                      Threads 계정 연동
+                    </>
+                  )}
+                </button>
+              )}
+              <small>Threads 계정을 연동하면 게시물 텍스트와 스타일을 자동으로 분석합니다</small>
             </div>
 
             <div className="platform-input-group">
@@ -1273,8 +1467,8 @@ function DynamicOnboarding() {
                 건너뛰기
               </button>
               <button
-                onClick={analyzeMultiPlatform}
-                disabled={!platformUrls.blog && !platformUrls.instagram && !platformUrls.youtube}
+                onClick={handleShowConsentModal}
+                disabled={!platformUrls.instagram && !platformUrls.youtube && !platformUrls.threads}
                 className="btn-primary"
               >
                 분석 시작
@@ -1640,7 +1834,7 @@ function DynamicOnboarding() {
               </div>
               {businessInfo.target_audience.interests.length > 0 && (
                 <div className="summary-item full-width">
-                  <span className="summary-label">관심사</span>
+                  <span className="summary-label">타겟 고객 관심사</span>
                   <span className="summary-value">{businessInfo.target_audience.interests.join(', ')}</span>
                 </div>
               )}
@@ -1672,6 +1866,15 @@ function DynamicOnboarding() {
           </div>
         </div>
       )}
+
+      {/* 플랫폼 분석 동의 모달 */}
+      <PlatformConsentModal
+        isOpen={showConsentModal}
+        onClose={() => setShowConsentModal(false)}
+        onAccept={handleConsentAccept}
+        platform={consentPlatform}
+        platformUrl={consentPlatformUrl}
+      />
     </div>
   );
 }

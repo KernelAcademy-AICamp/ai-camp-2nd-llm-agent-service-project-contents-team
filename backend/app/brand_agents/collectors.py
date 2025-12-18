@@ -5,12 +5,15 @@ Platform Collector Agents
 """
 
 import logging
+import re
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 from datetime import datetime
 
 from ..services.naver_blog_service import NaverBlogService
 from ..services.youtube_service import YouTubeService
+from ..services.instagram_service import InstagramService
+from ..services.threads_service import ThreadsService
 from sqlalchemy.orm import Session
 from .. import models
 
@@ -85,14 +88,23 @@ class BlogCollectorAgent(PlatformCollectorAgent):
 
 
 class InstagramCollectorAgent(PlatformCollectorAgent):
-    """인스타그램 Collector Agent"""
+    """인스타그램 Collector Agent (OAuth 연동 기반)"""
 
-    async def collect(self, url: str, max_items: int = 10) -> List[Dict[str, Any]]:
+    def __init__(self, db: Session = None, user_id: int = None):
         """
-        인스타그램 포스트 수집
+        Args:
+            db: Database session
+            user_id: User ID (Instagram 연동 확인용)
+        """
+        self.db = db
+        self.user_id = user_id
+
+    async def collect(self, url: str = None, max_items: int = 25) -> List[Dict[str, Any]]:
+        """
+        인스타그램 포스트 수집 (OAuth 연동 기반)
 
         Args:
-            url: 인스타그램 프로필 URL
+            url: 사용 안 함 (OAuth 연동으로 자동 수집)
             max_items: 최대 포스트 수
 
         Returns:
@@ -101,40 +113,103 @@ class InstagramCollectorAgent(PlatformCollectorAgent):
                 {
                     'caption': str,
                     'image_urls': List[str],
+                    'media_url': str,
+                    'media_type': str,
                     'hashtags': List[str],
                     'likes': int,
                     'comments': int,
                     'date': str,
-                    'platform': 'instagram'
+                    'platform': 'instagram',
+                    'username': str,
+                    'followers_count': int
                 },
                 ...
             ]
         """
         try:
-            logger.info(f"📷 [Instagram Collector] 인스타그램 수집 시작: {url}")
+            logger.info(f"📷 [Instagram Collector] Instagram 계정 연동 데이터 수집 시작 (user_id: {self.user_id})")
 
-            # TODO: 실제 Instagram API 또는 크롤링 구현
-            # 현재는 더미 데이터 반환
-            logger.warning("⚠️ [Instagram Collector] 실제 구현 필요 - 더미 데이터 반환")
+            if not self.db or not self.user_id:
+                logger.warning("⚠️ [Instagram Collector] DB session 또는 user_id가 없습니다")
+                return []
 
-            dummy_posts = [
-                {
-                    'caption': f"인스타그램 샘플 포스트 {i+1}\n\n우리 브랜드의 새로운 제품을 소개합니다! #브랜드 #신제품",
-                    'image_urls': [f"https://example.com/image_{i+1}.jpg"],
-                    'hashtags': ['브랜드', '신제품', '일상'],
-                    'likes': 100 + i * 10,
-                    'comments': 10 + i,
-                    'date': datetime.now().isoformat(),
-                    'platform': 'instagram'
-                }
-                for i in range(min(max_items, 3))  # 더미는 최대 3개
-            ]
+            # Instagram Connection 확인
+            instagram_connection = self.db.query(models.InstagramConnection).filter(
+                models.InstagramConnection.user_id == self.user_id,
+                models.InstagramConnection.is_active == True
+            ).first()
 
-            logger.info(f"✅ [Instagram Collector] {len(dummy_posts)}개 포스트 수집 완료 (더미)")
-            return dummy_posts
+            if not instagram_connection:
+                logger.warning(f"⚠️ [Instagram Collector] 연동된 Instagram 계정이 없습니다 (user_id: {self.user_id})")
+                return []
+
+            logger.info(f"✅ [Instagram Collector] 연동된 Instagram 계정 발견: @{instagram_connection.instagram_username}")
+
+            # InstagramService 생성
+            instagram_service = InstagramService(instagram_connection.page_access_token)
+
+            # 계정 정보 가져오기
+            account_info = await instagram_service.get_account_info(instagram_connection.instagram_account_id)
+
+            if not account_info:
+                logger.error("❌ [Instagram Collector] 계정 정보 가져오기 실패")
+                await instagram_service.close()
+                return []
+
+            username = account_info.get('username', '')
+            followers_count = account_info.get('followers_count', 0)
+
+            # 게시물 목록 가져오기
+            media_list = await instagram_service.get_media_list(
+                instagram_connection.instagram_account_id,
+                limit=max_items
+            )
+
+            await instagram_service.close()
+
+            if not media_list:
+                logger.warning("⚠️ [Instagram Collector] 수집된 게시물이 없습니다")
+                return []
+
+            # 데이터 정규화
+            collected_posts = []
+            for media in media_list:
+                caption = media.get('caption', '')
+
+                # 해시태그 추출
+                hashtags = re.findall(r'#(\w+)', caption)
+
+                # media_url 처리
+                media_url = media.get('media_url', '')
+                media_type = media.get('media_type', 'IMAGE')
+
+                # thumbnail_url은 비디오일 때 사용
+                if media_type == 'VIDEO':
+                    media_url = media.get('thumbnail_url', media_url)
+
+                collected_posts.append({
+                    'caption': caption,
+                    'image_urls': [media_url] if media_url else [],
+                    'media_url': media_url,
+                    'media_type': media_type,
+                    'hashtags': hashtags,
+                    'likes': media.get('like_count', 0),
+                    'comments': media.get('comments_count', 0),
+                    'date': media.get('timestamp', ''),
+                    'platform': 'instagram',
+                    'username': username,
+                    'followers_count': followers_count
+                })
+
+            logger.info(f"✅ [Instagram Collector] {len(collected_posts)}개 게시물 수집 완료")
+            logger.info(f"   계정: @{username} (팔로워: {followers_count:,}명)")
+
+            return collected_posts
 
         except Exception as e:
             logger.error(f"❌ [Instagram Collector] 수집 실패: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
 
 
@@ -254,6 +329,147 @@ class YouTubeCollectorAgent(PlatformCollectorAgent):
 
         except Exception as e:
             logger.error(f"❌ [YouTube Collector] 수집 실패: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
+
+
+class ThreadsCollectorAgent(PlatformCollectorAgent):
+    """Threads Collector Agent (OAuth 연동 기반)"""
+
+    def __init__(self, db: Session = None, user_id: int = None):
+        """
+        Args:
+            db: Database session
+            user_id: User ID (Threads 연동 확인용)
+        """
+        self.db = db
+        self.user_id = user_id
+
+    async def collect(self, url: str = None, max_items: int = 25) -> List[Dict[str, Any]]:
+        """
+        Threads 포스트 수집 (OAuth 연동 기반)
+
+        Args:
+            url: 사용 안 함 (OAuth 연동으로 자동 수집)
+            max_items: 최대 포스트 수
+
+        Returns:
+            Threads 포스트 리스트
+            [
+                {
+                    'text': str,
+                    'media_type': str,
+                    'media_url': str,
+                    'thumbnail_url': str,
+                    'hashtags': List[str],
+                    'views': int,
+                    'likes': int,
+                    'replies': int,
+                    'reposts': int,
+                    'quotes': int,
+                    'date': str,
+                    'platform': 'threads',
+                    'username': str,
+                    'name': str,
+                    'biography': str,
+                    'profile_picture_url': str
+                },
+                ...
+            ]
+        """
+        try:
+            logger.info(f"🧵 [Threads Collector] Threads 계정 연동 데이터 수집 시작 (user_id: {self.user_id})")
+
+            if not self.db or not self.user_id:
+                logger.warning("⚠️ [Threads Collector] DB session 또는 user_id가 없습니다")
+                return []
+
+            # Threads Connection 확인
+            threads_connection = self.db.query(models.ThreadsConnection).filter(
+                models.ThreadsConnection.user_id == self.user_id,
+                models.ThreadsConnection.is_active == True
+            ).first()
+
+            if not threads_connection:
+                logger.warning(f"⚠️ [Threads Collector] 연동된 Threads 계정이 없습니다 (user_id: {self.user_id})")
+                return []
+
+            logger.info(f"✅ [Threads Collector] 연동된 Threads 계정 발견: @{threads_connection.username}")
+
+            # ThreadsService 생성
+            threads_service = ThreadsService(threads_connection.access_token)
+
+            # 사용자 정보 가져오기
+            user_info = await threads_service.get_me()
+
+            if not user_info:
+                logger.error("❌ [Threads Collector] 사용자 정보 가져오기 실패")
+                return []
+
+            username = user_info.get('username', '')
+            name = user_info.get('name', '')
+            biography = user_info.get('threads_biography', '')
+            profile_picture_url = user_info.get('threads_profile_picture_url', '')
+            threads_user_id = user_info.get('id', threads_connection.threads_user_id)
+
+            # 포스트 목록 가져오기
+            posts_result = await threads_service.get_user_threads(
+                threads_user_id,
+                limit=max_items
+            )
+
+            if not posts_result or 'data' not in posts_result:
+                logger.warning("⚠️ [Threads Collector] 수집된 포스트가 없습니다")
+                return []
+
+            posts_data = posts_result['data']
+
+            # 데이터 정규화
+            collected_posts = []
+            for post in posts_data:
+                post_id = post.get('id', '')
+                text = post.get('text', '')
+
+                # 해시태그 추출
+                hashtags = re.findall(r'#(\w+)', text)
+
+                # 인사이트 조회 (통계)
+                insights = await threads_service.get_thread_insights(post_id)
+                stats = {}
+                if insights and 'data' in insights:
+                    for metric in insights['data']:
+                        metric_name = metric.get('name', '')
+                        metric_values = metric.get('values', [])
+                        if metric_values:
+                            stats[metric_name] = metric_values[0].get('value', 0)
+
+                collected_posts.append({
+                    'text': text,
+                    'media_type': post.get('media_type', 'TEXT'),
+                    'media_url': post.get('media_url', ''),
+                    'thumbnail_url': post.get('thumbnail_url', ''),
+                    'hashtags': hashtags,
+                    'views': stats.get('views', 0),
+                    'likes': stats.get('likes', 0),
+                    'replies': stats.get('replies', 0),
+                    'reposts': stats.get('reposts', 0),
+                    'quotes': stats.get('quotes', 0),
+                    'date': post.get('timestamp', ''),
+                    'platform': 'threads',
+                    'username': username,
+                    'name': name,
+                    'biography': biography,
+                    'profile_picture_url': profile_picture_url
+                })
+
+            logger.info(f"✅ [Threads Collector] {len(collected_posts)}개 포스트 수집 완료")
+            logger.info(f"   계정: @{username} ({name})")
+
+            return collected_posts
+
+        except Exception as e:
+            logger.error(f"❌ [Threads Collector] 수집 실패: {e}")
             import traceback
             logger.error(traceback.format_exc())
             return []
