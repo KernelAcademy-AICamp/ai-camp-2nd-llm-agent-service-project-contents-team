@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { MdDashboard, MdAdd, MdFolder, MdStyle, MdSettings, MdHome } from 'react-icons/md';
 import { FiCreditCard } from 'react-icons/fi';
-import { FaYoutube, FaFacebook, FaInstagram, FaXTwitter, FaTiktok, FaWordpress } from 'react-icons/fa6';
-import { SiThreads } from 'react-icons/si';
-import { youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI, tiktokAPI, wordpressAPI, creditsAPI } from '../services/api';
+import { creditsAPI } from '../services/api';
 import './Sidebar.css';
 
 // 메뉴 아이템 렌더링 컴포넌트
@@ -14,17 +12,6 @@ const MenuItem = ({ item, isActive }) => (
     <span className="sidebar-label">{item.label}</span>
   </Link>
 );
-
-// 플랫폼 설정
-const PLATFORMS = [
-  { key: 'youtube', path: '/youtube', label: 'YouTube', icon: FaYoutube },
-  { key: 'facebook', path: '/facebook', label: 'Facebook', icon: FaFacebook },
-  { key: 'instagram', path: '/instagram', label: 'Instagram', icon: FaInstagram },
-  { key: 'threads', path: '/threads', label: 'Threads', icon: SiThreads },
-  { key: 'x', path: '/x', label: 'X', icon: FaXTwitter },
-  { key: 'tiktok', path: '/tiktok', label: 'TikTok', icon: FaTiktok },
-  { key: 'wordpress', path: '/wordpress', label: 'WordPress', icon: FaWordpress },
-];
 
 // 메뉴 설정
 const MAIN_MENU = [
@@ -45,7 +32,6 @@ function Sidebar({ onHoverChange }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-  const [connectedPlatforms, setConnectedPlatforms] = useState({});
   const [creditBalance, setCreditBalance] = useState(0);
 
   const handleSidebarHover = (hovered) => {
@@ -53,34 +39,8 @@ function Sidebar({ onHoverChange }) {
     onHoverChange?.(hovered);
   };
 
-  // 플랫폼 연동 상태 및 크레딧 조회
+  // 크레딧 조회
   useEffect(() => {
-    const fetchPlatformStatus = async () => {
-      try {
-        const [youtube, facebook, instagram, threads, x, tiktok, wordpress] = await Promise.all([
-          youtubeAPI.getStatus().catch(() => null),
-          facebookAPI.getStatus().catch(() => null),
-          instagramAPI.getStatus().catch(() => null),
-          threadsAPI.getStatus().catch(() => null),
-          twitterAPI.getStatus().catch(() => null),
-          tiktokAPI.getStatus().catch(() => null),
-          wordpressAPI.getStatus().catch(() => null),
-        ]);
-
-        setConnectedPlatforms({
-          youtube: !!youtube,
-          facebook: !!(facebook?.page_id),
-          instagram: !!(instagram?.instagram_account_id),
-          threads: !!threads,
-          x: !!x,
-          tiktok: !!tiktok,
-          wordpress: !!wordpress,
-        });
-      } catch (error) {
-        console.error('Failed to fetch platform status:', error);
-      }
-    };
-
     const fetchCreditBalance = async () => {
       try {
         const data = await creditsAPI.getBalance();
@@ -90,13 +50,11 @@ function Sidebar({ onHoverChange }) {
       }
     };
 
-    fetchPlatformStatus();
     fetchCreditBalance();
   }, []);
 
   const isActive = (path) => location.pathname === path;
   const isContentActive = CONTENT_PATHS.includes(location.pathname);
-  const connectedPlatformItems = PLATFORMS.filter(p => connectedPlatforms[p.key]);
 
   return (
     <aside
@@ -122,16 +80,6 @@ function Sidebar({ onHoverChange }) {
         {MAIN_MENU.map(item => (
           <MenuItem key={item.path} item={item} isActive={isActive(item.path)} />
         ))}
-
-        {/* 연동된 플랫폼 메뉴 */}
-        {connectedPlatformItems.length > 0 && (
-          <>
-            <div className="sidebar-divider" />
-            {connectedPlatformItems.map(item => (
-              <MenuItem key={item.path} item={item} isActive={isActive(item.path)} />
-            ))}
-          </>
-        )}
       </nav>
 
       {/* 하단 메뉴 */}
