@@ -5,11 +5,12 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func, case, text
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
+import time
 import logging
+from pydantic import BaseModel
 import os
 import uuid
 import base64
@@ -924,20 +925,57 @@ async def list_published_contents(
     """
     발행 콘텐츠 목록 조회 (콘텐츠 관리 페이지용)
     - 상태별, 플랫폼별 필터링 지원
+    - 최적화: Raw SQL로 필요한 컬럼만 조회 (대용량 JSON/TEXT 제외)
     """
-    query = db.query(PublishedContent).filter(
-        PublishedContent.user_id == current_user.id
-    )
+    start_time = time.perf_counter()
+
+    # Raw SQL로 최적화된 쿼리 실행
+    # card_image_urls는 제외하고, content는 SUBSTRING으로 300자만
+    sql = """
+        SELECT
+            id, platform, title,
+            SUBSTRING(content, 1, 300) as content,
+            status, scheduled_at, published_at, views, created_at
+        FROM published_contents
+        WHERE user_id = :user_id
+    """
+    params = {"user_id": current_user.id, "skip": skip, "limit": limit}
 
     if status:
-        query = query.filter(PublishedContent.status == status)
+        sql += " AND status = :status"
+        params["status"] = status
 
     if platform:
-        query = query.filter(PublishedContent.platform == platform)
+        sql += " AND platform = :platform"
+        params["platform"] = platform
 
-    contents = query.order_by(
-        PublishedContent.created_at.desc()
-    ).offset(skip).limit(limit).all()
+    sql += " ORDER BY created_at DESC OFFSET :skip LIMIT :limit"
+
+    result = db.execute(text(sql), params)
+    rows = result.fetchall()
+
+    elapsed = time.perf_counter() - start_time
+    logger.info(f"published_contents 목록 조회: {len(rows)}건, {elapsed:.3f}초")
+
+    if not rows:
+        return []
+
+    # Row 객체를 dict로 변환 (card_image_urls는 목록에서 불필요하므로 null 처리)
+    contents = [
+        {
+            "id": r.id,
+            "platform": r.platform,
+            "title": r.title,
+            "content": r.content or "",
+            "card_image_urls": None,  # 목록에서는 이미지 URL 불필요
+            "status": r.status,
+            "scheduled_at": r.scheduled_at,
+            "published_at": r.published_at,
+            "views": r.views,
+            "created_at": r.created_at
+        }
+        for r in rows
+    ]
 
     return contents
 
@@ -949,31 +987,23 @@ async def get_content_stats(
 ):
     """
     콘텐츠 상태별 통계 (콘텐츠 관리 페이지 탭 카운트용)
+    - 최적화: 4개의 COUNT 쿼리를 1개의 조건부 COUNT로 통합
     """
-    total = db.query(PublishedContent).filter(
+    # 단일 쿼리로 모든 상태별 카운트 조회
+    result = db.query(
+        func.count(PublishedContent.id).label('total'),
+        func.sum(case((PublishedContent.status == "draft", 1), else_=0)).label('draft'),
+        func.sum(case((PublishedContent.status == "scheduled", 1), else_=0)).label('scheduled'),
+        func.sum(case((PublishedContent.status == "published", 1), else_=0)).label('published')
+    ).filter(
         PublishedContent.user_id == current_user.id
-    ).count()
-
-    draft = db.query(PublishedContent).filter(
-        PublishedContent.user_id == current_user.id,
-        PublishedContent.status == "draft"
-    ).count()
-
-    scheduled = db.query(PublishedContent).filter(
-        PublishedContent.user_id == current_user.id,
-        PublishedContent.status == "scheduled"
-    ).count()
-
-    published = db.query(PublishedContent).filter(
-        PublishedContent.user_id == current_user.id,
-        PublishedContent.status == "published"
-    ).count()
+    ).first()
 
     return {
-        "total": total,
-        "draft": draft,
-        "scheduled": scheduled,
-        "published": published
+        "total": result.total or 0,
+        "draft": int(result.draft or 0),
+        "scheduled": int(result.scheduled or 0),
+        "published": int(result.published or 0)
     }
 
 

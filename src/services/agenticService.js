@@ -26,6 +26,31 @@ const fileToDataURL = (file) => {
   });
 };
 
+// JSON 문자열 정제 함수 - AI 응답에서 발생하는 일반적인 JSON 오류 수정
+const cleanJsonString = (jsonStr) => {
+  let cleaned = jsonStr;
+
+  // 1. JSON 문자열 내의 이스케이프되지 않은 줄바꿈을 \\n으로 변환
+  // 문자열 값 내부만 처리 (키는 제외)
+  cleaned = cleaned.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (_, content) => {
+    // 실제 줄바꿈을 이스케이프된 줄바꿈으로 변환
+    const fixedContent = content
+      .replace(/\r\n/g, '\\n')
+      .replace(/\r/g, '\\n')
+      .replace(/\n/g, '\\n')
+      .replace(/\t/g, '\\t');
+    return `"${fixedContent}"`;
+  });
+
+  // 2. 제어 문자 제거 (줄바꿈, 탭 제외)
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+  // 3. 마지막 쉼표 제거 (trailing comma)
+  cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
+
+  return cleaned;
+};
+
 // ============================================
 // 1. Orchestrator Agent
 // ============================================
@@ -340,10 +365,16 @@ JSON만 응답하세요.`;
     const result = await this.model.generateContent(prompt);
     const response = result.response.text();
 
-
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        // JSON 파싱 실패 시 문자열 정제 후 재시도
+        console.warn('JSON 파싱 1차 실패, 정제 후 재시도:', parseError.message);
+        const cleanedJson = cleanJsonString(jsonMatch[0]);
+        return JSON.parse(cleanedJson);
+      }
     }
 
     throw new Error('콘텐츠 생성 결과 파싱 실패');

@@ -2,14 +2,18 @@
 AI 생성 콘텐츠 API 라우터
 - AI 글 생성 기능으로 생성된 블로그 및 SNS 콘텐츠 저장/조회
 - v2: 플랫폼별 분리 저장 구조
+- 쿼리 성능 로깅 추가
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload, selectinload
-from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, event
+from sqlalchemy.engine import Engine
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import logging
+import time
+from contextlib import contextmanager
 
 from ..database import get_db
 from ..models import (
@@ -20,11 +24,63 @@ from ..models import (
 from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/ai-content", tags=["ai-content"])
+
+# ============================================
+# 로깅 설정
+# ============================================
+
+# 기본 로거
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# SQLAlchemy 쿼리 로거
+sql_logger = logging.getLogger("sqlalchemy.engine")
+sql_logger.setLevel(logging.INFO)  # DEBUG로 변경하면 더 상세한 로그
+
+# 콘솔 핸들러 (없으면 추가)
+if not logger.handlers:
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+
+# SQLAlchemy 쿼리 실행 시간 측정 이벤트
+@event.listens_for(Engine, "before_cursor_execute")
+def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    conn.info.setdefault("query_start_time", []).append(time.perf_counter())
+    logger.debug(f"쿼리 시작: {statement[:100]}...")
+
+
+@event.listens_for(Engine, "after_cursor_execute")
+def after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+    total_time = time.perf_counter() - conn.info["query_start_time"].pop()
+    if total_time > 0.1:  # 100ms 이상 걸린 쿼리만 경고
+        logger.warning(f"느린 쿼리 ({total_time:.3f}초): {statement[:200]}...")
+    else:
+        logger.debug(f"쿼리 완료 ({total_time:.3f}초)")
+
+
+@contextmanager
+def log_execution_time(operation_name: str):
+    """작업 실행 시간을 측정하는 컨텍스트 매니저"""
+    start_time = time.perf_counter()
+    logger.info(f"[{operation_name}] 시작")
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - start_time
+        if elapsed > 1.0:
+            logger.warning(f"[{operation_name}] 완료 - 소요시간: {elapsed:.3f}초 (느림!)")
+        else:
+            logger.info(f"[{operation_name}] 완료 - 소요시간: {elapsed:.3f}초")
 
 
 # ============================================
-# V2 API - 플랫폼별 분리 저장 구조
+# Pydantic 모델
 # ============================================
 
 class BlogContentData(BaseModel):
@@ -145,6 +201,10 @@ class ContentSessionResponse(BaseModel):
         from_attributes = True
 
 
+# ============================================
+# V2 API 엔드포인트
+# ============================================
+
 @router.post("/v2/save", response_model=ContentSessionResponse)
 async def save_content_session(
     request: ContentSessionSaveRequest,
@@ -155,88 +215,93 @@ async def save_content_session(
     콘텐츠 생성 세션 저장 (v2)
     - 플랫폼별로 분리하여 저장
     """
-    try:
-        # 1. 세션 생성
-        session = ContentGenerationSession(
-            user_id=current_user.id,
-            topic=request.topic,
-            content_type=request.content_type,
-            style=request.style,
-            selected_platforms=request.selected_platforms,
-            requested_image_count=request.requested_image_count,
-            analysis_data=request.analysis_data,
-            critique_data=request.critique_data,
-            generation_attempts=request.generation_attempts,
-            status="generated"
-        )
-        db.add(session)
-        db.flush()  # ID 생성을 위해 flush
-
-        # 2. 플랫폼별 콘텐츠 저장
-        if request.blog and "blog" in request.selected_platforms:
-            blog_content = GeneratedBlogContent(
-                session_id=session.id,
-                user_id=current_user.id,
-                title=request.blog.title,
-                content=request.blog.content,
-                tags=request.blog.tags,
-                score=request.blog.score
-            )
-            db.add(blog_content)
-
-        if request.sns and "sns" in request.selected_platforms:
-            sns_content = GeneratedSNSContent(
-                session_id=session.id,
-                user_id=current_user.id,
-                content=request.sns.content,
-                hashtags=request.sns.hashtags,
-                score=request.sns.score
-            )
-            db.add(sns_content)
-
-        if request.x and "x" in request.selected_platforms:
-            x_content = GeneratedXContent(
-                session_id=session.id,
-                user_id=current_user.id,
-                content=request.x.content,
-                hashtags=request.x.hashtags,
-                score=request.x.score
-            )
-            db.add(x_content)
-
-        if request.threads and "threads" in request.selected_platforms:
-            threads_content = GeneratedThreadsContent(
-                session_id=session.id,
-                user_id=current_user.id,
-                content=request.threads.content,
-                hashtags=request.threads.hashtags,
-                score=request.threads.score
-            )
-            db.add(threads_content)
-
-        # 3. 이미지 저장
-        if request.images:
-            for img in request.images:
-                image = GeneratedImage(
-                    session_id=session.id,
+    with log_execution_time(f"save_content_session (user={current_user.id})"):
+        try:
+            # 1. 세션 생성
+            with log_execution_time("세션 생성"):
+                session = ContentGenerationSession(
                     user_id=current_user.id,
-                    image_url=img.image_url,
-                    prompt=img.prompt
+                    topic=request.topic,
+                    content_type=request.content_type,
+                    style=request.style,
+                    selected_platforms=request.selected_platforms,
+                    requested_image_count=request.requested_image_count,
+                    analysis_data=request.analysis_data,
+                    critique_data=request.critique_data,
+                    generation_attempts=request.generation_attempts,
+                    status="generated"
                 )
-                db.add(image)
+                db.add(session)
+                db.flush()  # ID 생성을 위해 flush
 
-        db.commit()
-        db.refresh(session)
+            # 2. 플랫폼별 콘텐츠 저장
+            with log_execution_time("플랫폼별 콘텐츠 저장"):
+                if request.blog and "blog" in request.selected_platforms:
+                    blog_content = GeneratedBlogContent(
+                        session_id=session.id,
+                        user_id=current_user.id,
+                        title=request.blog.title,
+                        content=request.blog.content,
+                        tags=request.blog.tags,
+                        score=request.blog.score
+                    )
+                    db.add(blog_content)
 
-        logger.info(f"콘텐츠 세션 저장 완료: user_id={current_user.id}, session_id={session.id}")
+                if request.sns and "sns" in request.selected_platforms:
+                    sns_content = GeneratedSNSContent(
+                        session_id=session.id,
+                        user_id=current_user.id,
+                        content=request.sns.content,
+                        hashtags=request.sns.hashtags,
+                        score=request.sns.score
+                    )
+                    db.add(sns_content)
 
-        # 응답 생성
-        return _build_session_response(session)
+                if request.x and "x" in request.selected_platforms:
+                    x_content = GeneratedXContent(
+                        session_id=session.id,
+                        user_id=current_user.id,
+                        content=request.x.content,
+                        hashtags=request.x.hashtags,
+                        score=request.x.score
+                    )
+                    db.add(x_content)
 
-    except Exception as e:
-        db.rollback()
-        logger.error(f"콘텐츠 세션 저장 실패: {e}")
-        raise HTTPException(status_code=500, detail=f"콘텐츠 저장에 실패했습니다: {str(e)}")
+                if request.threads and "threads" in request.selected_platforms:
+                    threads_content = GeneratedThreadsContent(
+                        session_id=session.id,
+                        user_id=current_user.id,
+                        content=request.threads.content,
+                        hashtags=request.threads.hashtags,
+                        score=request.threads.score
+                    )
+                    db.add(threads_content)
+
+            # 3. 이미지 저장
+            with log_execution_time("이미지 저장"):
+                if request.images:
+                    for img in request.images:
+                        image = GeneratedImage(
+                            session_id=session.id,
+                            user_id=current_user.id,
+                            image_url=img.image_url,
+                            prompt=img.prompt
+                        )
+                        db.add(image)
+
+            with log_execution_time("DB 커밋"):
+                db.commit()
+                db.refresh(session)
+
+            logger.info(f"콘텐츠 세션 저장 완료: user_id={current_user.id}, session_id={session.id}")
+
+            # 응답 생성
+            return _build_session_response(session)
+
+        except Exception as e:
+            db.rollback()
+            logger.error(f"콘텐츠 세션 저장 실패: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"콘텐츠 저장에 실패했습니다: {str(e)}")
 
 
 @router.get("/v2/list", response_model=List[ContentSessionListResponse])
@@ -247,37 +312,106 @@ async def list_content_sessions(
     db: Session = Depends(get_db)
 ):
     """
-    콘텐츠 생성 세션 목록 조회 (v2)
-    - 이미지 데이터 제외하여 빠른 로딩 (이미지 갯수만 포함)
-    - N+1 쿼리 방지: 이미지 갯수를 서브쿼리로 한 번에 조회
+    콘텐츠 생성 세션 목록 조회 (v2) - 최적화 버전
+    - 2단계 쿼리로 분리하여 원격 DB 성능 최적화
+    - 1단계: 세션 ID만 빠르게 조회
+    - 2단계: 필요한 데이터를 IN 쿼리로 한번에 조회
     """
-    # 이미지 갯수 서브쿼리
-    image_count_subq = db.query(
-        GeneratedImage.session_id,
-        func.count(GeneratedImage.id).label('image_count')
-    ).group_by(GeneratedImage.session_id).subquery()
+    with log_execution_time(f"list_content_sessions (user={current_user.id}, skip={skip}, limit={limit})"):
 
-    # 세션 + 이미지 갯수를 한 번에 조회 (이미지도 함께 로드)
-    results = db.query(
-        ContentGenerationSession,
-        func.coalesce(image_count_subq.c.image_count, 0).label('image_count')
-    ).outerjoin(
-        image_count_subq,
-        ContentGenerationSession.id == image_count_subq.c.session_id
-    ).options(
-        selectinload(ContentGenerationSession.blog_content),
-        selectinload(ContentGenerationSession.sns_content),
-        selectinload(ContentGenerationSession.x_content),
-        selectinload(ContentGenerationSession.threads_content),
-        selectinload(ContentGenerationSession.cardnews_content),
-        selectinload(ContentGenerationSession.images)  # 이미지도 로드
-    ).filter(
-        ContentGenerationSession.user_id == current_user.id
-    ).order_by(
-        ContentGenerationSession.created_at.desc()
-    ).offset(skip).limit(limit).all()
+        # 1단계: 세션 기본 정보만 빠르게 조회 (JOIN 없이)
+        with log_execution_time("세션 기본 조회"):
+            sessions = db.query(ContentGenerationSession).filter(
+                ContentGenerationSession.user_id == current_user.id
+            ).order_by(
+                ContentGenerationSession.created_at.desc()
+            ).offset(skip).limit(limit).all()
 
-    return [_build_session_list_response(session, image_count) for session, image_count in results]
+        if not sessions:
+            return []
+
+        session_ids = [s.id for s in sessions]
+        logger.info(f"조회된 세션 수: {len(sessions)}")
+
+        # 2단계: 관련 데이터를 IN 쿼리로 한번에 조회 (필요한 컬럼만)
+        with log_execution_time("관련 콘텐츠 조회"):
+            # 블로그 콘텐츠 (content는 200자만 필요하지만 전체 로드 - 작은 테이블)
+            blog_contents = {
+                b.session_id: b for b in
+                db.query(GeneratedBlogContent).filter(
+                    GeneratedBlogContent.session_id.in_(session_ids)
+                ).all()
+            }
+
+            # SNS 콘텐츠
+            sns_contents = {
+                s.session_id: s for s in
+                db.query(GeneratedSNSContent).filter(
+                    GeneratedSNSContent.session_id.in_(session_ids)
+                ).all()
+            }
+
+            # X 콘텐츠
+            x_contents = {
+                x.session_id: x for x in
+                db.query(GeneratedXContent).filter(
+                    GeneratedXContent.session_id.in_(session_ids)
+                ).all()
+            }
+
+            # Threads 콘텐츠
+            threads_contents = {
+                t.session_id: t for t in
+                db.query(GeneratedThreadsContent).filter(
+                    GeneratedThreadsContent.session_id.in_(session_ids)
+                ).all()
+            }
+
+            # 카드뉴스 콘텐츠 - 필요한 컬럼만 조회 (대용량 JSON 제외)
+            cardnews_results = db.query(
+                GeneratedCardnewsContent.session_id,
+                GeneratedCardnewsContent.id,
+                GeneratedCardnewsContent.title,
+                GeneratedCardnewsContent.page_count,
+                GeneratedCardnewsContent.purpose
+            ).filter(
+                GeneratedCardnewsContent.session_id.in_(session_ids)
+            ).all()
+            cardnews_contents = {
+                c.session_id: {'id': c.id, 'title': c.title, 'page_count': c.page_count, 'purpose': c.purpose}
+                for c in cardnews_results
+            }
+
+        # 3단계: 이미지 카운트만 조회 (URL은 목록에서 불필요 - 성능 최적화)
+        with log_execution_time("이미지 카운트 조회"):
+            image_counts = db.query(
+                GeneratedImage.session_id,
+                func.count(GeneratedImage.id).label('count')
+            ).filter(
+                GeneratedImage.session_id.in_(session_ids)
+            ).group_by(GeneratedImage.session_id).all()
+
+            image_data = {
+                stat.session_id: {'count': stat.count, 'first_url': None}
+                for stat in image_counts
+            }
+
+        with log_execution_time("응답 객체 생성"):
+            response = []
+            for session in sessions:
+                img_info = image_data.get(session.id, {'count': 0, 'first_url': None})
+                response.append(_build_session_list_response_v2(
+                    session=session,
+                    blog=blog_contents.get(session.id),
+                    sns=sns_contents.get(session.id),
+                    x=x_contents.get(session.id),
+                    threads=threads_contents.get(session.id),
+                    cardnews=cardnews_contents.get(session.id),
+                    image_count=img_info['count'],
+                    first_image_url=img_info['first_url']
+                ))
+
+        return response
 
 
 @router.get("/v2/{session_id}", response_model=ContentSessionResponse)
@@ -289,22 +423,29 @@ async def get_content_session(
     """
     특정 콘텐츠 생성 세션 조회 (v2)
     """
-    session = db.query(ContentGenerationSession).options(
-        joinedload(ContentGenerationSession.blog_content),
-        joinedload(ContentGenerationSession.sns_content),
-        joinedload(ContentGenerationSession.x_content),
-        joinedload(ContentGenerationSession.threads_content),
-        joinedload(ContentGenerationSession.cardnews_content),
-        joinedload(ContentGenerationSession.images)
-    ).filter(
-        ContentGenerationSession.id == session_id,
-        ContentGenerationSession.user_id == current_user.id
-    ).first()
+    with log_execution_time(f"get_content_session (user={current_user.id}, session_id={session_id})"):
+        
+        with log_execution_time("세션 쿼리 실행"):
+            session = db.query(ContentGenerationSession).options(
+                joinedload(ContentGenerationSession.blog_content),
+                joinedload(ContentGenerationSession.sns_content),
+                joinedload(ContentGenerationSession.x_content),
+                joinedload(ContentGenerationSession.threads_content),
+                joinedload(ContentGenerationSession.cardnews_content),
+                joinedload(ContentGenerationSession.images)
+            ).filter(
+                ContentGenerationSession.id == session_id,
+                ContentGenerationSession.user_id == current_user.id
+            ).first()
 
-    if not session:
-        raise HTTPException(status_code=404, detail="콘텐츠를 찾을 수 없습니다.")
+        if not session:
+            logger.warning(f"세션을 찾을 수 없음: session_id={session_id}, user_id={current_user.id}")
+            raise HTTPException(status_code=404, detail="콘텐츠를 찾을 수 없습니다.")
 
-    return _build_session_response(session)
+        with log_execution_time("응답 객체 생성"):
+            response = _build_session_response(session)
+
+        return response
 
 
 @router.delete("/v2/{session_id}")
@@ -317,24 +458,85 @@ async def delete_content_session(
     콘텐츠 생성 세션 삭제 (v2)
     - 연관된 모든 플랫폼 콘텐츠와 이미지도 함께 삭제됨 (CASCADE)
     """
-    session = db.query(ContentGenerationSession).filter(
-        ContentGenerationSession.id == session_id,
-        ContentGenerationSession.user_id == current_user.id
-    ).first()
+    with log_execution_time(f"delete_content_session (user={current_user.id}, session_id={session_id})"):
+        
+        with log_execution_time("세션 조회"):
+            session = db.query(ContentGenerationSession).filter(
+                ContentGenerationSession.id == session_id,
+                ContentGenerationSession.user_id == current_user.id
+            ).first()
 
-    if not session:
-        raise HTTPException(status_code=404, detail="콘텐츠를 찾을 수 없습니다.")
+        if not session:
+            logger.warning(f"삭제할 세션을 찾을 수 없음: session_id={session_id}, user_id={current_user.id}")
+            raise HTTPException(status_code=404, detail="콘텐츠를 찾을 수 없습니다.")
 
-    db.delete(session)
-    db.commit()
+        with log_execution_time("세션 삭제 및 커밋"):
+            db.delete(session)
+            db.commit()
 
-    logger.info(f"콘텐츠 세션 삭제: user_id={current_user.id}, session_id={session_id}")
+        logger.info(f"콘텐츠 세션 삭제 완료: user_id={current_user.id}, session_id={session_id}")
 
-    return {"message": "콘텐츠가 삭제되었습니다."}
+        return {"message": "콘텐츠가 삭제되었습니다."}
 
 
-def _build_session_list_response(session: ContentGenerationSession, image_count: int) -> ContentSessionListResponse:
-    """목록용 세션 응답 객체 생성 (미리보기용 콘텐츠 포함)"""
+# ============================================
+# 디버깅용 엔드포인트
+# ============================================
+
+@router.get("/v2/debug/query-stats")
+async def get_query_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    디버깅용: 쿼리 통계 정보 조회
+    """
+    with log_execution_time("query_stats"):
+        # 세션 수 조회
+        session_count = db.query(func.count(ContentGenerationSession.id)).filter(
+            ContentGenerationSession.user_id == current_user.id
+        ).scalar()
+
+        # 이미지 수 조회
+        image_count = db.query(func.count(GeneratedImage.id)).join(
+            ContentGenerationSession
+        ).filter(
+            ContentGenerationSession.user_id == current_user.id
+        ).scalar()
+
+        # 플랫폼별 콘텐츠 수 조회
+        blog_count = db.query(func.count(GeneratedBlogContent.id)).filter(
+            GeneratedBlogContent.user_id == current_user.id
+        ).scalar()
+
+        sns_count = db.query(func.count(GeneratedSNSContent.id)).filter(
+            GeneratedSNSContent.user_id == current_user.id
+        ).scalar()
+
+        return {
+            "user_id": current_user.id,
+            "total_sessions": session_count,
+            "total_images": image_count,
+            "blog_contents": blog_count,
+            "sns_contents": sns_count
+        }
+
+
+# ============================================
+# 헬퍼 함수
+# ============================================
+
+def _build_session_list_response_v2(
+    session: ContentGenerationSession,
+    blog: GeneratedBlogContent = None,
+    sns: GeneratedSNSContent = None,
+    x: GeneratedXContent = None,
+    threads: GeneratedThreadsContent = None,
+    cardnews: Dict[str, Any] = None,  # 이미 dict로 전달됨
+    image_count: int = 0,
+    first_image_url: str = None
+) -> ContentSessionListResponse:
+    """목록용 세션 응답 객체 생성 (v2 최적화 버전) - 별도 조회된 콘텐츠 사용"""
     return ContentSessionListResponse(
         id=session.id,
         user_id=session.user_id,
@@ -347,37 +549,29 @@ def _build_session_list_response(session: ContentGenerationSession, image_count:
         created_at=session.created_at.isoformat(),
         requested_image_count=session.requested_image_count or 0,
         blog={
-            "id": session.blog_content.id,
-            "title": session.blog_content.title,
-            "content": session.blog_content.content[:200] if session.blog_content.content else "",
-            "tags": session.blog_content.tags
-        } if session.blog_content else None,
+            "id": blog.id,
+            "title": blog.title,
+            "content": blog.content[:200] if blog.content else "",
+            "tags": blog.tags
+        } if blog else None,
         sns={
-            "id": session.sns_content.id,
-            "content": session.sns_content.content[:200] if session.sns_content.content else "",
-            "hashtags": session.sns_content.hashtags
-        } if session.sns_content else None,
+            "id": sns.id,
+            "content": sns.content[:200] if sns.content else "",
+            "hashtags": sns.hashtags
+        } if sns else None,
         x={
-            "id": session.x_content.id,
-            "content": session.x_content.content[:200] if session.x_content.content else "",
-            "hashtags": session.x_content.hashtags
-        } if session.x_content else None,
+            "id": x.id,
+            "content": x.content[:200] if x.content else "",
+            "hashtags": x.hashtags
+        } if x else None,
         threads={
-            "id": session.threads_content.id,
-            "content": session.threads_content.content[:200] if session.threads_content.content else "",
-            "hashtags": session.threads_content.hashtags
-        } if session.threads_content else None,
-        cardnews={
-            "id": session.cardnews_content.id,
-            "title": session.cardnews_content.title,
-            "page_count": session.cardnews_content.page_count,
-            "purpose": session.cardnews_content.purpose
-        } if session.cardnews_content else None,
+            "id": threads.id,
+            "content": threads.content[:200] if threads.content else "",
+            "hashtags": threads.hashtags
+        } if threads else None,
+        cardnews=cardnews,  # 이미 dict 형태로 전달됨
         image_count=image_count,
-        images=[
-            {"id": img.id, "image_url": img.image_url}
-            for img in (session.images[:3] if session.images else [])  # 최대 3개만
-        ] if session.images else None
+        images=[{"image_url": first_image_url}] if first_image_url else None
     )
 
 
