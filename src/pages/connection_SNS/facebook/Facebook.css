@@ -1,0 +1,207 @@
+/* ========================================
+   FACEBOOK PAGE - PLATFORM SPECIFIC STYLES
+   ======================================== */
+
+/* Facebook 브랜드 컬러 */
+.facebook-page .tab-btn:hover,
+.facebook-page .tab-btn.active {
+  color: #1877f2;
+}
+
+.facebook-page .tab-btn.active::after {
+  background: #1877f2;
+}
+
+.facebook-page .post-card:hover {
+  border-color: #1877f2;
+}
+
+.facebook-page .page-item:hover {
+  border-color: #1877f2;
+}
+
+.facebook-page .form-group input:focus,
+.facebook-page .form-group textarea:focus {
+  border-color: #1877f2;
+}
+
+/* Facebook 연결 버튼 */
+.btn-connect-facebook {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-md) var(--space-xl);
+  background: #1877f2;
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-connect-facebook:hover {
+  background: #166fe5;
+}
+
+.btn-connect-facebook svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* 페이지 선택 */
+.page-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.page-item:hover {
+  background: var(--bg-primary);
+}
+
+.page-picture {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.page-info {
+  flex: 1;
+}
+
+.page-info h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.page-info > p {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-xs);
+}
+
+.page-stats {
+  display: flex;
+  gap: var(--space-md);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 카테고리 뱃지 */
+.account-category {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  background: var(--bg-secondary);
+  padding: var(--space-xs) var(--space-sm);
+  display: inline-block;
+}
+
+/* 게시물 카드 */
+.facebook-page .post-card {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.facebook-page .post-image {
+  flex-shrink: 0;
+  width: 120px;
+  height: 90px;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+}
+
+.facebook-page .post-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.facebook-page .post-message {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin-bottom: var(--space-sm);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.facebook-page .post-link {
+  flex-shrink: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: #1877f2;
+  color: white;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  align-self: center;
+  transition: background 0.15s ease;
+}
+
+.facebook-page .post-link:hover {
+  background: #166fe5;
+}
+
+/* 게시물 작성 권한 알림 */
+.permission-notice {
+  background: var(--bg-secondary);
+  padding: var(--space-lg);
+  text-align: center;
+}
+
+.permission-notice p {
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.permission-notice ul {
+  text-align: left;
+  display: inline-block;
+  margin-bottom: var(--space-lg);
+  padding-left: var(--space-lg);
+}
+
+.permission-notice li {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  margin-bottom: var(--space-sm);
+}
+
+/* 게시 버튼 */
+.facebook-page .btn-post {
+  background: #1877f2;
+}
+
+.facebook-page .btn-post:hover:not(:disabled) {
+  background: #166fe5;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .facebook-page .post-card {
+    flex-direction: column;
+  }
+
+  .facebook-page .post-image {
+    width: 100%;
+    height: 180px;
+  }
+
+  .facebook-page .post-link {
+    align-self: flex-start;
+  }
+}

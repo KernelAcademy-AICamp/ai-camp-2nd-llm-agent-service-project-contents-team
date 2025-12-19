@@ -1,0 +1,86 @@
+/* ========================================
+   X PAGE - PLATFORM SPECIFIC STYLES
+   ======================================== */
+
+/* X 브랜드 컬러 (검정색) */
+.x-page .tab-btn:hover,
+.x-page .tab-btn.active {
+  color: #000000;
+}
+
+.x-page .tab-btn.active::after {
+  background: #000000;
+}
+
+.x-page .post-card:hover {
+  border-color: #000000;
+}
+
+.x-page .compose-form textarea:focus,
+.x-page .compose-form input:focus {
+  border-color: #000000;
+}
+
+/* X 연결 버튼 */
+.btn-connect-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-md) var(--space-xl);
+  background: #000000;
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-connect-x:hover {
+  background: #1a1a1a;
+}
+
+.btn-connect-x svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* 미디어 업로드 버튼 */
+.x-page .media-upload-btn {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.x-page .media-upload-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+/* 게시 버튼 */
+.x-page .btn-post {
+  background: #000000;
+}
+
+.x-page .btn-post:hover:not(:disabled) {
+  background: #1a1a1a;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .x-page .compose-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .x-page .media-upload-btn,
+  .x-page .btn-post {
+    width: 100%;
+    text-align: center;
+  }
+}

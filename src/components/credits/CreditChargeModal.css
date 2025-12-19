@@ -1,0 +1,380 @@
+/* 크레딧 충전 모달 스타일 */
+
+.credit-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.credit-modal {
+  background: white;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.credit-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+  padding: 8px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.credit-modal-close:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.credit-modal-header {
+  padding: 32px 32px 24px;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+}
+
+.credit-modal-header.success {
+  border-bottom: none;
+  padding-bottom: 16px;
+}
+
+.credit-modal-icon {
+  font-size: 48px;
+  color: #FF8B5A;
+  margin-bottom: 16px;
+}
+
+.credit-modal-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 8px;
+}
+
+.credit-modal-header p {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+/* 패키지 목록 */
+.credit-packages {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.credit-packages-loading {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.credit-package-card {
+  border: 2px solid #e5e5e5;
+  border-radius: 16px;
+  padding: 20px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  background: white;
+}
+
+.credit-package-card:hover {
+  border-color: #FF8B5A;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 139, 90, 0.15);
+}
+
+.credit-package-card.selected {
+  border-color: #FF8B5A;
+  background: linear-gradient(135deg, #FFF5F2 0%, #FFF 100%);
+}
+
+.credit-package-card.popular {
+  border-color: #FF8B5A;
+}
+
+.package-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #FF8B5A 0%, #FF6B3D 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.package-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+.package-credits {
+  margin-bottom: 8px;
+}
+
+.credits-amount {
+  font-size: 28px;
+  font-weight: 800;
+  color: #FF8B5A;
+}
+
+.credits-label {
+  font-size: 12px;
+  color: #666;
+  margin-left: 4px;
+}
+
+.package-bonus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #FFF5F2;
+  color: #FF8B5A;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.package-total {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.package-total strong {
+  color: #1a1a1a;
+}
+
+.package-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.package-unit-price {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.package-selected-check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  background: #FF8B5A;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+}
+
+/* 결제 확인 */
+.credit-confirm-details {
+  padding: 24px 32px;
+}
+
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.confirm-label {
+  color: #666;
+  font-size: 14px;
+}
+
+.confirm-value {
+  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 14px;
+}
+
+.confirm-row.bonus .confirm-value {
+  color: #FF8B5A;
+}
+
+.confirm-row.total {
+  padding-top: 16px;
+}
+
+.confirm-row.total .confirm-label,
+.confirm-row.total .confirm-value {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.confirm-divider {
+  border-top: 1px dashed #ddd;
+  margin: 8px 0;
+}
+
+.confirm-row.price {
+  padding-top: 16px;
+}
+
+.confirm-row.price .confirm-label {
+  font-size: 16px;
+  color: #1a1a1a;
+}
+
+.confirm-row.price .confirm-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #FF8B5A;
+}
+
+.credit-notice {
+  padding: 0 32px 24px;
+}
+
+.credit-notice p {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+  text-align: center;
+}
+
+/* 성공 화면 */
+.success-icon {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.success-icon svg {
+  font-size: 32px;
+  color: white;
+}
+
+.credit-success-message {
+  padding: 24px 32px;
+  text-align: center;
+}
+
+.credit-success-message p {
+  color: #666;
+  margin: 0;
+}
+
+/* 푸터 */
+.credit-modal-footer {
+  padding: 16px 32px 32px;
+  display: flex;
+  gap: 12px;
+}
+
+.btn-back {
+  flex: 1;
+  padding: 14px 24px;
+  border: 2px solid #e5e5e5;
+  background: white;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  border-color: #ccc;
+  color: #333;
+}
+
+.btn-charge {
+  flex: 2;
+  padding: 14px 24px;
+  border: none;
+  background: linear-gradient(135deg, #FF8B5A 0%, #FF6B3D 100%);
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-charge:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 139, 90, 0.3);
+}
+
+.btn-charge:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* 반응형 */
+@media (max-width: 480px) {
+  .credit-modal {
+    width: 95%;
+    margin: 16px;
+  }
+
+  .credit-packages {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .credit-modal-header {
+    padding: 24px 20px 20px;
+  }
+
+  .credit-confirm-details,
+  .credit-modal-footer,
+  .credit-notice {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+}

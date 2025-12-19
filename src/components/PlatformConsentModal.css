@@ -1,0 +1,394 @@
+/* 모달 오버레이 */
+.consent-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 모달 컨테이너 */
+.consent-modal-container {
+  background: white;
+  border-radius: 16px;
+  max-width: 700px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 헤더 */
+.consent-modal-header {
+  padding: 24px 28px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.consent-modal-header h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.consent-modal-close {
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.consent-modal-close:hover {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+/* 바디 */
+.consent-modal-body {
+  padding: 28px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* 안내 메시지 */
+.consent-alert-box {
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 28px;
+}
+
+.consent-alert-box p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1e40af;
+}
+
+.consent-alert-box p + p {
+  margin-top: 8px;
+}
+
+.consent-alert-box strong {
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+/* 섹션 */
+.consent-section {
+  margin-bottom: 28px;
+}
+
+.consent-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.warning-icon {
+  font-size: 20px;
+}
+
+.section-icon {
+  font-size: 20px;
+}
+
+.consent-section-optional {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+/* 동의 항목 */
+.consent-item {
+  margin-bottom: 16px;
+}
+
+.consent-item:last-child {
+  margin-bottom: 0;
+}
+
+.consent-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  padding: 16px;
+  border-radius: 10px;
+  transition: background-color 0.2s;
+}
+
+.consent-checkbox-label:hover {
+  background-color: #f9fafb;
+}
+
+.consent-checkbox-label input[type="checkbox"] {
+  margin-top: 4px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #2563eb;
+  flex-shrink: 0;
+}
+
+.consent-item-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.consent-item-content {
+  flex: 1;
+}
+
+.consent-item-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  line-height: 1.6;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.consent-item-description,
+.consent-item-legal {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+.consent-item-legal {
+  background-color: #fef3c7;
+  border-left: 3px solid #f59e0b;
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: #92400e;
+  margin-top: 10px;
+}
+
+/* 배지 */
+.required-badge,
+.optional-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.required-badge {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.optional-badge {
+  background-color: #e0e7ff;
+  color: #4f46e5;
+}
+
+/* 사용자 권리 */
+.consent-user-rights {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 28px;
+}
+
+.user-rights-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #065f46;
+  margin: 0 0 16px 0;
+}
+
+.user-rights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.user-right-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.user-right-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.user-right-content {
+  flex: 1;
+}
+
+.user-right-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #064e3b;
+  margin-bottom: 4px;
+}
+
+.user-right-description {
+  font-size: 13px;
+  color: #047857;
+  line-height: 1.5;
+}
+
+/* 푸터 */
+.consent-modal-footer {
+  padding: 20px 28px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.consent-btn {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.consent-btn-cancel {
+  background-color: #f3f4f6;
+  color: #4b5563;
+}
+
+.consent-btn-cancel:hover {
+  background-color: #e5e7eb;
+}
+
+.consent-btn-required {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.consent-btn-required:hover:not(:disabled) {
+  background-color: #2563eb;
+}
+
+.consent-btn-required:disabled {
+  background-color: #d1d5db;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.consent-btn-all {
+  background-color: #10b981;
+  color: white;
+}
+
+.consent-btn-all:hover {
+  background-color: #059669;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .consent-modal-container {
+    max-width: 100%;
+    margin: 10px;
+    max-height: 95vh;
+  }
+
+  .consent-modal-header {
+    padding: 20px;
+  }
+
+  .consent-modal-header h2 {
+    font-size: 18px;
+  }
+
+  .consent-modal-body {
+    padding: 20px;
+  }
+
+  .consent-modal-footer {
+    padding: 16px 20px;
+    flex-direction: column;
+  }
+
+  .consent-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* 스크롤바 스타일 */
+.consent-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.consent-modal-body::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.consent-modal-body::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.consent-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}

@@ -2,22 +2,40 @@
   "name": "contents_creator",
   "version": "0.1.0",
   "private": true,
+  "proxy": "http://localhost:8000",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@hello-pangea/dnd": "^18.0.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-icons": "^5.5.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.9.5",
     "react-scripts": "5.0.1",
+    "remark-breaks": "^4.0.0",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "prestart": "node scripts/check-ports.js",
+    "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
+    "start:frontend": "react-scripts start",
+    "start:backend": "cd backend && python3 -m uvicorn app.main:app --reload --port 8000",
+    "start:dev": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
+    "setup:backend": "cd backend && bash setup.sh",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   },
   "eslintConfig": {
     "extends": [

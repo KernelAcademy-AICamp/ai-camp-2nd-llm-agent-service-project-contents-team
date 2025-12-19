@@ -1,0 +1,525 @@
+/* ========================================
+   DASHBOARD - MODERN UI DESIGN
+   Clean, compact, fits in one screen
+   ======================================== */
+
+.dashboard {
+  max-width: 1280px;
+  padding: var(--space-2xl) var(--space-xl);
+  margin: 0 auto;
+  animation: fadeIn var(--transition-normal) ease-out;
+}
+
+/* Header - 콘텐츠 관리/템플릿과 동일한 스타일 */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-xl);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+}
+
+.dashboard-header .header-left h2 {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-xs) 0;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-header .header-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* ==========================================
+   SNS 플랫폼 카드 그리드
+   ========================================== */
+
+.dashboard .sns-platform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  width: 100%;
+}
+
+.dashboard .sns-platform-card {
+  overflow: hidden;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 140px;
+}
+
+/* 연동됨 상태 */
+.dashboard .sns-platform-card.connected {
+  background: var(--brand-light-bg, #F8F8FF);
+}
+
+/* .dashboard .sns-platform-card.connected::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--brand-gradient, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
+} */
+
+.dashboard .sns-platform-card.connected:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* 미연동 상태 */
+.dashboard .sns-platform-card.disconnected {
+  background: var(--bg-secondary);
+  opacity: 0.85;
+}
+
+.dashboard .sns-platform-card.disconnected:hover {
+  opacity: 1;
+  background: var(--brand-light-bg, #F8F8FF);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* 카드 헤더 (아이콘 영역) */
+.dashboard .platform-card-header {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dashboard .platform-icon-wrapper {
+  position: relative;
+}
+
+.dashboard .platform-icon {
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-color);
+}
+
+.dashboard .connected-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  background: #22C55E;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 9px;
+  border: 2px solid var(--bg-primary);
+}
+
+/* 카드 바디 */
+.dashboard .platform-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard .platform-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 2px 0;
+}
+
+.dashboard .platform-status {
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.dashboard .platform-status.loading {
+  color: var(--text-tertiary);
+}
+
+.dashboard .platform-status.connected {
+  color: var(--brand-color, #667eea);
+  font-weight: 600;
+}
+
+.dashboard .platform-status.disconnected {
+  color: var(--text-tertiary);
+}
+
+/* 카드 푸터 */
+.dashboard .platform-card-footer {
+  display: flex;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+
+.dashboard .platform-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: none;
+  white-space: nowrap;
+}
+
+.dashboard .platform-btn.primary {
+  background: var(--brand-gradient, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
+  color: white;
+}
+
+.dashboard .platform-btn.primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.dashboard .platform-btn.secondary {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.dashboard .platform-btn.secondary:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--brand-color, #667eea);
+  color: var(--brand-color, #667eea);
+}
+
+.dashboard .platform-btn.connect {
+  background: var(--bg-primary);
+  border: 2px dashed var(--border-color);
+  color: var(--text-secondary);
+  padding: var(--space-xs) var(--space-md);
+}
+
+.dashboard .platform-btn.connect:hover {
+  border-color: var(--brand-color, #667eea);
+  border-style: solid;
+  color: var(--brand-color, #667eea);
+  background: var(--brand-light-bg, #F8F8FF);
+}
+
+/* ==========================================
+   Dashboard Charts (reach-dashboard)
+   ========================================== */
+
+.dashboard-charts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.reach-dashboard {
+  background: var(--bg-primary);
+  border: var(--border-thin) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+}
+
+/* 팔로워 그래프 - 라벤더 */
+.reach-dashboard:nth-child(1) {
+  background: linear-gradient(135deg, #F8F8FF 0%, #ffffff 100%);
+}
+
+/* 콘텐츠 그래프 - 핑크 */
+.reach-dashboard:nth-child(2) {
+  background: linear-gradient(135deg, #FFF8F8 0%, #ffffff 100%);
+}
+
+/* 조회수 그래프 - 그린 */
+.reach-dashboard:nth-child(3) {
+  background: linear-gradient(135deg, #F8FFF8 0%, #ffffff 100%);
+}
+
+.reach-dashboard-header {
+  margin-bottom: var(--space-md);
+}
+
+.reach-title-section {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin-bottom: 2px;
+}
+
+.reach-title-section h3 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.reach-total-value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.reach-subtitle {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.reach-bars-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.reach-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reach-bar-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.reach-bar-icon {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.reach-bar-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.reach-bar-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.reach-bar-track {
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.reach-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.5s ease-out;
+}
+
+/* Dashboard Content Grid */
+.dashboard-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-md);
+  flex: 1;
+  min-height: 0;
+}
+
+/* Section Title (공통) */
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ==========================================
+   공통 섹션 스타일 (SNS Connection & Quick Actions)
+   ========================================== */
+
+.sns-connection-section,
+.quick-actions {
+  background: var(--bg-primary);
+  border: var(--border-thin) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+.sns-connection-section .section-title,
+.quick-actions .section-title {
+  margin-bottom: var(--space-sm);
+}
+
+.sns-connection-section .section-title h3,
+.quick-actions .section-title h3 {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.sns-connection-section .section-title-left,
+.quick-actions .section-title-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sns-connection-section .section-description,
+.quick-actions .section-description {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* 공통 카드 아이템 스타일 (SNS Card & Action Button) */
+.dashboard .sns-platform-card,
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border: none;
+  border-radius: 5px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.action-btn {
+  text-align: left;
+}
+
+.action-btn:hover {
+  background: var(--brand-light-bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.action-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.action-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.action-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* SNS Connection Section - 고유 스타일 */
+.sns-refresh-btn {
+  background: var(--bg-secondary);
+  border: var(--border-thin) solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.sns-refresh-btn:hover {
+  background: var(--accent-color);
+  color: var(--text-primary);
+}
+
+.sns-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sns-refresh-btn.spinning svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .dashboard {
+    height: auto;
+    min-height: calc(100vh - 60px);
+    overflow: auto;
+  }
+
+  .dashboard-charts {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-content {
+    grid-template-columns: 1fr;
+    flex: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    padding: var(--space-md);
+  }
+
+  .dashboard-header h2 {
+    font-size: var(--text-xl);
+  }
+
+  /* 공통 섹션 반응형 */
+  .sns-connection-section,
+  .quick-actions {
+    padding: var(--space-sm);
+    border-radius: var(--radius-md);
+  }
+
+  /* 공통 카드 아이템 반응형 */
+  .dashboard .sns-platform-card,
+  .action-btn {
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard .sns-platform-grid {
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  }
+
+  .dashboard .sns-platform-card,
+  .action-btn {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .dashboard .platform-card-footer {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

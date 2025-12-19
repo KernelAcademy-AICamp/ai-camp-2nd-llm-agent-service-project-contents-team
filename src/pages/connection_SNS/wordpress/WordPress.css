@@ -1,0 +1,658 @@
+/* WordPress 페이지 스타일 */
+
+/* WordPress 연동 카드 */
+.connect-card {
+  background: var(--card-bg, #ffffff);
+  border-radius: 16px;
+  padding: 40px;
+  text-align: center;
+  border: 1px solid var(--border-color, #e5e7eb);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.connect-icon.wordpress {
+  color: #21759b;
+  margin-bottom: 24px;
+}
+
+.connect-card h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--text-primary, #1f2937);
+}
+
+.connect-description {
+  font-size: 16px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0 0 24px;
+}
+
+.connect-features {
+  text-align: left;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.connect-features h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--text-primary, #1f2937);
+}
+
+.connect-features ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.connect-features li {
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 8px;
+}
+
+.connect-features li:last-child {
+  margin-bottom: 0;
+}
+
+/* 연동 폼 */
+.connect-form {
+  text-align: left;
+}
+
+.connect-form .form-group {
+  margin-bottom: 16px;
+}
+
+.connect-form label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-primary, #1f2937);
+}
+
+.connect-form input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.connect-form input:focus {
+  outline: none;
+  border-color: #21759b;
+}
+
+.form-help {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+  margin-top: 6px;
+}
+
+/* WordPress 연동 버튼 */
+.btn-connect-wordpress {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 24px;
+  background: #21759b;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 8px;
+}
+
+.btn-connect-wordpress:hover:not(:disabled) {
+  background: #1a5f7a;
+}
+
+.btn-connect-wordpress:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 글 목록 */
+.post-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 글 카드 */
+.post-card {
+  background: var(--card-bg, #ffffff);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  transition: box-shadow 0.2s;
+}
+
+.post-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.post-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.post-status {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.post-status.status-publish {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.post-status.status-draft {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.post-status.status-pending {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.post-status.status-private {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.post-status.status-future {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.post-categories {
+  font-size: 12px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.post-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--text-primary, #1f2937);
+}
+
+.post-excerpt {
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0 0 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.post-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-muted, #9ca3af);
+  margin-bottom: 16px;
+}
+
+.post-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.btn-view {
+  padding: 8px 16px;
+  background: #21759b;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn-view:hover {
+  background: #1a5f7a;
+}
+
+.btn-delete {
+  padding: 8px 16px;
+  background: transparent;
+  color: #dc2626;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-delete:hover {
+  background: #fef2f2;
+}
+
+/* 글 작성 섹션 */
+.compose-section {
+  background: var(--card-bg, #ffffff);
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.compose-section h3 {
+  margin: 0 0 20px;
+  font-size: 18px;
+  color: var(--text-primary, #1f2937);
+}
+
+.compose-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.compose-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.compose-form label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary, #1f2937);
+}
+
+.compose-form input,
+.compose-form textarea,
+.compose-form select {
+  padding: 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.compose-form input:focus,
+.compose-form textarea:focus,
+.compose-form select:focus {
+  outline: none;
+  border-color: #21759b;
+}
+
+.compose-form textarea {
+  resize: vertical;
+  min-height: 200px;
+  font-family: monospace;
+}
+
+/* 카테고리 체크박스 */
+.category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.category-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+}
+
+.category-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.compose-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+.btn-publish {
+  padding: 12px 24px;
+  background: #21759b;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-publish:hover:not(:disabled) {
+  background: #1a5f7a;
+}
+
+.btn-publish:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* WordPress 탭 색상 */
+.tab-navigation.wordpress .tab-btn.active {
+  color: #21759b;
+  border-bottom-color: #21759b;
+}
+
+/* 통계 섹션 */
+.stats-section {
+  background: var(--card-bg, #ffffff);
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.stats-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-primary, #1f2937);
+}
+
+.stats-period-selector {
+  display: flex;
+  gap: 8px;
+}
+
+.period-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 20px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.period-btn:hover {
+  border-color: #21759b;
+  color: #21759b;
+}
+
+.period-btn.active {
+  background: #21759b;
+  border-color: #21759b;
+  color: white;
+}
+
+/* 통계 요약 카드 */
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-icon {
+  font-size: 24px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary, #1f2937);
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+}
+
+.stats-source {
+  font-size: 12px;
+  color: var(--text-muted, #9ca3af);
+  margin-bottom: 24px;
+}
+
+/* 인기 게시물 섹션 */
+.top-posts-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.top-posts-section h4 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  color: var(--text-primary, #1f2937);
+}
+
+.top-posts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.top-post-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 8px;
+}
+
+.top-post-rank {
+  font-size: 14px;
+  font-weight: 700;
+  color: #21759b;
+  min-width: 32px;
+}
+
+.top-post-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+  gap: 12px;
+}
+
+.top-post-title {
+  font-size: 14px;
+  color: var(--text-primary, #1f2937);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-post-views {
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+/* 통계 불가 메시지 */
+.stats-unavailable {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.stats-unavailable h3 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  color: var(--text-primary, #1f2937);
+}
+
+.stats-unavailable > p {
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 24px;
+}
+
+.stats-help {
+  text-align: left;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.stats-help h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
+}
+
+.stats-help ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.stats-help li {
+  margin-bottom: 12px;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+}
+
+.stats-help li:last-child {
+  margin-bottom: 0;
+}
+
+.stats-help strong {
+  color: var(--text-primary, #1f2937);
+}
+
+.stats-help small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted, #9ca3af);
+}
+
+/* 통계 로딩 */
+.stats-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+}
+
+.stats-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color, #e5e7eb);
+  border-top-color: #21759b;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.stats-loading p {
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+}
+
+/* 통계 에러 */
+.stats-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.stats-error p {
+  margin: 0;
+  color: #dc2626;
+  font-size: 14px;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .connect-card {
+    padding: 24px;
+  }
+
+  .post-card {
+    padding: 16px;
+  }
+
+  .post-meta {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .category-list {
+    gap: 8px;
+  }
+
+  .stats-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stats-period-selector {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .stats-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  .top-post-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

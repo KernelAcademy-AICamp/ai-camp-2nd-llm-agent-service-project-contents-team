@@ -1,0 +1,68 @@
+/* ========================================
+   THREADS PAGE - PLATFORM SPECIFIC STYLES
+   ======================================== */
+
+/* Threads 브랜드 컬러 (검정색) */
+.threads-page .tab-btn:hover,
+.threads-page .tab-btn.active {
+  color: #000000;
+}
+
+.threads-page .tab-btn.active::after {
+  background: #000000;
+}
+
+.threads-page .post-card:hover {
+  border-color: #000000;
+}
+
+.threads-page .compose-form textarea:focus,
+.threads-page .compose-form input:focus {
+  border-color: #000000;
+}
+
+/* Threads 연결 버튼 */
+.btn-connect-threads {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-md) var(--space-xl);
+  background: #000000;
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-connect-threads:hover {
+  background: #1a1a1a;
+}
+
+.btn-connect-threads svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Threads에서 보기 링크 */
+.threads-page .view-on-threads {
+  font-size: 12px;
+  color: var(--info-color);
+  text-decoration: none;
+}
+
+.threads-page .view-on-threads:hover {
+  text-decoration: underline;
+}
+
+/* 게시 버튼 */
+.threads-page .btn-post {
+  background: #000000;
+}
+
+.threads-page .btn-post:hover:not(:disabled) {
+  background: #1a1a1a;
+}

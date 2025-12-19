@@ -1,0 +1,317 @@
+/* ========================================
+   YOUTUBE PAGE - PLATFORM SPECIFIC STYLES
+   ======================================== */
+
+/* YouTube 브랜드 컬러 */
+.youtube-page .tab-btn:hover,
+.youtube-page .tab-btn.active {
+  color: #ff0000;
+}
+
+.youtube-page .tab-btn.active::after {
+  background: #ff0000;
+}
+
+.youtube-page .video-card:hover {
+  border-color: #ff0000;
+}
+
+.youtube-page .form-group input:focus,
+.youtube-page .form-group textarea:focus,
+.youtube-page .form-group select:focus {
+  border-color: #ff0000;
+}
+
+/* YouTube 연결 버튼 */
+.btn-connect-youtube {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-md) var(--space-xl);
+  background: #ff0000;
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-connect-youtube:hover {
+  background: #cc0000;
+}
+
+.btn-connect-youtube svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* YouTube 비디오 그리드 */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-lg);
+}
+
+.video-card {
+  background: var(--bg-secondary);
+  overflow: hidden;
+  transition: all 0.15s ease;
+  border: 1px solid var(--border-color);
+}
+
+.video-thumbnail {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: var(--bg-tertiary);
+}
+
+.video-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-duration {
+  position: absolute;
+  bottom: var(--space-sm);
+  right: var(--space-sm);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 2px var(--space-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.privacy-badge {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  padding: 2px var(--space-sm);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.privacy-badge.private {
+  background: var(--error-color);
+  color: white;
+}
+
+.privacy-badge.unlisted {
+  background: var(--warning-color);
+  color: var(--primary-color);
+}
+
+.video-info {
+  padding: var(--space-md);
+}
+
+.video-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.video-stats {
+  display: flex;
+  gap: var(--space-md);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-sm);
+}
+
+.video-date {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* YouTube 분석 섹션 */
+.analytics-header {
+  margin-bottom: var(--space-lg);
+}
+
+.analytics-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.analytics-header p {
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+}
+
+.analytics-card {
+  background: var(--bg-secondary);
+  padding: var(--space-md);
+  text-align: center;
+}
+
+.analytics-card.positive {
+  background: var(--success-light);
+}
+
+.analytics-card.negative {
+  background: var(--error-light);
+}
+
+.analytics-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-sm);
+}
+
+.analytics-value {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.analytics-card.positive .analytics-value {
+  color: var(--success-dark);
+}
+
+.analytics-card.negative .analytics-value {
+  color: var(--error-dark);
+}
+
+/* 인기 동영상 섹션 */
+.top-videos-section {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-color);
+}
+
+.top-videos-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-md);
+}
+
+.top-videos-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.top-video-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-secondary);
+}
+
+.top-video-item .rank {
+  width: 24px;
+  height: 24px;
+  background: var(--primary-color);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.top-video-item .title {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-video-item .views {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* 업로드 섹션 */
+.upload-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-lg);
+}
+
+.upload-form {
+  max-width: 600px;
+}
+
+.file-name {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: var(--space-sm);
+}
+
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #ff0000;
+  transition: width 0.3s;
+}
+
+.btn-upload {
+  padding: var(--space-sm) var(--space-xl);
+  background: #ff0000;
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-upload:hover:not(:disabled) {
+  background: #cc0000;
+}
+
+.btn-upload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .video-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

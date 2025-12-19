@@ -1,0 +1,190 @@
+/* ========================================
+   LOGIN PAGE - MODERN STYLE
+   Bold geometric design, high contrast
+   ======================================== */
+
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: var(--bg-primary);
+  padding: var(--space-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Geometric background decorations */
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  background: var(--primary-color);
+  z-index: 0;
+}
+
+.login-container::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 200px;
+  height: 200px;
+  background: var(--secondary-color);
+  border-radius: 50%;
+  transform: translate(30%, 30%);
+  z-index: 0;
+}
+
+.login-box {
+  background: var(--bg-primary);
+  border: var(--border-thick) solid var(--primary-color);
+  padding: var(--space-2xl);
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Accent line */
+.login-box::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: var(--accent-color);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: var(--space-xl);
+}
+
+.login-header h1 {
+  font-family: var(--font-display);
+  font-size: 32px;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+}
+
+.login-header p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.error-message {
+  background-color: var(--bg-primary);
+  color: var(--error-color);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  font-size: 13px;
+  text-align: center;
+  font-weight: 600;
+  text-transform: uppercase;
+  border: var(--border-medium) solid var(--error-color);
+}
+
+/* Social Login */
+.social-login {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.social-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border: var(--border-medium) solid var(--primary-color);
+  background: var(--bg-primary);
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--font-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.social-btn:hover {
+  background: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+.social-btn svg {
+  flex-shrink: 0;
+}
+
+.social-btn.google {
+  color: var(--text-primary);
+  border-color: var(--secondary-color);
+}
+
+.social-btn.google:hover {
+  background: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+.social-btn.kakao {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--primary-color);
+}
+
+.social-btn.kakao:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.social-btn.facebook {
+  color: var(--info-color);
+  border-color: var(--info-color);
+}
+
+.social-btn.facebook:hover {
+  background: var(--info-color);
+  color: var(--bg-primary);
+}
+
+/* Geometric decoration at bottom */
+.login-box::after {
+  content: '';
+  position: absolute;
+  bottom: var(--space-md);
+  right: var(--space-md);
+  width: 24px;
+  height: 24px;
+  background: var(--secondary-color);
+  border-radius: 50%;
+}
+
+@media (max-width: 768px) {
+  .login-container::before {
+    width: 100%;
+    height: 30%;
+  }
+
+  .login-box {
+    padding: var(--space-xl) var(--space-lg);
+  }
+
+  .login-header h1 {
+    font-size: 24px;
+  }
+
+  .social-btn {
+    font-size: 13px;
+    padding: var(--space-sm) var(--space-md);
+  }
+}

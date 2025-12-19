@@ -1,0 +1,1882 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import api from '../../services/api';
+import PlatformConsentModal from '../../components/PlatformConsentModal';
+import './DynamicOnboarding.css';
+
+// 스타일별 콘텐츠 예시
+const styleExamples = {
+  '따뜻한': {
+    industry: '카페',
+    text: '추운 겨울, 따뜻한 라떼 한 잔으로 몸과 마음을 녹여보세요. 오늘도 우리 카페에서 손님들의 웃음소리가 들려왔어요. 편안한 공간에서 잠시 쉬어가시길 바라며, 정성껏 내린 커피 한 잔 준비해두었습니다.'
+  },
+  '친근한': {
+    industry: '반려동물 용품점',
+    text: '우리 강아지가 이 간식 먹고 꼬리가 프로펠러처럼 돌아가더라구요 ㅋㅋ 여러분네 댕댕이는 어때요? 요즘 날씨 건조해서 발바닥 케어도 신경 써주셔야 해요! 궁금한 거 있으면 언제든 물어보세요~'
+  },
+  '전문적인': {
+    industry: 'IT 보안 솔루션',
+    text: '최신 암호화 기술을 적용한 엔터프라이즈급 보안 시스템을 제공합니다. ISO 27001 인증을 획득하였으며, 연간 99.9%의 가동률을 보장합니다. 전담 보안 전문가가 24시간 모니터링하여 귀사의 데이터를 안전하게 보호합니다.'
+  },
+  '유머러스한': {
+    industry: '헬스장',
+    text: '운동은 내일부터? 그 내일이 오늘입니다! 😂 PT 선생님이 \'하나만 더~\' 할 때마다 제 영혼이 빠져나가는 기분이지만, 신기하게도 몸은 좋아지더라구요. 같이 고통(?)받으실 분들 환영합니다! 첫 달 회원권 50% 할인 중!'
+  },
+  '진지한': {
+    industry: '법률 사무소',
+    text: '법적 분쟁은 신중하고 체계적인 접근이 필요합니다. 저희는 15년간 누적된 판례 연구를 바탕으로 최선의 법률 서비스를 제공합니다. 의뢰인의 권리를 지키기 위해 끝까지 책임지고 대응하겠습니다.'
+  },
+  '창의적인': {
+    industry: '인테리어 디자인 스튜디오',
+    text: '벽 하나로 공간의 분위기가 180도 바뀐다면 믿으시겠나요? 우리는 \'불가능\'이란 말 대신 \'어떻게 하면 될까?\'를 고민합니다. 당신만의 라이프스타일을 공간에 담아내는 새로운 경험, 지금 시작해보세요.'
+  },
+  '신뢰감있는': {
+    industry: '자동차 정비소',
+    text: '25년 경력의 국가공인 정비사가 직접 점검합니다. 모든 정비 과정은 고객님께 투명하게 공개되며, 정품 부품만을 사용합니다. A/S 보증서를 발급해드리고, 정비 후 3개월 무상 재점검을 약속드립니다.'
+  },
+  '트렌디한': {
+    industry: '패션 편집샵',
+    text: '요즘 인스타에서 난리난 그 브랜드, 드디어 입고됐어요! 🔥 완판 임박이니까 서두르세요! 연예인 ○○○이 착용한 바로 그 아이템! OOTD 찍기 딱 좋은 감성 가득 신상 라인업, 놓치면 후회할걸요?'
+  }
+};
+
+function DynamicOnboarding() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [currentStep, setCurrentStep] = useState(0); // 0: SNS 질문, 1: 비즈니스 정보, 2: 스타일, 3: 완료
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  // 온보딩 경로 선택
+  const [onboardingPath, setOnboardingPath] = useState(null); // 'sns_analysis' or 'manual_input'
+
+  // Step 1: 비즈니스 정보
+  const [businessInfo, setBusinessInfo] = useState({
+    brand_name: '',
+    business_type: '',
+    business_description: '',
+    target_audience: {
+      age_range: '',
+      gender: 'all',
+      interests: []
+    },
+    custom_fields: {}, // 업종별 맞춤 필드
+    selected_styles: [], // 선택한 스타일 (최대 3개)
+    brand_values: [] // 브랜드 가치 (최대 5개)
+  });
+
+  // 업종별 맞춤 질문
+  const [customQuestions, setCustomQuestions] = useState([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+
+  // AI 추천 관심사
+  const [recommendedInterests, setRecommendedInterests] = useState([]);
+  const [aiReasoning, setAiReasoning] = useState('');
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+
+  // SNS 분석 (멀티 플랫폼)
+  const [platformUrls, setPlatformUrls] = useState({
+    instagram: '',
+    youtube: '',
+    threads: ''
+  });
+
+  // 멀티 플랫폼 분석 상태
+  const [multiPlatformAnalysisStatus, setMultiPlatformAnalysisStatus] = useState('idle'); // idle, analyzing, completed, failed
+  const [multiPlatformAnalysisResult, setMultiPlatformAnalysisResult] = useState(null);
+  const [analysisProgress, setAnalysisProgress] = useState(0); // SNS 분석 진행률 (0-100)
+
+  // YouTube 연동 상태
+  const [youtubeConnection, setYoutubeConnection] = useState(null);
+  const [youtubeConnectionLoading, setYoutubeConnectionLoading] = useState(false);
+
+  // Instagram 연동 상태
+  const [instagramConnection, setInstagramConnection] = useState(null);
+  const [instagramConnectionLoading, setInstagramConnectionLoading] = useState(false);
+
+  // Threads 연동 상태
+  const [threadsConnection, setThreadsConnection] = useState(null);
+  const [threadsConnectionLoading, setThreadsConnectionLoading] = useState(false);
+
+  // 수동 입력 분석 상태
+  const [manualAnalysisStatus, setManualAnalysisStatus] = useState('idle'); // idle, analyzing, completed, failed
+  const [manualAnalysisResult, setManualAnalysisResult] = useState(null);
+
+  // 동의 모달 상태
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [consentPlatform, setConsentPlatform] = useState(null); // 'youtube', 'instagram', 'threads'
+  const [consentPlatformUrl, setConsentPlatformUrl] = useState('');
+  const [userConsents, setUserConsents] = useState(null);
+
+  // Step 2: 콘텐츠 선호도
+  const [preferences, setPreferences] = useState({
+    text_style_sample: '',
+    text_tone: 'casual',
+    image_style_description: '',
+    video_style_description: '',
+    video_duration_preference: 'short'
+  });
+
+  // 파일 업로드 (드래그 앤 드롭) - 수동 입력 경로용 (여러 개)
+  const [textSamples, setTextSamples] = useState([]); // 최소 2개
+  const [imageSamples, setImageSamples] = useState([]); // 최소 2개
+  const [videoSamples, setVideoSamples] = useState([]); // 최소 2개
+
+  // 레거시 - SNS 분석 경로에서는 사용 안 함
+  const [imageSample, setImageSample] = useState(null);
+  const [videoSample, setVideoSample] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [videoPreview, setVideoPreview] = useState(null);
+  const [dragActive, setDragActive] = useState({ image: false, video: false });
+
+  // 관심사 입력
+  const [interestInput, setInterestInput] = useState('');
+
+  // 브랜드 가치 입력
+  const [valueInput, setValueInput] = useState('');
+
+  // 스타일 미리보기
+  const [selectedStyleForPreview, setSelectedStyleForPreview] = useState(null);
+
+  // 실시간 유효성 검사
+  const [validation, setValidation] = useState({
+    brand_name: { valid: false, message: '' },
+    business_type: { valid: false, message: '' },
+  });
+
+  const imageInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+
+  useEffect(() => {
+    checkOnboardingStatus();
+  }, []);
+
+  // 업종 변경 시 맞춤 질문 로드
+  useEffect(() => {
+    if (businessInfo.business_type) {
+      loadCustomQuestions();
+    }
+  }, [businessInfo.business_type]);
+
+  // SNS 분석 진행률 자동 증가
+  useEffect(() => {
+    if (multiPlatformAnalysisStatus === 'analyzing') {
+      const progressInterval = setInterval(() => {
+        setAnalysisProgress(prev => {
+          // 95%까지만 자동 증가 (완료 시 100%로 설정)
+          if (prev < 95) {
+            // 처음에는 빠르게, 나중에는 느리게 증가
+            const increment = prev < 30 ? 2 : prev < 60 ? 1 : 0.5;
+            return Math.min(prev + increment, 95);
+          }
+          return prev;
+        });
+      }, 800); // 0.8초마다 업데이트
+
+      return () => clearInterval(progressInterval);
+    }
+  }, [multiPlatformAnalysisStatus]);
+
+  // YouTube/Instagram/Threads 연동 상태 확인
+  useEffect(() => {
+    checkYouTubeConnection();
+    checkInstagramConnection();
+    checkThreadsConnection();
+  }, []);
+
+  const checkOnboardingStatus = async () => {
+    // 개발 모드: URL에 ?dev=true 파라미터가 있으면 리다이렉트 안함
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('dev') === 'true') {
+      console.log('개발 모드: 온보딩 리다이렉트 비활성화');
+      return;
+    }
+
+    try {
+      const response = await api.get('/api/onboarding/status');
+      if (response.data.onboarding_completed) {
+        navigate('/content');
+      }
+    } catch (error) {
+      console.error('온보딩 상태 확인 실패:', error);
+    }
+  };
+
+  // YouTube 연동 상태 확인
+  const checkYouTubeConnection = async () => {
+    try {
+      const response = await api.get('/api/youtube/status');
+      if (response.data) {
+        setYoutubeConnection(response.data);
+        // YouTube 연동되어 있으면 platformUrls에 표시
+        setPlatformUrls(prev => ({ ...prev, youtube: 'connected' }));
+      }
+    } catch (error) {
+      console.log('YouTube 연동 없음:', error.response?.status === 404 ? '연동되지 않음' : error.message);
+      setYoutubeConnection(null);
+    }
+  };
+
+  // YouTube 계정 연동
+  const handleYouTubeConnect = async () => {
+    try {
+      setYoutubeConnectionLoading(true);
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.id) {
+        alert('로그인이 필요합니다.');
+        return;
+      }
+
+      // YouTube OAuth 연동 페이지로 이동 (user_id 전달)
+      window.location.href = `http://localhost:8000/api/youtube/connect?user_id=${user.id}`;
+    } catch (error) {
+      console.error('YouTube 연동 실패:', error);
+      alert('YouTube 연동에 실패했습니다.');
+      setYoutubeConnectionLoading(false);
+    }
+  };
+
+  // Instagram 연동 상태 확인
+  const checkInstagramConnection = async () => {
+    try {
+      const response = await api.get('/api/instagram/status');
+      if (response.data) {
+        setInstagramConnection(response.data);
+        // Instagram 연동되어 있으면 platformUrls에 표시
+        setPlatformUrls(prev => ({ ...prev, instagram: 'connected' }));
+      }
+    } catch (error) {
+      console.log('Instagram 연동 없음:', error.response?.status === 404 ? '연동되지 않음' : error.message);
+      setInstagramConnection(null);
+    }
+  };
+
+  // Instagram 계정 연동
+  const handleInstagramConnect = async () => {
+    try {
+      setInstagramConnectionLoading(true);
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.id) {
+        alert('로그인이 필요합니다.');
+        return;
+      }
+
+      // Instagram OAuth 연동 페이지로 이동 (user_id 전달)
+      window.location.href = `http://localhost:8000/api/instagram/connect?user_id=${user.id}`;
+    } catch (error) {
+      console.error('Instagram 연동 실패:', error);
+      alert('Instagram 연동에 실패했습니다.');
+      setInstagramConnectionLoading(false);
+    }
+  };
+
+  // Threads 연동 상태 확인
+  const checkThreadsConnection = async () => {
+    try {
+      const response = await api.get('/api/threads/status');
+      if (response.data) {
+        setThreadsConnection(response.data);
+        // Threads 연동되어 있으면 platformUrls에 표시
+        setPlatformUrls(prev => ({ ...prev, threads: 'connected' }));
+      }
+    } catch (error) {
+      console.log('Threads 연동 없음:', error.response?.status === 404 ? '연동되지 않음' : error.message);
+      setThreadsConnection(null);
+    }
+  };
+
+  // Threads 계정 연동
+  const handleThreadsConnect = async () => {
+    try {
+      setThreadsConnectionLoading(true);
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user || !user.id) {
+        alert('로그인이 필요합니다.');
+        return;
+      }
+
+      // Threads OAuth 연동 페이지로 이동 (user_id 전달)
+      window.location.href = `http://localhost:8000/api/threads/connect?user_id=${user.id}`;
+    } catch (error) {
+      console.error('Threads 연동 실패:', error);
+      alert('Threads 연동에 실패했습니다.');
+      setThreadsConnectionLoading(false);
+    }
+  };
+
+  const loadCustomQuestions = async () => {
+    setLoadingQuestions(true);
+    try {
+      const response = await api.post('/api/ai/business-questions', {
+        business_type: businessInfo.business_type
+      });
+      setCustomQuestions(response.data.questions || []);
+    } catch (error) {
+      console.error('맞춤 질문 로드 실패:', error);
+      setCustomQuestions([]);
+    } finally {
+      setLoadingQuestions(false);
+    }
+  };
+
+  const requestAIRecommendations = async () => {
+    if (!businessInfo.brand_name || !businessInfo.business_type || !businessInfo.target_audience.age_range) {
+      return;
+    }
+
+    setLoadingRecommendations(true);
+    try {
+      const response = await api.post('/api/ai/recommend-interests', {
+        brand_name: businessInfo.brand_name,
+        business_type: businessInfo.business_type,
+        business_description: businessInfo.business_description,
+        age_range: businessInfo.target_audience.age_range,
+        gender: businessInfo.target_audience.gender
+      });
+
+      setRecommendedInterests(response.data.interests || []);
+      setAiReasoning(response.data.reasoning || '');
+    } catch (error) {
+      console.error('AI 추천 실패:', error);
+    } finally {
+      setLoadingRecommendations(false);
+    }
+  };
+
+  // 동의 모달 표시 핸들러
+  const handleShowConsentModal = () => {
+    const hasAtLeastOne = platformUrls.instagram || platformUrls.youtube || platformUrls.threads || youtubeConnection || instagramConnection || threadsConnection;
+    if (!hasAtLeastOne) {
+      alert('최소 1개 이상의 플랫폼 URL을 입력해주세요.');
+      return;
+    }
+
+    // 연결된 모든 플랫폼 수집
+    const connectedPlatforms = [];
+
+    if (platformUrls.youtube || youtubeConnection) {
+      connectedPlatforms.push('YouTube');
+    }
+    if (platformUrls.instagram || instagramConnection) {
+      connectedPlatforms.push('Instagram');
+    }
+    if (platformUrls.threads || threadsConnection) {
+      connectedPlatforms.push('Threads');
+    }
+
+    // 플랫폼명 조합 (예: "YouTube, Instagram")
+    const platformTitle = connectedPlatforms.join(', ');
+
+    // 우선순위에 따라 대표 플랫폼 선택 (동의 항목 표시용)
+    let platform = null;
+    if (platformUrls.youtube || youtubeConnection) {
+      platform = 'youtube';
+    } else if (platformUrls.instagram || instagramConnection) {
+      platform = 'instagram';
+    } else if (platformUrls.threads || threadsConnection) {
+      platform = 'threads';
+    }
+
+    setConsentPlatform(platform);
+    setConsentPlatformUrl(platformTitle); // 모든 플랫폼명을 전달
+    setShowConsentModal(true);
+  };
+
+  // 동의 완료 핸들러
+  const handleConsentAccept = (consents) => {
+    console.log('사용자 동의 완료:', consents);
+    setUserConsents(consents);
+    setShowConsentModal(false);
+
+    // 동의 후 즉시 분석 시작
+    analyzeMultiPlatform(consents);
+  };
+
+  const analyzeMultiPlatform = async (consents = null) => {
+    const hasAtLeastOne = platformUrls.instagram || platformUrls.youtube || platformUrls.threads;
+    if (!hasAtLeastOne) {
+      alert('최소 1개 이상의 플랫폼 URL을 입력해주세요.');
+      return;
+    }
+
+    setMultiPlatformAnalysisStatus('analyzing');
+    setAnalysisProgress(0); // 진행률 초기화
+    setCurrentStep(2); // 분석 중 페이지로 이동
+
+    try {
+      // 분석 시작
+      const requestData = {};
+      if (platformUrls.instagram) requestData.instagram_url = platformUrls.instagram;
+      if (platformUrls.youtube) requestData.youtube_url = platformUrls.youtube;
+      if (platformUrls.threads) requestData.threads_url = platformUrls.threads;
+      requestData.max_posts = 10;
+
+      // 동의 정보 추가 (있을 경우)
+      if (consents) {
+        requestData.consents = consents;
+        requestData.consent_timestamp = new Date().toISOString();
+      }
+
+      const response = await api.post('/api/brand-analysis/multi-platform', requestData);
+      console.log('멀티 플랫폼 분석 시작:', response.data);
+
+      // 분석 상태 폴링 (5초마다 체크)
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await api.get('/api/brand-analysis/status');
+          console.log('분석 상태:', statusResponse.data);
+
+          const { overall } = statusResponse.data;
+
+          // overall 데이터가 있으면 분석 완료
+          if (overall && overall.brand_tone) {
+            clearInterval(pollInterval);
+            setAnalysisProgress(100); // 진행률 100% 완료
+            setMultiPlatformAnalysisStatus('completed');
+            setMultiPlatformAnalysisResult(statusResponse.data);
+
+            // ✅ businessInfo 업데이트: 백엔드에서 추출한 브랜드명, 업종, 타겟 반영
+            setBusinessInfo(prev => ({
+              ...prev,
+              brand_name: overall.brand_name || prev.brand_name,
+              business_type: overall.business_type || prev.business_type,
+              target_audience: {
+                ...prev.target_audience,
+                age_range: overall.target_audience || prev.target_audience.age_range
+              }
+            }));
+
+            // 완료 페이지로 이동
+            setTimeout(() => {
+              setCurrentStep(3);
+            }, 1000);
+          }
+        } catch (error) {
+          console.error('분석 상태 확인 실패:', error);
+        }
+      }, 5000);
+
+      // 최대 5분 후 타임아웃
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (multiPlatformAnalysisStatus === 'analyzing') {
+          setMultiPlatformAnalysisStatus('failed');
+          alert('분석 시간이 초과되었습니다. 다시 시도해주세요.');
+          setCurrentStep(1); // 다시 입력 페이지로
+        }
+      }, 300000);
+
+    } catch (error) {
+      console.error('멀티 플랫폼 분석 실패:', error);
+      setMultiPlatformAnalysisStatus('failed');
+      alert('플랫폼 분석 요청에 실패했습니다: ' + (error.response?.data?.detail || error.message));
+      setCurrentStep(1); // 다시 입력 페이지로
+    }
+  };
+
+  const analyzeManualContent = async () => {
+    // 유효성 검사: 최소 1개 타입에서 2개 이상의 샘플
+    const hasValidText = textSamples.length >= 2 && textSamples.every(s => s.trim());
+    const hasValidImages = imageSamples.length >= 2;
+    const hasValidVideos = videoSamples.length >= 2;
+
+    if (!hasValidText && !hasValidImages && !hasValidVideos) {
+      alert('최소 1개 콘텐츠 타입에서 2개 이상의 샘플을 업로드해주세요.');
+      return;
+    }
+
+    // 각 타입별로 업로드된 경우 2개 미만이면 경고
+    if (textSamples.length > 0 && !hasValidText) {
+      alert('글 샘플은 최소 2개 이상 입력해주세요.');
+      return;
+    }
+    if (imageSamples.length > 0 && !hasValidImages) {
+      alert('이미지 샘플은 최소 2개 이상 업로드해주세요.');
+      return;
+    }
+    if (videoSamples.length > 0 && !hasValidVideos) {
+      alert('영상 샘플은 최소 2개 이상 업로드해주세요.');
+      return;
+    }
+
+    setManualAnalysisStatus('analyzing');
+    setIsLoading(true);
+
+    try {
+      // FormData 생성
+      const formData = new FormData();
+
+      // 텍스트 샘플 추가 (JSON 문자열로)
+      if (hasValidText) {
+        formData.append('text_samples', JSON.stringify(textSamples.filter(s => s.trim())));
+      }
+
+      // 이미지 샘플 추가
+      if (hasValidImages) {
+        imageSamples.forEach((file) => {
+          formData.append('image_files', file);
+        });
+      }
+
+      // 영상 샘플 추가
+      if (hasValidVideos) {
+        videoSamples.forEach((file) => {
+          formData.append('video_files', file);
+        });
+      }
+
+      const response = await api.post('/api/brand-analysis/manual', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      console.log('수동 콘텐츠 분석 시작:', response.data);
+
+      // 분석 상태 폴링 (5초마다 체크)
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await api.get('/api/brand-analysis/status');
+          console.log('분석 상태:', statusResponse.data);
+
+          const { overall } = statusResponse.data;
+
+          // overall 데이터가 있으면 분석 완료
+          if (overall && overall.brand_tone) {
+            clearInterval(pollInterval);
+            setManualAnalysisStatus('completed');
+            setManualAnalysisResult(statusResponse.data);
+            setIsLoading(false);
+
+            // ✅ AI 분석 결과를 businessInfo에 반영
+            setBusinessInfo(prev => ({
+              ...prev,
+              brand_name: overall.brand_name || prev.brand_name,
+              business_type: overall.business_type || prev.business_type,
+              target_audience: {
+                ...prev.target_audience,
+                age_range: overall.target_audience || prev.target_audience.age_range
+              }
+            }));
+
+            // 완료 페이지로 이동
+            setShowSuccess(true);
+            setTimeout(() => {
+              setShowSuccess(false);
+              setCurrentStep(3);
+            }, 1000);
+          }
+        } catch (error) {
+          console.error('분석 상태 확인 실패:', error);
+        }
+      }, 5000);
+
+      // 최대 5분 후 타임아웃
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (manualAnalysisStatus === 'analyzing') {
+          setManualAnalysisStatus('failed');
+          setIsLoading(false);
+          alert('분석 시간이 초과되었습니다. 다시 시도해주세요.');
+        }
+      }, 300000);
+
+    } catch (error) {
+      console.error('수동 콘텐츠 분석 실패:', error);
+      setManualAnalysisStatus('failed');
+      setIsLoading(false);
+      alert('콘텐츠 분석 요청에 실패했습니다: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
+  // 실시간 유효성 검사
+  const validateField = (name, value) => {
+    let valid = false;
+    let message = '';
+
+    switch (name) {
+      case 'brand_name':
+        valid = value.length >= 2;
+        message = valid ? '좋아요!' : '2자 이상 입력해주세요';
+        break;
+      case 'business_type':
+        valid = value !== '';
+        message = valid ? '선택 완료!' : '업종을 선택해주세요';
+        break;
+      default:
+        break;
+    }
+
+    setValidation(prev => ({
+      ...prev,
+      [name]: { valid, message }
+    }));
+  };
+
+  const handleBusinessInfoChange = (e) => {
+    const { name, value } = e.target;
+    setBusinessInfo(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    validateField(name, value);
+  };
+
+  const handleCustomFieldChange = (fieldName, value) => {
+    setBusinessInfo(prev => ({
+      ...prev,
+      custom_fields: {
+        ...prev.custom_fields,
+        [fieldName]: value
+      }
+    }));
+  };
+
+  const handleTargetAudienceChange = (e) => {
+    const { name, value } = e.target;
+    setBusinessInfo(prev => ({
+      ...prev,
+      target_audience: {
+        ...prev.target_audience,
+        [name]: value
+      }
+    }));
+  };
+
+  const handleAddInterest = (interest = null) => {
+    const newInterest = interest || interestInput.trim();
+    if (newInterest && businessInfo.target_audience.interests.length < 10) {
+      setBusinessInfo(prev => ({
+        ...prev,
+        target_audience: {
+          ...prev.target_audience,
+          interests: [...prev.target_audience.interests, newInterest]
+        }
+      }));
+      setInterestInput('');
+    }
+  };
+
+  const handleRemoveInterest = (index) => {
+    setBusinessInfo(prev => ({
+      ...prev,
+      target_audience: {
+        ...prev.target_audience,
+        interests: prev.target_audience.interests.filter((_, i) => i !== index)
+      }
+    }));
+  };
+
+  // 스타일 선택/해제
+  const toggleStyle = (style) => {
+    // 미리보기 업데이트
+    setSelectedStyleForPreview(style);
+
+    setBusinessInfo(prev => {
+      const currentStyles = prev.selected_styles || [];
+      if (currentStyles.includes(style)) {
+        // 이미 선택된 스타일이면 제거
+        return {
+          ...prev,
+          selected_styles: currentStyles.filter(s => s !== style)
+        };
+      } else {
+        // 최대 3개까지만 선택 가능
+        if (currentStyles.length < 3) {
+          return {
+            ...prev,
+            selected_styles: [...currentStyles, style]
+          };
+        }
+        return prev;
+      }
+    });
+  };
+
+  // 브랜드 가치 추가
+  const addValue = () => {
+    const newValue = valueInput.trim();
+    if (newValue && businessInfo.brand_values.length < 5) {
+      setBusinessInfo(prev => ({
+        ...prev,
+        brand_values: [...prev.brand_values, newValue]
+      }));
+      setValueInput('');
+    }
+  };
+
+  // 브랜드 가치 제거
+  const removeValue = (index) => {
+    setBusinessInfo(prev => ({
+      ...prev,
+      brand_values: prev.brand_values.filter((_, i) => i !== index)
+    }));
+  };
+
+  // 아이덴티티 정보(스타일/가치) 입력 여부 확인
+  const hasIdentityInfo = () => {
+    return (
+      (businessInfo.selected_styles && businessInfo.selected_styles.length > 0) ||
+      (businessInfo.brand_values && businessInfo.brand_values.length > 0)
+    );
+  };
+
+  const handlePreferenceChange = (e) => {
+    const { name, value } = e.target;
+    setPreferences(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // 드래그 앤 드롭 핸들러
+  const handleDrag = (e, type) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(prev => ({ ...prev, [type]: true }));
+    } else if (e.type === "dragleave") {
+      setDragActive(prev => ({ ...prev, [type]: false }));
+    }
+  };
+
+  const handleDrop = (e, type) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(prev => ({ ...prev, [type]: false }));
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files[0], type);
+    }
+  };
+
+  const handleFileUpload = (file, type) => {
+    if (type === 'image') {
+      if (file.type.startsWith('image/')) {
+        setImageSample(file);
+        setImagePreview(URL.createObjectURL(file));
+      } else {
+        alert('이미지 파일만 업로드 가능합니다.');
+      }
+    } else if (type === 'video') {
+      if (file.type.startsWith('video/')) {
+        setVideoSample(file);
+        setVideoPreview(URL.createObjectURL(file));
+      } else {
+        alert('영상 파일만 업로드 가능합니다.');
+      }
+    }
+  };
+
+  const handleImageInputChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileUpload(e.target.files[0], 'image');
+    }
+  };
+
+  const handleVideoInputChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFileUpload(e.target.files[0], 'video');
+    }
+  };
+
+  const saveBusinessInfo = async () => {
+    if (!validation.brand_name.valid || !validation.business_type.valid) {
+      alert('필수 정보를 모두 입력해주세요.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await api.put('/api/onboarding/business-info', {
+        ...businessInfo,
+        business_description: businessInfo.business_description +
+          (Object.keys(businessInfo.custom_fields).length > 0
+            ? '\n\n추가 정보:\n' + JSON.stringify(businessInfo.custom_fields, null, 2)
+            : '')
+      });
+
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        setCurrentStep(2);
+      }, 800);
+    } catch (error) {
+      console.error('비즈니스 정보 저장 실패:', error);
+      alert('비즈니스 정보 저장에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const savePreferences = async () => {
+    setIsLoading(true);
+    try {
+      await api.post('/api/onboarding/preferences', preferences);
+
+      if (imageSample) {
+        const formData = new FormData();
+        formData.append('file', imageSample);
+        formData.append('description', preferences.image_style_description);
+        await api.post('/api/onboarding/upload-image-sample', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      }
+
+      if (videoSample) {
+        const formData = new FormData();
+        formData.append('file', videoSample);
+        formData.append('description', preferences.video_style_description);
+        formData.append('duration_preference', preferences.video_duration_preference);
+        await api.post('/api/onboarding/upload-video-sample', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      }
+
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        setCurrentStep(3);
+      }, 800);
+    } catch (error) {
+      console.error('선호도 저장 실패:', error);
+      alert('선호도 저장에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const completeOnboarding = async () => {
+    setIsLoading(true);
+    try {
+      await api.post('/api/onboarding/complete');
+      setShowSuccess(true);
+      setTimeout(() => {
+        navigate('/content');
+      }, 1500);
+    } catch (error) {
+      console.error('온보딩 완료 실패:', error);
+      alert('온보딩 완료에 실패했습니다.');
+      setIsLoading(false);
+    }
+  };
+
+  const getProgressPercentage = () => {
+    if (currentStep === 1) {
+      let progress = 0;
+      if (businessInfo.brand_name) progress += 20;
+      if (businessInfo.business_type) progress += 20;
+      if (businessInfo.target_audience.age_range) progress += 10;
+      return progress;
+    } else if (currentStep === 2) {
+      return 50;
+    } else {
+      return 100;
+    }
+  };
+
+  return (
+    <div className="dynamic-onboarding">
+      {showSuccess && (
+        <div className="success-overlay">
+          <div className="success-checkmark">✓</div>
+        </div>
+      )}
+
+      <div className="onboarding-header">
+        <h1>환영합니다, {user?.full_name || user?.username}님!</h1>
+        <p>AI가 회원님만의 맞춤 콘텐츠를 만들어드립니다</p>
+      </div>
+
+      {/* 프로그레스 바 */}
+      <div className="progress-container">
+        <div className="progress-bar">
+          <div
+            className="progress-fill"
+            style={{ width: `${getProgressPercentage()}%` }}
+          />
+        </div>
+        <div className="progress-steps">
+          {currentStep > 0 && (
+            <>
+              <div className={`step ${currentStep >= 1 ? 'active' : ''}`}>
+                <div className="step-number">1</div>
+                <div className="step-label">{onboardingPath === 'sns_analysis' ? 'SNS 입력' : '비즈니스'}</div>
+              </div>
+              <div className={`step ${currentStep >= 2 ? 'active' : ''}`}>
+                <div className="step-number">2</div>
+                <div className="step-label">{onboardingPath === 'sns_analysis' ? '분석 중' : '스타일'}</div>
+              </div>
+              <div className={`step ${currentStep >= 3 ? 'active' : ''}`}>
+                <div className="step-number">3</div>
+                <div className="step-label">완료</div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Step 0: SNS 여부 질문 */}
+      {currentStep === 0 && (
+        <div className="onboarding-step fade-in">
+          <h2>안녕하세요! 기존에 운영하시는 SNS가 있으신가요?</h2>
+          <p className="step-description">
+            기존 SNS가 있다면 AI가 자동으로 브랜드 특성을 분석해드립니다
+          </p>
+
+          <div className="sns-choice-container">
+            <button
+              className="choice-button yes-button"
+              onClick={() => {
+                setOnboardingPath('sns_analysis');
+                setCurrentStep(1);
+              }}
+            >
+              <div className="choice-icon">✅</div>
+              <div className="choice-title">예, 있습니다</div>
+              <div className="choice-description">
+                인스타그램, 유튜브, Threads 등 운영 중인 SNS를 분석하여
+                <br />
+                브랜드 특성을 자동으로 파악합니다
+              </div>
+            </button>
+
+            <button
+              className="choice-button no-button"
+              onClick={() => {
+                setOnboardingPath('manual_input');
+                setCurrentStep(1);
+              }}
+            >
+              <div className="choice-icon">📝</div>
+              <div className="choice-title">아니오, 없습니다</div>
+              <div className="choice-description">
+                비즈니스 정보와 콘텐츠 샘플을 직접 입력하여
+                <br />
+                브랜드 특성을 설정합니다
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 1: 비즈니스 정보 (또는 SNS URL 입력) */}
+      {currentStep === 1 && onboardingPath === 'manual_input' && (
+        <div className="onboarding-step fade-in">
+          <h2>비즈니스를 알려주세요</h2>
+          <p className="step-description">AI가 이 정보를 바탕으로 완벽한 콘텐츠를 만듭니다</p>
+
+          <div className="onboarding-form-section">
+            <div className="form-group">
+              <label>브랜드명 *</label>
+              <input
+                type="text"
+                name="brand_name"
+                value={businessInfo.brand_name}
+                onChange={handleBusinessInfoChange}
+                placeholder="예: 나의 카페"
+                className={validation.brand_name.valid ? 'valid' : ''}
+              />
+              {validation.brand_name.message && (
+                <span className={`validation-message ${validation.brand_name.valid ? 'success' : 'error'}`}>
+                  {validation.brand_name.message}
+                </span>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>업종 *</label>
+              <select
+                name="business_type"
+                value={businessInfo.business_type}
+                onChange={handleBusinessInfoChange}
+                className={validation.business_type.valid ? 'valid' : ''}
+              >
+                <option value="">업종 선택</option>
+                <option value="food">음식/카페</option>
+                <option value="fashion">패션/뷰티</option>
+                <option value="health">헬스/피트니스</option>
+                <option value="education">교육</option>
+                <option value="tech">IT/기술</option>
+                <option value="retail">소매/유통</option>
+                <option value="service">서비스/기타</option>
+              </select>
+              {validation.business_type.message && (
+                <span className={`validation-message ${validation.business_type.valid ? 'success' : 'error'}`}>
+                  {validation.business_type.message}
+                </span>
+              )}
+            </div>
+
+            {/* 업종별 맞춤 질문 */}
+            {loadingQuestions && (
+              <div className="loading-questions">
+                <div className="spinner-small"></div>
+                <span>맞춤 질문 준비 중...</span>
+              </div>
+            )}
+
+            {customQuestions.length > 0 && (
+              <div className="custom-questions fade-in">
+                <h3>🎯 {businessInfo.business_type === 'food' ? '음식/카페' : businessInfo.business_type} 맞춤 질문</h3>
+                {customQuestions.map((q, index) => (
+                  <div key={index} className="form-group">
+                    <label>{q.question}</label>
+                    <input
+                      type="text"
+                      placeholder={q.placeholder}
+                      onChange={(e) => handleCustomFieldChange(q.field_name, e.target.value)}
+                      value={businessInfo.custom_fields[q.field_name] || ''}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="form-group">
+              <label>비즈니스 설명</label>
+              <textarea
+                name="business_description"
+                value={businessInfo.business_description}
+                onChange={handleBusinessInfoChange}
+                placeholder="예: 건강한 재료로 만든 디저트를 판매하는 카페입니다."
+                rows={4}
+              />
+            </div>
+
+            <h3 className="section-title">타겟 고객</h3>
+
+            <div className="form-group">
+              <label>타겟 고객층</label>
+              <input
+                type="text"
+                name="target_description"
+                value={businessInfo.target_audience.age_range}
+                onChange={(e) => {
+                  setBusinessInfo(prev => ({
+                    ...prev,
+                    target_audience: {
+                      ...prev.target_audience,
+                      age_range: e.target.value,
+                      gender: 'all'
+                    }
+                  }));
+                }}
+                placeholder="예: 20-30대 남성, 40-50대 여성, 30대 직장인 등"
+              />
+              <p className="input-hint">
+                자유롭게 입력하세요. 예: "20-30대 남성", "40-50대 여성", "30대 직장인"
+              </p>
+            </div>
+
+            {/* AI 추천 버튼 */}
+            {businessInfo.brand_name && businessInfo.business_type && businessInfo.target_audience.age_range && (
+              <button
+                type="button"
+                onClick={requestAIRecommendations}
+                className="btn-ai-recommend"
+                disabled={loadingRecommendations}
+              >
+                {loadingRecommendations ? (
+                  <>
+                    <div className="spinner-small"></div>
+                    <span>AI가 분석 중...</span>
+                  </>
+                ) : (
+                  <>✨ AI가 타겟 고객 관심사 추천</>
+                )}
+              </button>
+            )}
+
+            {/* AI 추천 타겟 고객 관심사 */}
+            {recommendedInterests.length > 0 && (
+              <div className="ai-recommendations fade-in">
+                <h4>🤖 AI 추천 타겟 고객 관심사</h4>
+                {aiReasoning && <p className="ai-reasoning">{aiReasoning}</p>}
+                <div className="recommended-tags">
+                  {recommendedInterests.map((interest, index) => (
+                    <button
+                      key={index}
+                      className="recommended-tag"
+                      onClick={() => handleAddInterest(interest)}
+                      disabled={businessInfo.target_audience.interests.includes(interest)}
+                    >
+                      {interest} +
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label>타겟 고객 관심사 (최대 10개)</label>
+              <div className="interest-input-container">
+                <input
+                  type="text"
+                  value={interestInput}
+                  onChange={(e) => setInterestInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddInterest())}
+                  placeholder="예: 건강, 다이어트"
+                  disabled={businessInfo.target_audience.interests.length >= 10}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddInterest()}
+                  className="btn-add"
+                  disabled={businessInfo.target_audience.interests.length >= 10}
+                >
+                  추가
+                </button>
+              </div>
+              <div className="interest-tags">
+                {businessInfo.target_audience.interests.map((interest, index) => (
+                  <span key={index} className="interest-tag">
+                    {interest}
+                    <button onClick={() => handleRemoveInterest(index)}>×</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <h3 className="section-title">
+              🎨 브랜드 아이덴티티
+              <span className="optional-badge">선택</span>
+            </h3>
+            <p className="section-hint">
+              💡 입력하시면 샘플 없이도 콘텐츠 생성이 가능합니다.
+              <br />
+              {hasIdentityInfo() ? (
+                <span className="text-success">
+                  ✓ 입력 완료! 다음 단계에서 샘플은 선택 사항입니다.
+                </span>
+              ) : (
+                <span className="text-warning">
+                  ⚠️ 미입력 시 다음 단계에서 샘플이 필수입니다.
+                </span>
+              )}
+            </p>
+
+            <div className="form-group">
+              <label>추구하는 스타일 (최대 3개 선택)</label>
+              <div className="style-selector-container">
+                {/* 왼쪽: 스타일 옵션 그리드 (2행 4열) */}
+                <div className="style-options-grid">
+                  {['따뜻한', '친근한', '전문적인', '유머러스한', '진지한', '창의적인', '신뢰감있는', '트렌디한'].map(style => (
+                    <button
+                      key={style}
+                      type="button"
+                      className={`style-option-button ${businessInfo.selected_styles?.includes(style) ? 'selected' : ''} ${selectedStyleForPreview === style ? 'previewing' : ''} ${(style === '유머러스한' || style === '신뢰감있는') ? 'style-long-text' : ''}`}
+                      onClick={() => toggleStyle(style)}
+                      disabled={businessInfo.selected_styles?.length >= 3 && !businessInfo.selected_styles?.includes(style)}
+                    >
+                      {style}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 오른쪽: 스타일 예시 카드 */}
+                <div className="style-preview-card">
+                  {selectedStyleForPreview ? (
+                    <div className="preview-content fade-in">
+                      <div className="preview-header">
+                        <h4>{selectedStyleForPreview}</h4>
+                        <span className="preview-industry">{styleExamples[selectedStyleForPreview].industry}</span>
+                      </div>
+                      <div className="preview-text">
+                        {styleExamples[selectedStyleForPreview].text}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="preview-placeholder">
+                      <p>스타일을 선택하면 예시를 확인할 수 있습니다</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {businessInfo.selected_styles?.length > 0 && (
+                <small className="input-hint">
+                  {businessInfo.selected_styles.length}/3개 선택됨
+                </small>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>브랜드 가치 (최대 5개)</label>
+              <div className="interest-input-container">
+                <input
+                  type="text"
+                  value={valueInput}
+                  onChange={(e) => setValueInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addValue())}
+                  placeholder="예: 친환경, 고품질"
+                  disabled={businessInfo.brand_values?.length >= 5}
+                />
+                <button
+                  type="button"
+                  onClick={addValue}
+                  className="btn-add"
+                  disabled={businessInfo.brand_values?.length >= 5}
+                >
+                  추가
+                </button>
+              </div>
+              <div className="interest-tags">
+                {businessInfo.brand_values?.map((value, index) => (
+                  <span key={index} className="interest-tag">
+                    {value}
+                    <button onClick={() => removeValue(index)}>×</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="step-actions">
+              <button
+                onClick={() => setCurrentStep(0)}
+                className="btn-secondary"
+              >
+                이전
+              </button>
+              <button
+                onClick={() => setCurrentStep(2)}
+                className="btn-secondary"
+              >
+                건너뛰기
+              </button>
+              <button
+                onClick={saveBusinessInfo}
+                disabled={isLoading || !validation.brand_name.valid || !validation.business_type.valid}
+                className="btn-primary"
+              >
+                {isLoading ? '저장 중...' : '다음 단계'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 1: SNS URL 입력 (SNS 분석 경로) */}
+      {currentStep === 1 && onboardingPath === 'sns_analysis' && (
+        <div className="onboarding-step fade-in">
+          <h2>SNS 계정을 알려주세요</h2>
+          <p className="step-description">
+            운영 중인 플랫폼의 URL을 입력해주세요.
+            <br />
+            입력하신 플랫폼만 분석되며, 선택적으로 입력 가능합니다.
+          </p>
+
+          <div className="platform-note" style={{ marginBottom: 'var(--space-lg)' }}>
+            ℹ️ 최소 1개 이상의 플랫폼 URL을 입력해주세요
+          </div>
+
+          <div className="onboarding-form-section">
+            <div className="platform-input-group">
+              <h3>📸 인스타그램 (선택)</h3>
+              {instagramConnection ? (
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: '#faf5ff',
+                  borderRadius: '8px',
+                  border: '2px solid #e9d5ff'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {instagramConnection.instagram_profile_picture_url && (
+                      <img
+                        src={instagramConnection.instagram_profile_picture_url}
+                        alt="Profile"
+                        style={{ width: '48px', height: '48px', borderRadius: '50%' }}
+                      />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                        @{instagramConnection.instagram_username}
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#666' }}>
+                        팔로워 {instagramConnection.followers_count?.toLocaleString()}명 ·
+                        게시물 {instagramConnection.media_count}개
+                      </div>
+                    </div>
+                    <div style={{ color: '#4CAF50', fontWeight: 'bold' }}>✓ 연동됨</div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleInstagramConnect}
+                  disabled={instagramConnectionLoading}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: instagramConnectionLoading ? '#ccc' : 'linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: instagramConnectionLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {instagramConnectionLoading ? '연동 중...' : (
+                    <>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                      </svg>
+                      Instagram 계정 연동
+                    </>
+                  )}
+                </button>
+              )}
+              <small>Instagram 계정을 연동하면 게시물 이미지와 캡션 스타일을 자동으로 분석합니다</small>
+            </div>
+
+            <div className="platform-input-group">
+              <h3>🧵 Threads (선택)</h3>
+              {threadsConnection ? (
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: '#f0f0f0',
+                  borderRadius: '8px',
+                  border: '2px solid #d0d0d0'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {threadsConnection.threads_profile_picture_url && (
+                      <img
+                        src={threadsConnection.threads_profile_picture_url}
+                        alt="Profile"
+                        style={{ width: '48px', height: '48px', borderRadius: '50%' }}
+                      />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                        @{threadsConnection.username}
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#666' }}>
+                        {threadsConnection.name}
+                      </div>
+                    </div>
+                    <div style={{ color: '#4CAF50', fontWeight: 'bold' }}>✓ 연동됨</div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleThreadsConnect}
+                  disabled={threadsConnectionLoading}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: threadsConnectionLoading ? '#ccc' : '#000000',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: threadsConnectionLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {threadsConnectionLoading ? '연동 중...' : (
+                    <>
+                      <svg width="24" height="24" viewBox="0 0 192 192" fill="white">
+                        <path d="M141.537 88.9883C140.71 88.5919 139.87 88.2104 139.019 87.8451C137.537 60.5382 122.616 44.905 97.5619 44.745C97.4484 44.7443 97.3355 44.7443 97.222 44.7443C82.2364 44.7443 69.7731 51.1409 62.102 62.7807L75.881 72.2328C81.6116 63.5383 90.6052 61.6848 97.2286 61.6848C97.3051 61.6848 97.3819 61.6848 97.4576 61.6855C105.707 61.7381 111.932 64.1366 115.961 68.814C118.893 72.2193 120.854 76.925 121.825 82.8638C114.511 81.6207 106.601 81.2385 98.145 81.7233C74.3247 83.0954 59.0111 96.9879 60.0396 116.292C60.5615 126.084 65.4397 134.508 73.775 140.011C80.8224 144.663 89.899 146.938 99.3323 146.423C111.79 145.74 121.563 140.987 128.381 132.296C133.559 125.696 136.834 117.143 138.28 106.366C144.217 109.949 148.617 114.664 151.047 120.332C155.179 129.967 155.42 145.8 142.501 158.708C131.182 170.016 117.576 174.908 97.0135 175.059C74.2042 174.89 56.9538 167.575 45.7381 153.317C35.2355 139.966 29.8077 120.682 29.6052 96C29.8077 71.3178 35.2355 52.0336 45.7381 38.6827C56.9538 24.4249 74.2039 17.11 97.0132 16.9405C119.988 17.1113 137.539 24.4614 149.184 38.788C154.894 45.8136 159.199 54.6488 162.037 64.9503L178.184 60.6422C174.744 47.9622 169.331 37.0357 161.965 27.974C147.036 9.60668 125.202 0.195148 97.0695 0H96.9569C68.8816 0.19447 47.2921 9.6418 32.7883 28.0793C19.8819 44.4864 13.2244 67.3157 13.0007 95.9325L13 96L13.0007 96.0675C13.2244 124.684 19.8819 147.514 32.7883 163.921C47.2921 182.358 68.8816 191.806 96.9569 192H97.0695C122.03 191.827 139.624 185.292 154.118 170.811C173.081 151.866 172.51 128.119 166.26 113.541C161.776 103.087 153.227 94.5962 141.537 88.9883ZM98.4405 129.507C88.0005 130.095 77.1544 125.409 76.6196 115.372C76.2232 107.93 81.9158 99.626 99.0812 98.6368C101.047 98.5234 102.976 98.468 104.871 98.468C111.106 98.468 116.939 99.0737 122.242 100.233C120.264 124.935 108.662 128.946 98.4405 129.507Z"/>
+                      </svg>
+                      Threads 계정 연동
+                    </>
+                  )}
+                </button>
+              )}
+              <small>Threads 계정을 연동하면 게시물 텍스트와 스타일을 자동으로 분석합니다</small>
+            </div>
+
+            <div className="platform-input-group">
+              <h3>🎥 유튜브 (선택)</h3>
+              {youtubeConnection ? (
+                <div style={{
+                  padding: '16px',
+                  backgroundColor: '#f0f8ff',
+                  borderRadius: '8px',
+                  border: '2px solid #D8BFD8'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {youtubeConnection.channel_thumbnail_url && (
+                      <img
+                        src={youtubeConnection.channel_thumbnail_url}
+                        alt="Channel"
+                        style={{ width: '48px', height: '48px', borderRadius: '50%' }}
+                      />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                        {youtubeConnection.channel_title}
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#666' }}>
+                        구독자 {youtubeConnection.subscriber_count?.toLocaleString()}명 ·
+                        동영상 {youtubeConnection.video_count}개
+                      </div>
+                    </div>
+                    <div style={{ color: '#4CAF50', fontWeight: 'bold' }}>✓ 연동됨</div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleYouTubeConnect}
+                  disabled={youtubeConnectionLoading}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    backgroundColor: youtubeConnectionLoading ? '#ccc' : '#FF0000',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    cursor: youtubeConnectionLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  {youtubeConnectionLoading ? '연동 중...' : (
+                    <>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                      </svg>
+                      YouTube 계정 연동
+                    </>
+                  )}
+                </button>
+              )}
+              <small>YouTube 계정을 연동하면 채널 정보와 영상 스타일을 자동으로 분석합니다</small>
+            </div>
+
+            <div className="step-actions">
+              <button
+                onClick={() => setCurrentStep(0)}
+                className="btn-secondary"
+              >
+                이전
+              </button>
+              <button
+                onClick={() => setCurrentStep(3)}
+                className="btn-secondary"
+              >
+                건너뛰기
+              </button>
+              <button
+                onClick={handleShowConsentModal}
+                disabled={!platformUrls.instagram && !platformUrls.youtube && !platformUrls.threads}
+                className="btn-primary"
+              >
+                분석 시작
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: 콘텐츠 스타일 (수동 입력 경로만) */}
+      {currentStep === 2 && onboardingPath === 'manual_input' && (
+        <div className="onboarding-step fade-in">
+          <h2>선호하는 콘텐츠 스타일</h2>
+
+          {/* 조건부 설명 */}
+          <p className="step-description">
+            {!hasIdentityInfo() ? (
+              <>
+                ⚠️ <strong>최소 1개 콘텐츠 타입</strong>에서 <strong>2개 이상의 샘플</strong>을 업로드해주세요.
+                <br />
+                <small className="text-warning">
+                  (Step 1에서 스타일/가치를 입력하지 않으셨기 때문에 샘플이 필수입니다)
+                </small>
+              </>
+            ) : (
+              <>
+                샘플을 제공하시면 더 정확한 콘텐츠를 만들 수 있어요
+                <br />
+                <small className="text-success">
+                  ✓ 스타일/가치 정보를 입력하셨으므로 샘플은 선택 사항입니다
+                </small>
+              </>
+            )}
+          </p>
+
+          <div className="onboarding-form-section">
+            {/* 글 스타일 */}
+            <div className="style-card">
+              <h3>
+                📝 글 스타일
+                {hasIdentityInfo() ? ' (선택)' : ' (필수 중 1개)'}
+              </h3>
+              <p className="style-hint">
+                업로드 시 최소 2개의 글 샘플을 입력해주세요
+              </p>
+
+              {textSamples.map((sample, index) => (
+                <div key={index} className="sample-item">
+                  <label>글 샘플 {index + 1}</label>
+                  <textarea
+                    value={sample}
+                    onChange={(e) => {
+                      const newSamples = [...textSamples];
+                      newSamples[index] = e.target.value;
+                      setTextSamples(newSamples);
+                    }}
+                    placeholder="예: 안녕하세요! 오늘은 건강한 디저트 레시피를 소개해드릴게요 😊"
+                    rows={4}
+                  />
+                  {textSamples.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn-remove-sample"
+                      onClick={() => setTextSamples(textSamples.filter((_, i) => i !== index))}
+                    >
+                      삭제
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              <button
+                type="button"
+                className="btn-add-sample"
+                onClick={() => setTextSamples([...textSamples, ''])}
+              >
+                + 글 샘플 추가
+              </button>
+
+              {textSamples.length > 0 && textSamples.length < 2 && (
+                <small className="validation-warning">
+                  최소 2개의 글 샘플이 필요합니다
+                </small>
+              )}
+            </div>
+
+            {/* 이미지 스타일 */}
+            <div className="style-card">
+              <h3>
+                🎨 이미지 스타일
+                {hasIdentityInfo() ? ' (선택)' : ' (필수 중 1개)'}
+              </h3>
+              <p className="style-hint">
+                업로드 시 최소 2개의 이미지 샘플을 업로드해주세요
+              </p>
+
+              <div className="multiple-samples-container">
+                {imageSamples.map((sample, index) => (
+                  <div key={index} className="sample-preview">
+                    <img src={URL.createObjectURL(sample)} alt={`이미지 샘플 ${index + 1}`} />
+                    <button
+                      type="button"
+                      className="btn-remove-sample-mini"
+                      onClick={() => setImageSamples(imageSamples.filter((_, i) => i !== index))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files);
+                  setImageSamples([...imageSamples, ...files]);
+                }}
+                style={{ display: 'none' }}
+              />
+
+              <button
+                type="button"
+                className="btn-upload-sample"
+                onClick={() => imageInputRef.current?.click()}
+              >
+                📸 이미지 추가
+              </button>
+
+              {imageSamples.length > 0 && imageSamples.length < 2 && (
+                <small className="validation-warning">
+                  최소 2개의 이미지 샘플이 필요합니다
+                </small>
+              )}
+            </div>
+
+            {/* 영상 스타일 */}
+            <div className="style-card">
+              <h3>
+                🎥 영상 스타일
+                {hasIdentityInfo() ? ' (선택)' : ' (필수 중 1개)'}
+              </h3>
+              <p className="style-hint">
+                업로드 시 최소 2개의 영상 샘플을 업로드해주세요
+              </p>
+
+              <div className="multiple-samples-container">
+                {videoSamples.map((sample, index) => (
+                  <div key={index} className="sample-preview video-preview">
+                    <video src={URL.createObjectURL(sample)} controls />
+                    <button
+                      type="button"
+                      className="btn-remove-sample-mini"
+                      onClick={() => setVideoSamples(videoSamples.filter((_, i) => i !== index))}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files);
+                  setVideoSamples([...videoSamples, ...files]);
+                }}
+                style={{ display: 'none' }}
+              />
+
+              <button
+                type="button"
+                className="btn-upload-sample"
+                onClick={() => videoInputRef.current?.click()}
+              >
+                🎬 영상 추가
+              </button>
+
+              {videoSamples.length > 0 && videoSamples.length < 2 && (
+                <small className="validation-warning">
+                  최소 2개의 영상 샘플이 필요합니다
+                </small>
+              )}
+            </div>
+
+            {/* 조건부 안내 메시지 */}
+            <div className={`sample-note ${!hasIdentityInfo() ? 'required' : 'optional'}`}>
+              {!hasIdentityInfo() ? (
+                <>
+                  ⚠️ <strong>필수:</strong> 최소 1개 콘텐츠 타입(글/이미지/영상)을 선택하여 업로드해주세요.
+                  <br />
+                  각 타입별로 최소 2개의 샘플이 필요합니다.
+                </>
+              ) : (
+                <>
+                  ℹ️ <strong>선택:</strong> 샘플을 제공하지 않아도 되지만, 제공하시면 더 정확한 분석이 가능합니다.
+                </>
+              )}
+            </div>
+
+            <div className="step-actions">
+              <button onClick={() => setCurrentStep(1)} className="btn-secondary">
+                이전
+              </button>
+              <button
+                onClick={async () => {
+                  if (!hasIdentityInfo()) {
+                    alert('스타일/가치를 입력하지 않으셨으므로 샘플이 필수입니다.');
+                    return;
+                  }
+                  // 샘플 없이 건너뛰기 - 기본 프로필 생성
+                  try {
+                    await api.post('/api/brand-analysis/create-basic-profile', {
+                      brand_name: businessInfo.brand_name,
+                      business_type: businessInfo.business_type,
+                      business_description: businessInfo.business_description,
+                      target_audience: businessInfo.target_audience.age_range,
+                      selected_styles: businessInfo.selected_styles,
+                      brand_values: businessInfo.brand_values
+                    });
+                    setCurrentStep(3);
+                  } catch (error) {
+                    console.error('기본 프로필 생성 실패:', error);
+                    alert('프로필 생성에 실패했습니다: ' + (error.response?.data?.detail || error.message));
+                  }
+                }}
+                className="btn-secondary"
+                disabled={!hasIdentityInfo()}
+                title={!hasIdentityInfo() ? 'Step 1에서 스타일/가치를 입력하지 않으셨다면 샘플이 필수입니다' : ''}
+              >
+                건너뛰기 {!hasIdentityInfo() && '(비활성)'}
+              </button>
+              <button
+                onClick={analyzeManualContent}
+                disabled={isLoading}
+                className="btn-primary"
+              >
+                {isLoading ? '분석 중...' : '분석 시작'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: SNS 분석 진행 중 (SNS 분석 경로만) */}
+      {currentStep === 2 && onboardingPath === 'sns_analysis' && (
+        <div className="onboarding-step fade-in">
+          <h2>SNS 분석 중입니다...</h2>
+          <p className="step-description">
+            입력하신 플랫폼의 콘텐츠를 분석하고 있습니다.
+            <br />
+            잠시만 기다려주세요 (최대 5분 소요)
+          </p>
+
+          <div className="analysis-progress-container">
+            <div className="spinner-large"></div>
+
+            {/* 진행률 프로그래스바 */}
+            {multiPlatformAnalysisStatus === 'analyzing' && (
+              <div style={{ width: '100%', marginTop: '32px', marginBottom: '24px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                    분석 진행률
+                  </span>
+                  <span style={{ fontSize: '16px', fontWeight: '700', color: '#D8BFD8' }}>
+                    {Math.round(analysisProgress)}%
+                  </span>
+                </div>
+                <div style={{
+                  width: '100%',
+                  height: '10px',
+                  backgroundColor: '#F8F8FF',
+                  borderRadius: '5px',
+                  overflow: 'hidden',
+                  boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)'
+                }}>
+                  <div style={{
+                    width: `${analysisProgress}%`,
+                    height: '100%',
+                    background: 'linear-gradient(90deg, #D8BFD8 0%, #E6E6FA 100%)',
+                    transition: 'width 0.5s ease',
+                    borderRadius: '5px'
+                  }}></div>
+                </div>
+              </div>
+            )}
+
+            {multiPlatformAnalysisStatus === 'analyzing' && (
+              <div className="progress-message">
+                {analysisProgress < 20 && (
+                  <p>🔍 플랫폼 콘텐츠 수집 중...</p>
+                )}
+                {analysisProgress >= 20 && analysisProgress < 40 && (
+                  <p>📊 수집된 콘텐츠 분석 중...</p>
+                )}
+                {analysisProgress >= 40 && analysisProgress < 70 && (
+                  <p>🤖 AI가 브랜드 특성을 분석 중...</p>
+                )}
+                {analysisProgress >= 70 && analysisProgress < 90 && (
+                  <p>✨ 브랜드 프로필 생성 중...</p>
+                )}
+                {analysisProgress >= 90 && (
+                  <p>✅ 거의 완료되었습니다!</p>
+                )}
+              </div>
+            )}
+
+            {multiPlatformAnalysisStatus === 'completed' && (
+              <div className="analysis-complete fade-in">
+                <div className="completion-icon">✅</div>
+                <h3>분석 완료!</h3>
+                <p>브랜드 특성 분석이 성공적으로 완료되었습니다.</p>
+              </div>
+            )}
+
+            {multiPlatformAnalysisStatus === 'failed' && (
+              <div className="analysis-failed">
+                <div className="error-icon">❌</div>
+                <h3>분석 실패</h3>
+                <p>분석 중 오류가 발생했습니다. 다시 시도해주세요.</p>
+                <button onClick={() => setCurrentStep(1)} className="btn-secondary">
+                  다시 시도
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: 완료 */}
+      {currentStep === 3 && (
+        <div className="onboarding-step completion-step fade-in">
+          <div className="completion-animation">
+            <div className="completion-icon">🎉</div>
+            <div className="confetti"></div>
+          </div>
+          <h2>모든 설정이 완료되었습니다!</h2>
+          <p className="step-description">
+            이제 AI가 {businessInfo.brand_name}만을 위한 맞춤 콘텐츠를 생성할 준비가 되었습니다
+          </p>
+
+          <div className="completion-summary">
+            <h3>입력하신 정보</h3>
+            <div className="summary-grid">
+              <div className="summary-item">
+                <span className="summary-label">브랜드</span>
+                <span className="summary-value">{businessInfo.brand_name}</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">업종</span>
+                <span className="summary-value">{businessInfo.business_type}</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">타겟</span>
+                <span className="summary-value">
+                  {businessInfo.target_audience.age_range} {businessInfo.target_audience.gender === 'all' ? '전체' : businessInfo.target_audience.gender}
+                </span>
+              </div>
+              {businessInfo.target_audience.interests.length > 0 && (
+                <div className="summary-item full-width">
+                  <span className="summary-label">타겟 고객 관심사</span>
+                  <span className="summary-value">{businessInfo.target_audience.interests.join(', ')}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="step-actions">
+            <button
+              onClick={() => setCurrentStep(0)}
+              className="btn-secondary"
+            >
+              처음으로
+            </button>
+            <button
+              onClick={() => {
+                if (onboardingPath === 'sns_analysis') {
+                  setCurrentStep(1);
+                } else {
+                  setCurrentStep(2);
+                }
+              }}
+              className="btn-secondary"
+            >
+              이전
+            </button>
+            <button onClick={completeOnboarding} disabled={isLoading} className="btn-primary btn-large">
+              {isLoading ? '처리 중...' : '🚀 대시보드로 이동'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 플랫폼 분석 동의 모달 */}
+      <PlatformConsentModal
+        isOpen={showConsentModal}
+        onClose={() => setShowConsentModal(false)}
+        onAccept={handleConsentAccept}
+        platform={consentPlatform}
+        platformUrl={consentPlatformUrl}
+      />
+    </div>
+  );
+}
+
+export default DynamicOnboarding;

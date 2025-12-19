@@ -1,0 +1,173 @@
+/* ========================================
+   INSTAGRAM PAGE - PLATFORM SPECIFIC STYLES
+   ======================================== */
+
+/* Instagram 브랜드 컬러 */
+.instagram-page .tab-btn:hover,
+.instagram-page .tab-btn.active {
+  color: #e4405f;
+}
+
+.instagram-page .tab-btn.active::after {
+  background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+}
+
+.instagram-page .post-card:hover {
+  border-color: #e4405f;
+}
+
+.instagram-page .account-item:hover {
+  border-color: #e4405f;
+}
+
+/* Instagram 연결 버튼 */
+.btn-connect-instagram {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-md) var(--space-xl);
+  background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+  color: white;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-connect-instagram:hover {
+  opacity: 0.9;
+}
+
+.btn-connect-instagram svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* 계정 선택 */
+.account-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.account-item:hover {
+  background: var(--bg-primary);
+}
+
+.account-picture {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.account-info h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+  color: var(--text-primary);
+}
+
+.account-info > p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: var(--space-sm);
+}
+
+.account-stats {
+  display: flex;
+  gap: var(--space-md);
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.linked-page {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: var(--space-xs);
+}
+
+/* 계정 이름 */
+.account-name {
+  display: block;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  margin-bottom: var(--space-sm);
+}
+
+/* 게시물 그리드 */
+.instagram-page .post-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-lg);
+}
+
+.instagram-page .post-card {
+  overflow: hidden;
+}
+
+.instagram-page .post-image {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--bg-tertiary);
+}
+
+.instagram-page .post-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-type-badge {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 11px;
+}
+
+.instagram-page .post-caption {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin-bottom: var(--space-sm);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.instagram-page .post-link {
+  display: block;
+  text-align: center;
+  padding: var(--space-sm);
+  background: var(--bg-secondary);
+  color: #e4405f;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.instagram-page .post-link:hover {
+  background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+  color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .instagram-page .post-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}

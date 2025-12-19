@@ -1,59 +1,250 @@
-# 콘텐츠 팀 🤖 LLM Agent 기반 콘텐츠 크리에이터 서비스 개발
+# Contents Creator - AI 기반 콘텐츠 제작 플랫폼
 
-_본 프로젝트는 1인 기업 및 소상공인을 위한 AI 기반 콘텐츠 제작 및 자동화 서비스입니다._
+1인 기업 및 소상공인을 위한 AI 기반 콘텐츠 제작 및 멀티 플랫폼 관리 서비스
 
-## 1. 👥 팀원 및 역할
+## 프로젝트 개요
 
-| 이름 | GitHub |
-| :--- |  :--- |
-| [이름] |  [GitHub ID] |
-| [이름] |  [GitHub ID] |
-| [이름] |  [GitHub ID] |
-| [이름] |  [GitHub ID] |
+Contents Creator는 LLM Agent를 활용하여 블로그, SNS, 동영상 콘텐츠를 자동으로 생성하고 Instagram, Facebook, YouTube, X(Twitter), Threads, TikTok, WordPress 등 다양한 플랫폼에 통합 발행할 수 있는 서비스입니다.
 
----
+### 핵심 기능
 
-## 2. 🎯 프로젝트 개요
-
-### 2.1. 프로젝트 주제
-- **콘텐츠 크리에이터: 1인 기업 및 소상공인을 위한 AI 기반 콘텐츠 제작 및 자동 배포 플랫폼**
-
-### 2.2. 제작 배경 (해결하고자 하는 문제)
-- 1인 기업과 소상공인은 제한된 시간과 리소스로 인해 효과적인 마케팅 콘텐츠를 지속적으로 생산하기 어렵습니다.
-- 다양한 플랫폼(Instagram, Facebook, YouTube, 블로그 등)에 맞는 콘텐츠를 각각 제작하고 관리하는 것은 많은 시간과 노력이 필요합니다.
-
-### 2.3. 핵심 목표 (제공하는 가치)
-1. **AI 기반 콘텐츠 생성**: LLM Agent를 활용하여 비즈니스에 맞는 마케팅 콘텐츠를 자동으로 생성
-2. **멀티 플랫폼 관리**: 소셜 미디어, 블로그, 이메일 등 다양한 플랫폼의 콘텐츠를 한 곳에서 관리
-3. **자동 예약 발행**: 콘텐츠를 미리 작성하고 원하는 시간에 자동으로 발행
-4. **템플릿 시스템**: 검증된 마케팅 템플릿을 활용하여 빠르게 콘텐츠 제작
-5. **성과 분석**: 콘텐츠 성과를 분석하고 인사이트 제공
+- **AI 콘텐츠 생성**: Claude, Gemini를 활용한 블로그/SNS 콘텐츠 자동 생성
+- **AI 이미지 생성**: Gemini 2.0 Flash, Stable Diffusion 기반 이미지 생성
+- **AI 동영상 생성**: Replicate API (Stable Video Diffusion, LTX-Video) 기반 동영상 제작
+- **카드뉴스 생성**: 자동 레이아웃 및 디자인 적용 카드뉴스 제작
+- **브랜드 분석**: Multi-Agent Pipeline으로 블로그/Instagram/YouTube 콘텐츠 분석 및 스타일 추출
+- **멀티 플랫폼 연동**: YouTube, Facebook, Instagram, X(Twitter), Threads, TikTok, WordPress OAuth 연동
+- **AI 채팅 어시스턴트**: 대화형 콘텐츠 생성 인터페이스
+- **크레딧 시스템**: 사용량 기반 크레딧 관리
 
 ---
 
-## 3. 🛠️ 기술 스택 (Tech Stack)
+## 기술 스택
 
-본 프로젝트는 다음 기술 스택을 기반으로 합니다. (팀별 상황에 맞게 수정 가능)
+### Frontend
 
-| 구분 | 기술 |
+| 기술 | 버전 | 용도 |
+| :--- | :--- | :--- |
+| React | 19.2.0 | UI 프레임워크 |
+| React Router DOM | 7.9.5 | 클라이언트 라우팅 |
+| Axios | 1.13.2 | API 통신 |
+| React Markdown | 10.1.0 | 마크다운 렌더링 |
+| React Icons | 5.5.0 | 아이콘 라이브러리 |
+| CSS3 | - | 스타일링 |
+
+### Backend
+
+| 기술 | 버전 | 용도 |
+| :--- | :--- | :--- |
+| FastAPI | 0.115.0 | RESTful API 서버 |
+| Uvicorn | 0.32.0 | ASGI 서버 |
+| SQLAlchemy | 2.0.36 | ORM |
+| Supabase (PostgreSQL) | - | 데이터베이스 |
+| Python-JOSE | 3.3.0 | JWT 인증 |
+| Authlib | 1.3.2 | OAuth 2.0 |
+| Pydantic | 2.10.0 | 데이터 검증 |
+| HTTPX | 0.28.1 | 비동기 HTTP 클라이언트 |
+| Pillow | 11.0.0 | 이미지 처리 |
+| MoviePy | 2.2.1 | 동영상 편집 |
+
+### AI / ML
+
+| 기술 | 용도 |
 | :--- | :--- |
-| **Frontend** | React.js, React Router, CSS3 |
-| **Backend** | (추후 구현) FastAPI, Python, LangChain |
-| **Database** | (추후 구현) PostgreSQL, Vector DB |
-| **AI / ML** | (추후 구현) OpenAI API, Gemini API |
-| **External APIs** | (추후 구현) Instagram API, Facebook API, YouTube API |
-| **Infra / Tools** | Git, npm, Node.js |
+| Google Gemini API | 이미지 생성 (Gemini 2.0 Flash), 텍스트 생성, 프롬프트 최적화 |
+| Anthropic Claude API | 콘텐츠 생성, 브랜드 분석, 품질 검증 |
+| Google Vertex AI | Google Cloud 기반 AI 서비스 |
+| Hugging Face | Stable Diffusion 2.1 이미지 생성 |
+| Replicate API | AI 동영상 생성 (Stable Video Diffusion, LTX-Video) |
+| FAL API | 이미지/동영상 생성 (대체 제공자) |
+
+### SNS/플랫폼 연동
+
+| 플랫폼 | 기능 |
+| :--- | :--- |
+| Google | 소셜 로그인 |
+| Kakao | 소셜 로그인 |
+| Facebook | 소셜 로그인, 페이지 연동, 콘텐츠 발행 |
+| Instagram | 비즈니스 계정 연동, 콘텐츠 발행 |
+| YouTube | 채널 연동, 동영상 분석, 업로드 |
+| X (Twitter) | 계정 연동, 트윗 발행 |
+| Threads | 계정 연동, 포스트 발행 |
+| TikTok | 계정 연동, 동영상 업로드 |
+| WordPress | 블로그 연동, 포스트 발행 |
 
 ---
 
-## 4. 🚀 시작하기 (Getting Started)
+## 프로젝트 구조
 
-### 4.1. 개발 환경
-- **Node.js 버전**: 16.x 이상
-- **npm 버전**: 8.x 이상
-- **주요 라이브러리**: `package.json` 참조
+```
+contents_creator/
+├── backend/                           # FastAPI 백엔드
+│   └── app/
+│       ├── main.py                    # FastAPI 앱 설정 및 라우터 등록
+│       ├── models.py                  # SQLAlchemy 모델 (40개)
+│       ├── schemas.py                 # Pydantic 스키마
+│       ├── database.py                # DB 연결 설정
+│       ├── auth.py                    # JWT 인증
+│       ├── oauth.py                   # OAuth 설정
+│       ├── agents.py                  # Agentic AI 워크플로우
+│       ├── routers/                   # API 라우터 (22개)
+│       │   ├── auth.py                # 인증 API
+│       │   ├── oauth.py               # OAuth 콜백
+│       │   ├── user.py                # 사용자 프로필
+│       │   ├── chat.py                # AI 채팅
+│       │   ├── ai_content.py          # AI 콘텐츠 생성
+│       │   ├── image.py               # 이미지 생성
+│       │   ├── ai_video_generation.py # AI 동영상 생성
+│       │   ├── brand_analysis.py      # 브랜드 분석
+│       │   ├── cardnews.py            # 카드뉴스 생성
+│       │   ├── sns_publish.py         # 멀티 플랫폼 발행
+│       │   ├── onboarding.py          # 온보딩
+│       │   ├── dashboard.py           # 대시보드
+│       │   ├── credits.py             # 크레딧 시스템
+│       │   ├── templates.py           # 템플릿 관리
+│       │   ├── published_content.py   # 발행 콘텐츠 추적
+│       │   ├── generated_videos.py    # 생성 동영상 관리
+│       │   ├── ai_recommendations.py  # AI 추천
+│       │   └── sns/                   # SNS 플랫폼별 라우터
+│       │       ├── youtube.py         # YouTube 연동
+│       │       ├── facebook.py        # Facebook 연동
+│       │       ├── instagram.py       # Instagram 연동
+│       │       ├── x.py               # X(Twitter) 연동
+│       │       ├── threads.py         # Threads 연동
+│       │       ├── tiktok.py          # TikTok 연동
+│       │       ├── wordpress.py       # WordPress 연동
+│       │       └── blog.py            # 네이버 블로그 분석
+│       ├── services/                  # 비즈니스 로직 서비스
+│       │   ├── ai_video_service.py    # AI 동영상 생성 서비스
+│       │   ├── brand_analyzer_service.py  # 브랜드 분석 로직
+│       │   ├── instagram_service.py   # Instagram API
+│       │   ├── facebook_service.py    # Facebook API
+│       │   ├── youtube_service.py     # YouTube API
+│       │   ├── x_service.py           # X API
+│       │   ├── threads_service.py     # Threads API
+│       │   ├── naver_blog_service.py  # 네이버 블로그 스크래핑
+│       │   └── supabase_storage.py    # Supabase 스토리지
+│       ├── brand_agents/              # 브랜드 분석 Multi-Agent Pipeline
+│       │   ├── pipeline.py            # 분석 파이프라인 오케스트레이션
+│       │   ├── collectors.py          # 데이터 수집 에이전트
+│       │   ├── analyzers.py           # 분석 에이전트
+│       │   ├── synthesizer.py         # 결과 통합 에이전트
+│       │   └── normalizer.py          # 데이터 정규화
+│       ├── utils/                     # 유틸리티
+│       │   ├── cardnews_renderer.py   # 카드뉴스 렌더링
+│       │   └── vertex_ai_client.py    # Vertex AI 클라이언트
+│       ├── prompts/                   # AI 프롬프트
+│       └── system_prompts/            # 시스템 프롬프트
+│
+├── src/                               # React 프론트엔드
+│   ├── pages/
+│   │   ├── Home.js                    # 메인 AI 채팅 인터페이스
+│   │   ├── auth/
+│   │   │   ├── Login.js               # 로그인
+│   │   │   └── OAuthCallback.js       # OAuth 콜백
+│   │   ├── onboarding/
+│   │   │   └── DynamicOnboarding.js   # 온보딩 (자동/수동 모드)
+│   │   ├── content/
+│   │   │   ├── ContentCreatorSimple.js  # 통합 콘텐츠 생성
+│   │   │   ├── ContentEditor.js       # 콘텐츠 편집
+│   │   │   ├── ContentHub.js          # 콘텐츠 허브
+│   │   │   ├── ContentHistory.js      # 생성 이력
+│   │   │   ├── ContentList.js         # 콘텐츠 목록
+│   │   │   └── Templates.js           # 템플릿 관리
+│   │   ├── connection_SNS/            # SNS 연동 페이지
+│   │   │   ├── youtube/               # YouTube 채널 관리
+│   │   │   ├── facebook/              # Facebook 페이지 관리
+│   │   │   ├── instagram/             # Instagram 피드 관리
+│   │   │   ├── x/                     # X(Twitter) 포스팅
+│   │   │   ├── threads/               # Threads 연동
+│   │   │   ├── tiktok/                # TikTok 연동
+│   │   │   ├── wordpress/             # WordPress 블로그
+│   │   │   └── common/                # 공통 컴포넌트
+│   │   ├── dashboard/Dashboard.js     # 대시보드
+│   │   ├── profile/MyPage.js          # 마이페이지
+│   │   ├── settings/Settings.js       # 설정
+│   │   ├── credits/                   # 크레딧 관리
+│   │   └── legal/                     # 법적 고지
+│   ├── components/
+│   │   ├── Layout.js                  # 레이아웃
+│   │   ├── Sidebar.js                 # 사이드바
+│   │   ├── ProtectedRoute.js          # 인증 라우트
+│   │   └── sns/                       # SNS 공통 컴포넌트
+│   ├── contexts/
+│   │   ├── AuthContext.js             # 인증 상태
+│   │   └── ContentContext.js          # 콘텐츠 상태
+│   └── services/
+│       ├── api.js                     # API 클라이언트
+│       ├── agenticService.js          # AI 콘텐츠 서비스
+│       └── geminiService.js           # Gemini API
+│
+├── .env.example                       # 환경 변수 템플릿
+├── package.json                       # npm 설정
+└── README.md                          # 프로젝트 문서
+```
 
-### 4.2. 설치 및 실행
+---
+
+## 데이터베이스 모델
+
+### 사용자 관리 (2개)
+- **User**: OAuth 정보, 비즈니스 정보, 타겟 고객 정보
+- **UserPreference**: 텍스트/이미지/동영상 스타일 선호도
+
+### 콘텐츠 (6개)
+- **Content**: 블로그, 이미지, 동영상 통합 콘텐츠
+- **ContentGenerationSession**: 콘텐츠 생성 세션 추적
+- **GeneratedBlogContent**: 생성된 블로그 포스트
+- **GeneratedSNSContent**: SNS 콘텐츠 (Instagram 등)
+- **GeneratedXContent**: X(Twitter) 콘텐츠
+- **GeneratedThreadsContent**: Threads 콘텐츠
+
+### 이미지 & 동영상 (4개)
+- **GeneratedImage**: 생성된 이미지
+- **GeneratedCardnewsContent**: 카드뉴스 콘텐츠
+- **VideoGenerationJob**: 동영상 생성 작업 추적
+- **GeneratedVideo**: 생성된 동영상
+
+### 브랜드 분석 (1개)
+- **BrandAnalysis**: 멀티 플랫폼 브랜드 프로필
+
+### 채팅 (2개)
+- **ChatSession**: AI 채팅 세션
+- **ChatMessage**: 채팅 메시지
+
+### SNS 연동 (14개)
+- **YouTubeConnection / YouTubeVideo / YouTubeAnalytics**: YouTube 연동
+- **FacebookConnection / FacebookPost**: Facebook 연동
+- **InstagramConnection / InstagramPost**: Instagram 연동
+- **XConnection / XPost**: X(Twitter) 연동
+- **ThreadsConnection / ThreadsPost**: Threads 연동
+- **TikTokConnection / TikTokVideo**: TikTok 연동
+- **WordPressConnection / WordPressPost**: WordPress 연동
+
+### 발행 추적 (1개)
+- **PublishedContent**: 모든 플랫폼 발행 콘텐츠 통합 추적
+
+### 크레딧 시스템 (3개)
+- **UserCredit**: 사용자 크레딧 잔액
+- **CreditTransaction**: 크레딧 거래 이력
+- **CreditPackage**: 크레딧 구매 패키지
+
+### 템플릿 (2개)
+- **TemplateTab**: 템플릿 카테고리
+- **Template**: 콘텐츠 템플릿
+
+---
+
+## 시작하기
+
+### 요구사항
+
+- Node.js 18.x 이상
+- Python 3.10 이상
+- npm 9.x 이상
+- Supabase 계정 (PostgreSQL 데이터베이스)
+
+### 설치 및 실행
 
 1. **레포지토리 복제**
    ```bash
@@ -61,138 +252,309 @@ _본 프로젝트는 1인 기업 및 소상공인을 위한 AI 기반 콘텐츠 
    cd ai-camp-2nd-llm-agent-service-project-contents-team
    ```
 
-2. **의존성 설치**
+2. **프론트엔드 의존성 설치**
    ```bash
    npm install
    ```
 
-3. **개발 서버 실행**
+3. **백엔드 설정**
+   ```bash
+   npm run setup:backend
+   ```
+
+4. **환경 변수 설정**
+   ```bash
+   cp .env.example .env
+   ```
+
+   `.env` 파일 설정:
+   ```env
+   # ===== Backend Configuration =====
+   SECRET_KEY=your-secret-key-here-change-this-in-production
+   ALGORITHM=HS256
+   ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+   # Database (Supabase PostgreSQL)
+   DATABASE_URL=postgresql://postgres.YOUR_PROJECT_REF:YOUR_PASSWORD@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
+   ENV=development
+   CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+
+   # ===== OAuth 2.0 =====
+   # Google
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+   GOOGLE_REDIRECT_URI=http://localhost:8000/api/oauth/google/callback
+
+   # Kakao
+   KAKAO_CLIENT_ID=your-kakao-rest-api-key
+   KAKAO_REDIRECT_URI=http://localhost:8000/api/oauth/kakao/callback
+
+   # Facebook
+   FACEBOOK_CLIENT_ID=your-facebook-app-id
+   FACEBOOK_CLIENT_SECRET=your-facebook-app-secret
+   FACEBOOK_REDIRECT_URI=http://localhost:8000/api/oauth/facebook/callback
+
+   # X (Twitter)
+   X_CLIENT_ID=your-x-client-id
+   X_CLIENT_SECRET=your-x-client-secret
+
+   # ===== AI API Keys =====
+   GOOGLE_API_KEY=your-google-api-key
+   ANTHROPIC_API_KEY=your-anthropic-api-key
+   HUGGINGFACE_API_KEY=your-huggingface-api-key
+   REPLICATE_API_TOKEN=your-replicate-api-token
+
+   # Frontend
+   REACT_APP_GEMINI_API_KEY=your-gemini-api-key
+
+   # ===== Google Cloud (Optional) =====
+   GOOGLE_APPLICATION_CREDENTIALS=secrets/google-cloud-key.json
+   GOOGLE_CLOUD_PROJECT=your-project-id
+   GOOGLE_CLOUD_LOCATION=asia-northeast1
+   ```
+
+5. **개발 서버 실행**
    ```bash
    npm start
    ```
-   브라우저에서 [http://localhost:3000](http://localhost:3000)으로 접속
+   - 프론트엔드: http://localhost:3000
+   - 백엔드 API: http://localhost:8000
+   - API 문서: http://localhost:8000/docs
 
-4. **프로덕션 빌드**
-   ```bash
-   npm run build
-   ```
+### 개별 실행
 
----
+```bash
+# 프론트엔드만
+npm run start:frontend
 
-## 5. 🌳 레포지토리 구조
-
+# 백엔드만
+npm run start:backend
 ```
-/
-├── public/             # 정적 파일 (index.html, favicon 등)
-├── src/
-│   ├── components/     # 재사용 가능한 UI 컴포넌트
-│   │   ├── Header.js   # 헤더 컴포넌트
-│   │   ├── Sidebar.js  # 사이드바 네비게이션
-│   │   └── Layout.js   # 레이아웃 래퍼
-│   ├── pages/          # 페이지 컴포넌트
-│   │   ├── Dashboard.js        # 대시보드
-│   │   ├── ContentCreator.js   # 콘텐츠 생성
-│   │   ├── ContentList.js      # 콘텐츠 관리
-│   │   ├── Templates.js        # 템플릿
-│   │   ├── Schedule.js         # 스케줄 관리
-│   │   ├── Analytics.js        # 분석
-│   │   └── Settings.js         # 설정
-│   ├── App.js          # 메인 앱 컴포넌트
-│   └── index.js        # 엔트리 포인트
-├── package.json        # 프로젝트 의존성
-└── README.md           # 프로젝트 문서
+
+### 프로덕션 빌드
+
+```bash
+npm run build
 ```
 
 ---
 
-## 6. 룰 & 가이드라인 (Rules & Guidelines)
+## Supabase 데이터베이스 설정
 
-### 6.1. 핵심 수행 규칙
-1.  **매일 오전 10시 KST** : 팀 스크럼 진행 (어제 한 일, 오늘 할 일, 장애물 공유)
-2.  **문서화**: 아키텍처, ERD 등 주요 산출물은 **[Notion 링크]`** 에 문서화하고 팀원과 공유합니다.
-3.  **환경 통일**: Python 및 주요 라이브러리 버전을 통일하여 개발 환경 차이로 인한 문제를 방지합니다. (`requirements.txt` 준수)
-4.  **보안**: API Key, DB 접속 정보 등 민감 정보는 `.env` 파일을 사용하며, 절대로 Git에 커밋하지 않습니다. (`.gitignore` 확인)
+### 1. Supabase 프로젝트 생성
 
-### 6.2. Git 브랜치 전략
-본 프로젝트는 **Git Flow**를 기반으로 한 브랜치 전략을 따릅니다.
+1. [Supabase](https://supabase.com)에 접속하여 계정 생성
+2. 새 프로젝트 생성 (Region: Northeast Asia - Seoul 권장)
+3. 프로젝트 생성 완료 후 데이터베이스 비밀번호 저장
 
--   **`master`**: 최종 릴리즈(배포) 브랜치. (7주차 발표회)
--   **`develop`**: 개발의 중심이 되는 브랜치.
--   **`feature/[기능명]`**: 신규 기능 개발 브랜치. (예: `feature/pdf-processing`)
-    -   개발 완료 후 `develop` 브랜치로 Pull Request(PR)
--   **`hotfix/[버그명]`**: `master` 브랜치의 긴급 버그 수정.
+### 2. 데이터베이스 연결 정보 확인
 
+Supabase 대시보드 → Settings → Database에서 Connection string 확인:
 
+```env
+DATABASE_URL=postgresql://postgres.YOUR_PROJECT_REF:YOUR_PASSWORD@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres
 ```
-[개발 플로우]
 
-feature 브랜치 생성 (git checkout -b feature/my-feature develop)
+### 3. Connection Pooling (권장)
 
-기능 개발 및 커밋
+Supabase는 Connection Pooler를 제공합니다:
+- **Transaction mode (포트 6543)**: 일반적인 사용에 권장
+- **Session mode (포트 5432)**: 장기 연결이 필요한 경우
 
-develop 브랜치로 PR 요청 (코드 리뷰 진행)
+### 4. Supabase Storage (선택)
 
-develop 브랜치에 Merge
+이미지/동영상 저장을 위해 Supabase Storage 사용 가능:
+
+```env
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
 ```
 
 ---
 
-## 7. 📱 주요 기능
+## API 엔드포인트
 
-### 7.1. 현재 구현된 기능
-- ✅ **대시보드**: 통계 카드, 최근 콘텐츠, 빠른 작업 버튼
-- ✅ **콘텐츠 생성**: 다양한 콘텐츠 유형 및 플랫폼 선택, 에디터, 미리보기
-- ✅ **콘텐츠 관리**: 검색, 필터링, 테이블 뷰, 페이지네이션
-- ✅ **템플릿**: 템플릿 목록 및 사용
-- ✅ **설정**: 플랫폼 연동, 프로필 정보, 알림 설정
-- ✅ **반응형 디자인**: 모바일, 태블릿, 데스크톱 지원
+### 인증
+- `GET /api/auth/me` - 현재 사용자 정보
+- `PUT /api/auth/me` - 사용자 정보 수정
+- `POST /api/auth/logout` - 로그아웃
+- `POST /api/auth/refresh-token` - 토큰 갱신
+- `GET /api/oauth/{provider}/login` - OAuth 로그인 시작
+- `GET /api/oauth/{provider}/callback` - OAuth 콜백
 
-### 7.2. 추후 구현 예정
-- 🔄 **AI 콘텐츠 생성**: OpenAI/Gemini API 연동
-- 🔄 **플랫폼 API 연동**: Instagram, Facebook, YouTube 자동 발행
-- 🔄 **스케줄링**: 예약 발행 시스템
-- 🔄 **분석 대시보드**: 실시간 성과 분석 및 인사이트
-- 🔄 **이미지 편집**: 이미지 업로드 및 편집 기능
-- 🔄 **백엔드 API**: FastAPI 기반 REST API
+### AI 콘텐츠
+- `POST /api/ai-content/save` - AI 생성 콘텐츠 저장
+- `GET /api/ai-content/history` - 생성 이력 조회
+- `POST /api/chat` - AI 채팅
+- `GET /api/chat/{session_id}/messages` - 채팅 메시지 조회
+
+### 이미지 생성
+- `POST /api/image/generate` - 이미지 생성
+- `POST /api/image/optimize-prompt` - 프롬프트 최적화
+
+### 동영상 생성
+- `POST /api/ai-video/generate` - 동영상 생성 시작
+- `GET /api/ai-video/status/{job_id}` - 생성 상태 조회
+- `GET /api/videos/history` - 동영상 이력
+
+### 카드뉴스
+- `POST /api/cardnews/generate` - 카드뉴스 생성
+- `GET /api/cardnews/{id}` - 카드뉴스 조회
+
+### 브랜드 분석
+- `POST /api/brand-analysis/analyze` - 브랜드 분석 실행
+- `GET /api/brand-analysis/{user_id}` - 분석 결과 조회
+
+### SNS 연동
+- `GET /api/youtube/connect` - YouTube 연동
+- `GET /api/facebook/connect` - Facebook 연동
+- `GET /api/instagram/connect` - Instagram 연동
+- `GET /api/x/connect` - X(Twitter) 연동
+- `GET /api/threads/connect` - Threads 연동
+- `GET /api/tiktok/connect` - TikTok 연동
+- `GET /api/wordpress/connect` - WordPress 연동
+- `POST /api/sns/publish` - 통합 SNS 발행
+
+### 크레딧
+- `GET /api/credits/packages` - 크레딧 패키지 목록
+- `GET /api/credits/balance` - 현재 크레딧 잔액
+- `POST /api/credits/purchase` - 크레딧 구매
+- `GET /api/credits/transactions` - 거래 이력
+
+### 템플릿
+- `GET /api/templates` - 템플릿 목록
+- `POST /api/templates` - 템플릿 생성
+- `PUT /api/templates/{id}` - 템플릿 수정
+- `DELETE /api/templates/{id}` - 템플릿 삭제
+
+### 발행 콘텐츠
+- `GET /api/published` - 발행 콘텐츠 목록
+- `GET /api/published/{id}` - 발행 콘텐츠 상세
 
 ---
 
-## 8. 🗓️ 프로젝트 로드맵 (7-Week Plan)
+## 주요 기능 상세
 
-| 주차 | 핵심 목표 | 주요 산출물 |
+### 1. AI 채팅 어시스턴트
+- Gemini API 기반 대화형 콘텐츠 생성
+- 사용자 비즈니스 컨텍스트 자동 반영
+- 채팅 세션 저장 및 불러오기
+- 콘텐츠 아이디어 생성 및 제안
+
+### 2. AI 콘텐츠 생성 (Agentic Workflow)
+
+Multi-Agent 워크플로우를 통한 고품질 콘텐츠 생성:
+
+| 에이전트 | 역할 |
+| :--- | :--- |
+| ContentPlannerAgent | 콘텐츠 계획 수립 |
+| ContentEnricherAgent | 콘텐츠 작성 |
+| QualityAssuranceAgent | 품질 검증 |
+| VisualDesignerAgent | 비주얼 최적화 |
+| OrchestratorAgent | 전체 워크플로우 조정 |
+
+플랫폼별 자동 생성:
+- 블로그 포스트 (Markdown)
+- SNS 캡션 (Instagram, Facebook)
+- 트윗 (X/Twitter)
+- Threads 포스트
+- YouTube 설명
+
+### 3. AI 이미지 생성
+- Google Gemini 2.0 Flash (기본)
+- Hugging Face Stable Diffusion 2.1 (대체)
+- 브랜드 분석 기반 프롬프트 자동 강화
+- 스타일 선호도 적용
+
+### 4. AI 동영상 생성
+- **텍스트 → 동영상**: LTX-Video (Replicate)
+- **이미지 → 동영상**: Stable Video Diffusion
+- 생성 진행 상태 실시간 추적
+- 동영상 메타데이터 저장
+
+### 5. 카드뉴스 생성
+- AI 기반 콘텐츠 구조화
+- 자동 레이아웃 적용
+- 다양한 템플릿 지원
+- 이미지 렌더링 및 내보내기
+
+### 6. 브랜드 분석 (Multi-Agent Pipeline)
+
+플랫폼별 분석:
+- **네이버 블로그**: 글쓰기 스타일, 구조, 톤 분석
+- **Instagram**: 이미지 스타일, 색상 팔레트, 해시태그 패턴
+- **YouTube**: 콘텐츠 스타일, 제목 패턴, 썸네일 특성
+
+추출 요소:
+- 브랜드 톤앤매너, 가치관, 성격
+- 타겟 고객층, 핵심 주제
+- 색상 팔레트, 이미지 스타일
+- 키워드 패턴, 해시태그 사용법
+
+### 7. 멀티 플랫폼 발행
+- Instagram + Facebook 동시 발행
+- X(Twitter) 트윗 포스팅
+- YouTube 동영상 업로드
+- Threads 포스트 발행
+- TikTok 동영상 업로드
+- WordPress 블로그 포스트 발행
+- 발행 이력 통합 추적
+
+### 8. 온보딩 프로세스
+
+**자동 모드**:
+- 블로그 URL 입력 → 자동 스크래핑 및 분석
+- 비즈니스 정보 자동 추론
+
+**수동 모드**:
+- 비즈니스 정보 직접 입력
+- 텍스트/이미지 샘플 업로드
+- 스타일 선호도 수동 설정
+
+### 9. 크레딧 시스템
+
+| 패키지 | 크레딧 | 보너스 |
 | :--- | :--- | :--- |
-| **1주차** | **기획 및 프론트엔드 개발** | UI/UX 디자인, React SPA 구현 ✅ |
-| **2주차** | **백엔드 설계 및 API 개발** | FastAPI 서버, 데이터베이스 스키마 |
-| **3주차** | **AI 기능 통합** | LLM Agent, 콘텐츠 생성 로직 |
-| **4주차** | **플랫폼 API 연동** | 소셜 미디어 자동 발행 기능 |
-| **5주차** | **스케줄링 및 자동화** | 예약 발행, 배치 처리 |
-| **6주차** | **분석 및 최적화** | 성과 분석, 성능 개선 |
-| **7주차** | **테스트 및 배포** | **동작하는 웹 서비스 (최종 산출물)** |
+| 스타터 | 50 | - |
+| 베이직 | 120 | +20 |
+| 스탠다드 | 300 | +50 |
+| 프로 | 700 | +100 |
+| 엔터프라이즈 | 1500 | +300 |
 
 ---
 
-## 9. 📄 산출물 링크 (Documentation)
+## 아키텍처
 
-> 팀의 Notion, Fimga 등 관련 링크를 업데이트하세요.
+### Frontend
+- **라우팅**: React Router DOM
+- **상태 관리**: React Context API (AuthContext, ContentContext)
+- **API 통신**: Axios 인스턴스 + 인터셉터 (자동 토큰 관리)
+- **스타일**: CSS3
 
--   **[➡️ 서비스 기획서 및 요구사항 명세서]([링크])`**
--   **[➡️ 시스템 아키텍처 다이어그램]([링크])`**
--   **[➡️ 데이터베이스 ERD]([링크])`**
--   **[➡️ 팀 WBS / Scrum 보드]([링크])`**
+### Backend
+- **프레임워크**: FastAPI (ASGI 비동기)
+- **데이터베이스**: SQLAlchemy ORM + Supabase PostgreSQL
+- **스토리지**: Supabase Storage
+- **API 스타일**: RESTful
+- **인증**: JWT + OAuth 2.0
+- **미들웨어**: CORS, SessionMiddleware
+
+### Agentic AI
+- **패턴**: Multi-Agent Workflow
+- **Brand Analysis Pipeline**: DataCollector → StyleAnalyzer → BrandSynthesizer
 
 ---
 
-## 10. 🏁 최종 결과물 (Final Deliverables)
+## 팀 정보
 
-1. **웹 UI 기반 서비스**: React SPA ✅
-2. **AI 콘텐츠 생성 모듈**: LLM Agent 기반 자동 생성 (예정)
-3. **멀티 플랫폼 연동**: 소셜 미디어 API 통합 (예정)
-4. **스케줄링 시스템**: 예약 발행 자동화 (예정)
-5. **분석 대시보드**: 성과 추적 및 인사이트 (예정)
-6. **최종 발표 자료 및 데모 영상**
+| 이름 | GitHub |
+| :--- | :--- |
+| 기유진 | - |
+| 김종주 | jonjour99 |
+| 오화영 | - |
 
 ---
 
-## 11. 📜 License
+## License
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

@@ -1,0 +1,773 @@
+/* ========================================
+   CONTENT HISTORY - 생성 내역 페이지 스타일
+   ======================================== */
+
+.content-history {
+  min-height: calc(100vh - 60px);
+  padding: var(--space-xl);
+  max-width: 1400px;
+  margin: 0 auto;
+  animation: fadeIn 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Back Button */
+.content-history > .btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: var(--space-xs) 0;
+  margin-bottom: var(--space-md);
+  transition: color 0.15s ease;
+}
+
+.content-history > .btn-back:hover {
+  color: var(--primary-color);
+}
+
+/* Header */
+.history-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: var(--space-xl);
+}
+
+.history-header h2 {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-xs) 0;
+}
+
+.history-subtitle {
+  font-size: 15px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Filter Tabs */
+.history-filter-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.filter-tab {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-radius: 6px;
+}
+
+.filter-tab:hover {
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+.filter-tab.active {
+  background: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+/* ==========================================
+   히스토리 콘텐츠 영역
+   ========================================== */
+
+.history-content {
+  padding: 1rem 0;
+}
+
+.history-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 1.5rem;
+  min-height: 500px;
+}
+
+/* 내역 목록 */
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 700px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.history-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  padding: 0.875rem 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-radius: 8px;
+}
+
+.history-item:hover {
+  border-color: var(--secondary-color);
+}
+
+.history-item.selected {
+  border-color: var(--secondary-color);
+  background: var(--secondary-color);
+}
+
+.history-item-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.history-item-header h4 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-date {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* 생성 타입/스타일 정보 */
+.history-item-info {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
+}
+
+.info-badge {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.5rem;
+  font-weight: 500;
+  border-radius: 2px;
+}
+
+.info-badge.type {
+  background: var(--accent-color);
+  color: var(--text-secondary);
+}
+
+.info-badge.style {
+  background: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+.history-item-meta {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+/* 플랫폼 배지 */
+.platform-badge {
+  font-size: 0.65rem;
+  padding: 0.15rem 0.4rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* 내역 상세 */
+.history-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.history-detail .result-card {
+  margin-bottom: 0;
+}
+
+/* 내역 상세 헤더 */
+.history-detail-header {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-radius: 8px;
+}
+
+.history-detail-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.history-detail-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.history-detail-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.history-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.history-detail-meta .history-date {
+  margin-left: auto;
+}
+
+/* 내역 상세 탭 */
+.history-detail-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.history-tab {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-radius: 6px;
+}
+
+.history-tab:hover {
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+.history-tab.active {
+  background: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+/* 내역 상세 콘텐츠 */
+.history-detail-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.history-detail-content .result-card {
+  margin-bottom: 0;
+}
+
+/* ==========================================
+   Result Card 스타일 (ContentCreatorSimple에서 공유)
+   ========================================== */
+
+.result-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.result-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-primary);
+}
+
+.result-card-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.result-card-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.result-card-content {
+  padding: 1.25rem;
+}
+
+.blog-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.text-result {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  margin-bottom: 1rem;
+}
+
+.text-result.sns-content {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* 마크다운 콘텐츠 스타일 */
+.text-result.markdown-content {
+  white-space: normal;
+}
+
+.text-result.markdown-content p {
+  margin: 0 0 0.75rem 0;
+}
+
+.text-result.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.text-result.markdown-content strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.text-result.markdown-content em {
+  font-style: italic;
+}
+
+.text-result.markdown-content h1,
+.text-result.markdown-content h2,
+.text-result.markdown-content h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.text-result.markdown-content ul,
+.text-result.markdown-content ol {
+  margin: 0 0 0.75rem 0;
+  padding-left: 1.25rem;
+}
+
+.text-result.markdown-content li {
+  margin-bottom: 0.25rem;
+}
+
+.result-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tag-item {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  background: var(--accent-color);
+  color: var(--text-secondary);
+  border-radius: 2px;
+}
+
+.tag-item.hashtag {
+  background: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+/* ==========================================
+   빈 상태 & 로딩 상태
+   ========================================== */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.6;
+}
+
+.empty-state h3 {
+  margin: 0 0 0.4rem 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.empty-state p {
+  margin: 0 0 1.25rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.empty-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-color);
+  min-height: 250px;
+  border-radius: 8px;
+}
+
+.empty-detail .empty-icon {
+  font-size: 2rem;
+}
+
+.empty-detail p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  gap: 0.75rem;
+}
+
+.loading-state p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* ==========================================
+   버튼 스타일
+   ========================================== */
+
+.btn-primary {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-radius: 6px;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-radius: 4px;
+}
+
+.btn-icon:hover {
+  border-color: var(--secondary-color);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-icon-edit {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.btn-icon-edit:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+.btn-icon-delete {
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.btn-icon-delete:hover {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-icon-download {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.btn-icon-download:hover {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* ==========================================
+   비디오 플레이어
+   ========================================== */
+
+.video-player-container {
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto 1.5rem;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 9/16;
+}
+
+.generated-video-player {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.video-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.video-info p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.video-info strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+/* ==========================================
+   카드뉴스 스타일
+   ========================================== */
+
+.platform-badge.cardnews {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.cardnews-info {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.cardnews-info .info-badge {
+  background: var(--secondary-color);
+  color: var(--text-primary);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.75rem;
+}
+
+.cardnews-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.cardnews-grid .image-item {
+  aspect-ratio: 1 / 1.25;
+}
+
+.image-label {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 0.7rem;
+  border-radius: 4px;
+}
+
+/* ==========================================
+   이미지 그리드 & 팝업
+   ========================================== */
+
+.images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.image-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.image-item:hover {
+  transform: scale(1.02);
+}
+
+.image-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.btn-download-single {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.35rem 0.75rem;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  font-size: 0.7rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border-radius: 4px;
+}
+
+.image-item:hover .btn-download-single {
+  opacity: 1;
+}
+
+.image-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+}
+
+.image-popup-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.image-popup-content img {
+  max-width: 100%;
+  max-height: 85vh;
+  border-radius: 8px;
+}
+
+.image-popup-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0.5rem;
+}
+
+/* ==========================================
+   스피너
+   ========================================== */
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ==========================================
+   반응형
+   ========================================== */
+
+@media (max-width: 900px) {
+  .history-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .history-list {
+    max-height: 250px;
+  }
+}
+
+@media (max-width: 480px) {
+  .content-history {
+    padding: var(--space-md);
+  }
+
+  .history-header h2 {
+    font-size: 26px;
+  }
+}
