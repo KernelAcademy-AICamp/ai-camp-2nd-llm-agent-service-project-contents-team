@@ -567,6 +567,29 @@ class MasterPlanningAgent:
    - 카메라 움직임, 조명, 분위기 상세히 기술
    - 앞 컷과 뒤 컷의 연결을 자연스럽게 설명
    - 예: "Camera smoothly zooms out from close-up of luxury bottle's golden cap, gradually revealing the full pristine white bottle against minimalist marble background, maintaining soft professional lighting throughout"
+
+   **⚠️ 사람의 동작이 포함될 때 (필수 준수):**
+   - 모든 동작은 **자연스럽고 일반적인 방식**으로 표현
+   - 과장되거나 어색한 동작 금지, 실제 사람이 하는 그대로 묘사
+   - 예시:
+     * 가방 메기: "casually swings bag over shoulder in one smooth motion" (어깨에 툭 메는 자연스러운 동작)
+     * 음료 마시기: "lifts cup naturally to lips, takes a gentle sip"
+     * 제품 들기: "picks up product with relaxed hand movement"
+     * 걷기: "walks with natural, easy stride"
+   - 동작의 속도와 리듬이 현실적이어야 함
+
+   **⚠️ 재료/소재를 다루는 장면 (도구 사용 필수):**
+   - 손으로 직접 다루기 어려운 재료는 **적절한 도구를 반드시 명시**
+   - 도구의 종류와 사용 방법을 구체적으로 작성
+   - 예시:
+     * 딸기 퓨레 담기: "using a long thin spoon to scoop strawberry puree"
+     * 라떼 붓기: "pouring latte from stainless steel milk jug with steady hand"
+     * 시럽 뿌리기: "drizzling syrup using squeeze bottle in circular motion"
+     * 가루 뿌리기: "using small mesh sifter to dust matcha powder"
+     * 휘핑크림 올리기: "piping whipped cream using pastry bag with star tip"
+     * 재료 섞기: "stirring ingredients with wooden stirrer/long spoon"
+   - 도구 없이 손으로만 하는 것은 비현실적 → 반드시 도구 사용
+
    - ffmpeg 사용 시에는 간단히 작성 (효과명만 참고)
 4. duration: 전환 길이 (초)
    - **minimax**: 평균 {avg_transition_duration:.1f}초 (최소 4초, 최대 6초 권장)
@@ -581,7 +604,10 @@ class MasterPlanningAgent:
   * 실제 동작/액션이 있는 장면 → 무조건 minimax 사용
   * 역동적 카메라 움직임 필요 → minimax 사용
   * 정적 컷 간 단순 전환만 → ffmpeg 사용 가능
-  * 전체의 50-70%는 minimax로 구성하여 영상의 퀄리티 확보
+  * 전체의 50-70%는 minimax로 구성하여 영상의 퀘리티 확보
+- **동작 및 도구 사용 (중요!):**
+  * 사람의 모든 동작은 자연스럽고 일반적인 방식으로 (과장 금지)
+  * 재료/소재를 다룰 때는 적절한 도구를 구체적으로 명시 (손으로만 하는 것 금지)
 - 전체 흐름의 리듬감 유지
 - **image_prompt 작성 시 필수 사항:**
   * 브랜드 컨텍스트의 "제품 비주얼 특징"에 명시된 색상, 스타일, 조명, 분위기를 **반드시** 포함
