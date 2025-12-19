@@ -29,8 +29,8 @@ logger = get_logger(__name__)
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Vertex AI 지역 설정 (멀티 리전 로테이션으로 쿼터 분산)
+# 미국과 유럽 지역만 사용
 AVAILABLE_REGIONS = [
-    "asia-southeast1",   # 싱가포르
     "europe-west4",      # 네덜란드
     "us-west1",          # 오레곤
     "us-east4"           # 버지니아
@@ -777,7 +777,7 @@ class ImageGenerationAgent:
     - 생성된 이미지를 로컬 파일 시스템에 PNG로 저장
     """
 
-    def __init__(self, model: str = "gemini-2.5-flash-image"):
+    def __init__(self, model: str = "gemini-2.5-flash-image-ga"):
         self.model = model
         logger.info(f"ImageGenerationAgent initialized with Vertex AI model: {self.model}")
 
