@@ -1195,38 +1195,44 @@ async def publish_cardnews(
 
     logger.info(f"카드뉴스 발행 시작: platform={platform}, images={len(image_urls)}")
 
-    # base64 이미지를 Supabase Storage에 업로드하여 URL로 변환
-    converted_urls = []
-    for idx, img_url in enumerate(image_urls):
-        if img_url.startswith('data:image'):
-            # base64 데이터 URL -> Supabase Storage 업로드
-            logger.info(f"이미지 {idx + 1}: base64 형식, Supabase 업로드 필요")
-            try:
-                # 기존 upload_cardnews_image_to_supabase 함수 사용
-                # session_id 대신 타임스탬프 사용
-                import time
-                session_id = int(time.time())
-                public_url = await upload_cardnews_image_to_supabase(
-                    img_url,
-                    current_user.id,
-                    session_id,
-                    idx + 1
-                )
-                logger.info(f"이미지 {idx + 1} Supabase 업로드 완료: {public_url[:80]}...")
-                converted_urls.append(public_url)
-            except Exception as e:
-                logger.error(f"이미지 {idx + 1} 업로드 실패: {e}")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"이미지 {idx + 1} 업로드에 실패했습니다: {str(e)}"
-                )
-        else:
-            # 이미 HTTP URL인 경우 그대로 사용
-            logger.info(f"이미지 {idx + 1}: HTTP URL 형식")
-            converted_urls.append(img_url)
+    # base64 이미지를 Supabase Storage에 업로드하여 URL로 변환 (병렬 처리)
+    import asyncio
+    import time
+    session_id = int(time.time())
 
-    # 변환된 URL 사용
-    image_urls = converted_urls
+    async def upload_single_image(idx: int, img_url: str) -> tuple:
+        """개별 이미지 업로드 태스크"""
+        if img_url.startswith('data:image'):
+            public_url = await upload_cardnews_image_to_supabase(
+                img_url,
+                current_user.id,
+                session_id,
+                idx + 1
+            )
+            logger.info(f"이미지 {idx + 1} Supabase 업로드 완료")
+            return (idx, public_url)
+        else:
+            return (idx, img_url)
+
+    # base64 이미지가 있는지 확인
+    has_base64 = any(url.startswith('data:image') for url in image_urls)
+
+    if has_base64:
+        logger.info(f"이미지 {len(image_urls)}개 병렬 업로드 시작...")
+        tasks = [upload_single_image(idx, url) for idx, url in enumerate(image_urls)]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 에러 확인
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"이미지 업로드 실패: {result}")
+                raise HTTPException(status_code=500, detail=f"이미지 업로드 실패: {str(result)}")
+
+        # 순서대로 정렬
+        sorted_results = sorted([r for r in results if not isinstance(r, Exception)], key=lambda x: x[0])
+        image_urls = [r[1] for r in sorted_results]
+        logger.info(f"이미지 {len(image_urls)}개 업로드 완료")
+
     logger.info(f"최종 이미지 URL 수: {len(image_urls)}")
 
     try:
@@ -1311,26 +1317,38 @@ async def _publish_cardnews_to_instagram(
     logger.info(f"Instagram 캐러셀 발행 시작: user_id={user.id}, images={len(image_urls)}")
 
     try:
+        import asyncio
         service = InstagramService(connection.page_access_token)
         instagram_user_id = connection.instagram_account_id
 
-        # 1. 각 이미지에 대해 캐러셀 아이템 컨테이너 생성
-        children_ids = []
-        for idx, img_url in enumerate(image_urls):
-            logger.info(f"캐러셀 아이템 생성 중: {idx + 1}/{len(image_urls)}")
+        # 1. 각 이미지에 대해 캐러셀 아이템 컨테이너 생성 (병렬 처리)
+        async def create_container(idx: int, img_url: str):
+            """개별 컨테이너 생성 태스크"""
             container = await service.create_media_container(
                 instagram_user_id=instagram_user_id,
                 image_url=img_url,
                 is_carousel_item=True
             )
             if not container or "id" not in container:
-                logger.error(f"캐러셀 아이템 {idx + 1} 생성 실패")
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"이미지 {idx + 1} 컨테이너 생성에 실패했습니다."
-                )
-            children_ids.append(container["id"])
-            logger.info(f"캐러셀 아이템 생성됨: {container['id']}")
+                raise Exception(f"이미지 {idx + 1} 컨테이너 생성 실패")
+            logger.info(f"캐러셀 아이템 {idx + 1} 생성됨: {container['id']}")
+            return (idx, container["id"])
+
+        logger.info(f"캐러셀 아이템 {len(image_urls)}개 병렬 생성 시작...")
+        tasks = [create_container(idx, url) for idx, url in enumerate(image_urls)]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 결과 확인 및 순서 정렬
+        children_ids = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"캐러셀 아이템 생성 실패: {result}")
+                raise HTTPException(status_code=500, detail=str(result))
+
+        # 순서대로 정렬 (idx 기준)
+        sorted_results = sorted([r for r in results if not isinstance(r, Exception)], key=lambda x: x[0])
+        children_ids = [r[1] for r in sorted_results]
+        logger.info(f"캐러셀 아이템 {len(children_ids)}개 생성 완료")
 
         # 2. 캐러셀 컨테이너 생성
         logger.info(f"캐러셀 컨테이너 생성 중: children={children_ids}")

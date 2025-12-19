@@ -219,7 +219,6 @@ function ContentCreatorSimple() {
       try {
         const data = await userAPI.getContext();
         setUserContext(data.context);
-        console.log('✅ 사용자 컨텍스트 로드:', data.context);
       } catch (error) {
         console.error('사용자 컨텍스트 조회 실패:', error);
       }
@@ -244,7 +243,6 @@ function ContentCreatorSimple() {
           // 전체 템플릿 목록도 설정 (미리보기용)
           const allTemplates = v2Data.categories.flatMap(cat => cat.templates);
           setDesignTemplates(allTemplates);
-          console.log('✅ 카테고리별 템플릿 로드:', v2Data.total_templates, '개');
         }
       } catch (error) {
         console.error('디자인 템플릿 조회 실패:', error);
@@ -328,7 +326,6 @@ function ContentCreatorSimple() {
         generation_attempts: content.metadata?.attempts || 1
       };
       await contentSessionAPI.save(saveData);
-      console.log('✅ 콘텐츠 세션 저장 완료');
     } catch (error) {
       console.error('콘텐츠 저장 실패:', error);
     }
@@ -471,15 +468,11 @@ function ContentCreatorSimple() {
             generatedResult.videoJobId = jobId;
             generatedResult.videoStatus = 'processing';
 
-            console.log('Video generation job created:', jobId);
-
             // 작업 상태를 주기적으로 확인하는 폴링
             const checkVideoStatus = async () => {
               try {
                 const statusResponse = await api.get(`/api/ai-video/jobs/${jobId}`);
                 const job = statusResponse.data;
-
-                console.log('Job status:', job.status, job.current_step);
 
                 if (job.status === 'completed' && job.final_video_url) {
                   generatedResult.videoUrl = job.final_video_url;
@@ -555,7 +548,6 @@ function ContentCreatorSimple() {
           await creditsAPI.use(requiredCredits, description, referenceType);
           // 잔액 업데이트
           setCreditBalance(prev => prev - requiredCredits);
-          console.log(`✅ 크레딧 ${requiredCredits} 차감 완료`);
         } catch (creditError) {
           console.error('크레딧 차감 실패:', creditError);
           // 크레딧 차감 실패해도 생성은 완료된 것으로 처리
@@ -1018,8 +1010,8 @@ function ContentCreatorSimple() {
                   {CONTENT_TYPES.map(type => (
                     <div
                       key={type.id}
-                      className={`creator-type-card ${contentType === type.id ? 'selected' : ''}`}
-                      onClick={() => setContentType(type.id)}
+                      className={`creator-type-card ${contentType === type.id ? 'selected' : ''} ${isGenerating ? 'disabled' : ''}`}
+                      onClick={() => !isGenerating && setContentType(type.id)}
                     >
                       {type.recommended && <span className="recommended-badge">추천</span>}
                       {type.isNew && <span className="new-badge">NEW</span>}
@@ -1039,6 +1031,7 @@ function ContentCreatorSimple() {
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   rows={3}
+                  disabled={isGenerating}
                 />
                 <button
                   className="creator-generate-btn"
@@ -1064,7 +1057,7 @@ function ContentCreatorSimple() {
               <div className="creator-quick-options">
                 <span className="quick-label">빠른 시작:</span>
                 {QUICK_TOPICS.map(t => (
-                  <button key={t} className="quick-chip" onClick={() => setTopic(t)}>{t}</button>
+                  <button key={t} className="quick-chip" onClick={() => setTopic(t)} disabled={isGenerating}>{t}</button>
                 ))}
               </div>
 
@@ -1091,6 +1084,7 @@ function ContentCreatorSimple() {
                             key={format.id}
                             className={`creator-chip ${imageFormat === format.id ? 'selected' : ''}`}
                             onClick={() => setImageFormat(format.id)}
+                            disabled={isGenerating}
                           >
                             {format.label}
                           </button>
@@ -1110,6 +1104,7 @@ function ContentCreatorSimple() {
                             className={`creator-chip ${aspectRatio === ratio.id ? 'selected' : ''}`}
                             onClick={() => setAspectRatio(ratio.id)}
                             title={ratio.desc}
+                            disabled={isGenerating}
                           >
                             {ratio.label}
                           </button>
@@ -1130,6 +1125,7 @@ function ContentCreatorSimple() {
                           className={`category-tab no-template-tab ${designTemplate === 'none' ? 'active' : ''}`}
                           onClick={() => setDesignTemplate('none')}
                           title="템플릿 없이 AI 이미지와 텍스트만 사용합니다"
+                          disabled={isGenerating}
                         >
                           <span className="category-icon">🖼️</span>
                           <span className="category-name">선택 안함</span>
@@ -1147,6 +1143,7 @@ function ContentCreatorSimple() {
                               }
                             }}
                             title={category.description}
+                            disabled={isGenerating}
                           >
                             <span className="category-icon">{category.icon}</span>
                             <span className="category-name">{category.name}</span>
@@ -1165,6 +1162,7 @@ function ContentCreatorSimple() {
                               className={`creator-template-card ${designTemplate === template.id ? 'selected' : ''}`}
                               onClick={() => setDesignTemplate(template.id)}
                               title={template.description}
+                              disabled={isGenerating}
                             >
                               <span
                                 className="template-color-preview"
@@ -1279,6 +1277,7 @@ function ContentCreatorSimple() {
                             key={p.id}
                             className={`creator-chip ${selectedPlatforms.includes(p.id) ? 'selected' : ''}`}
                             onClick={() => togglePlatform(p.id)}
+                            disabled={isGenerating}
                           >
                             {p.label}
                           </button>
@@ -1297,6 +1296,7 @@ function ContentCreatorSimple() {
                             key={count}
                             className={`creator-chip ${imageCount === count ? 'selected' : ''}`}
                             onClick={() => setImageCount(count)}
+                            disabled={isGenerating}
                           >
                             {count}장
                           </button>
@@ -1309,10 +1309,10 @@ function ContentCreatorSimple() {
                   {contentType === 'shortform' && (
                     <div className="creator-option-section">
                       <label className="creator-label">이미지 업로드 *</label>
-                      <div className="creator-upload-area">
+                      <div className={`creator-upload-area ${isGenerating ? 'disabled' : ''}`}>
                         {uploadedImages.length === 0 ? (
-                          <label className="upload-label">
-                            <input type="file" accept="image/*" onChange={handleImageUpload} className="file-input" />
+                          <label className={`upload-label ${isGenerating ? 'disabled' : ''}`}>
+                            <input type="file" accept="image/*" onChange={handleImageUpload} className="file-input" disabled={isGenerating} />
                             <span className="upload-icon">📸</span>
                             <span>클릭하여 이미지 업로드</span>
                             <span className="upload-hint">PNG, JPG, WebP (최대 10MB)</span>
@@ -1320,7 +1320,7 @@ function ContentCreatorSimple() {
                         ) : (
                           <div className="uploaded-preview">
                             <img src={uploadedImages[0].preview} alt="업로드된 이미지" />
-                            <button type="button" className="btn-remove" onClick={() => setUploadedImages([])}>✕</button>
+                            <button type="button" className="btn-remove" onClick={() => setUploadedImages([])} disabled={isGenerating}>✕</button>
                           </div>
                         )}
                       </div>
@@ -1335,8 +1335,8 @@ function ContentCreatorSimple() {
                         {VIDEO_DURATION_OPTIONS.map(option => (
                           <div
                             key={option.id}
-                            className={`creator-duration-card ${videoDuration === option.id ? 'selected' : ''}`}
-                            onClick={() => setVideoDuration(option.id)}
+                            className={`creator-duration-card ${videoDuration === option.id ? 'selected' : ''} ${isGenerating ? 'disabled' : ''}`}
+                            onClick={() => !isGenerating && setVideoDuration(option.id)}
                           >
                             <span className="duration-label">{option.label}</span>
                             <span className="duration-time">{option.duration}</span>

@@ -1940,12 +1940,169 @@ class CardNewsBuilder:
                 width=max(1, thickness // 2)
             )
 
+        elif self.decoration_type == "line_accent":
+            # 하단 중앙 라인 액센트
+            line_width = int(card_width * 0.15)
+            line_x = card_x + (card_width - line_width) // 2
+            line_y = card_y + card_height + int(20 * self.scale)
+            draw.rectangle([line_x, line_y, line_x + line_width, line_y + thickness], fill=color)
+
+        elif self.decoration_type == "corner_brackets":
+            # 코너 브라켓 ([ ] 모양)
+            bracket_size = int(30 * self.scale)
+            bracket_thickness = max(2, thickness)
+            # 좌상단
+            draw.rectangle([card_x, card_y, card_x + bracket_size, card_y + bracket_thickness], fill=color)
+            draw.rectangle([card_x, card_y, card_x + bracket_thickness, card_y + bracket_size], fill=color)
+            # 우상단
+            draw.rectangle([card_x + card_width - bracket_size, card_y, card_x + card_width, card_y + bracket_thickness], fill=color)
+            draw.rectangle([card_x + card_width - bracket_thickness, card_y, card_x + card_width, card_y + bracket_size], fill=color)
+            # 좌하단
+            draw.rectangle([card_x, card_y + card_height - bracket_thickness, card_x + bracket_size, card_y + card_height], fill=color)
+            draw.rectangle([card_x, card_y + card_height - bracket_size, card_x + bracket_thickness, card_y + card_height], fill=color)
+            # 우하단
+            draw.rectangle([card_x + card_width - bracket_size, card_y + card_height - bracket_thickness, card_x + card_width, card_y + card_height], fill=color)
+            draw.rectangle([card_x + card_width - bracket_thickness, card_y + card_height - bracket_size, card_x + card_width, card_y + card_height], fill=color)
+
+        elif self.decoration_type == "rounded_border":
+            # 라운드 테두리
+            radius = int(self.corner_radius * self.scale) if self.corner_radius > 0 else int(32 * self.scale)
+            draw.rounded_rectangle(
+                [card_x, card_y, card_x + card_width, card_y + card_height],
+                radius=radius,
+                outline=color,
+                width=max(2, thickness)
+            )
+
+        elif self.decoration_type == "circle_accent":
+            # 원형 액센트 (코너에 원)
+            circle_size = int(80 * self.scale)
+            alpha_color = (*color[:3], min(color[3], 80))
+            # 우상단 원
+            draw.ellipse([card_x + card_width - circle_size, card_y - circle_size // 2,
+                         card_x + card_width + circle_size // 2, card_y + circle_size], fill=alpha_color)
+
+        elif self.decoration_type == "gradient_border":
+            # 그라데이션 테두리 (단색으로 대체)
+            radius = int(self.corner_radius * self.scale) if self.corner_radius > 0 else int(20 * self.scale)
+            draw.rounded_rectangle(
+                [card_x, card_y, card_x + card_width, card_y + card_height],
+                radius=radius,
+                outline=color,
+                width=max(2, thickness)
+            )
+
+        elif self.decoration_type == "underline":
+            # 언더라인 스타일
+            line_y = card_y + card_height + int(15 * self.scale)
+            line_width = int(card_width * 0.4)
+            line_x = card_x + (card_width - line_width) // 2
+            draw.rectangle([line_x, line_y, line_x + line_width, line_y + max(3, thickness)], fill=color)
+
+        elif self.decoration_type == "simple_frame":
+            # 심플 프레임
+            margin = int(30 * self.scale)
+            draw.rectangle([card_x - margin, card_y - margin, card_x + card_width + margin, card_y - margin + max(1, thickness)], fill=color)
+            draw.rectangle([card_x - margin, card_y + card_height + margin - max(1, thickness), card_x + card_width + margin, card_y + card_height + margin], fill=color)
+            draw.rectangle([card_x - margin, card_y - margin, card_x - margin + max(1, thickness), card_y + card_height + margin], fill=color)
+            draw.rectangle([card_x + card_width + margin - max(1, thickness), card_y - margin, card_x + card_width + margin, card_y + card_height + margin], fill=color)
+
+        elif self.decoration_type == "leaf_accent":
+            # 리프 액센트 (작은 원들로 표현)
+            alpha_color = (*color[:3], min(color[3], 60))
+            for i in range(3):
+                size = int((20 + i * 10) * self.scale)
+                offset = i * int(15 * self.scale)
+                draw.ellipse([card_x + card_width - size - offset, card_y + offset,
+                             card_x + card_width - offset, card_y + size + offset], fill=alpha_color)
+
+        elif self.decoration_type == "wave_pattern":
+            # 웨이브 패턴 (하단에 곡선 느낌)
+            alpha_color = (*color[:3], min(color[3], 40))
+            wave_y = card_y + card_height - int(50 * self.scale)
+            for i in range(5):
+                x_offset = i * int(card_width / 4)
+                draw.ellipse([card_x + x_offset, wave_y, card_x + x_offset + int(80 * self.scale), wave_y + int(40 * self.scale)], fill=alpha_color)
+
+        elif self.decoration_type == "geometric_accent":
+            # 기하학적 액센트 (삼각형과 원)
+            alpha_color = (*color[:3], min(color[3], 50))
+            # 우상단 원
+            draw.ellipse([card_x + card_width - int(60 * self.scale), card_y + int(20 * self.scale),
+                         card_x + card_width - int(20 * self.scale), card_y + int(60 * self.scale)], fill=alpha_color)
+            # 좌하단 작은 원
+            draw.ellipse([card_x + int(30 * self.scale), card_y + card_height - int(50 * self.scale),
+                         card_x + int(60 * self.scale), card_y + card_height - int(20 * self.scale)], fill=alpha_color)
+
+        elif self.decoration_type == "elegant_border":
+            # 엘레강트 보더 (이중 라인)
+            outer_thickness = max(1, thickness)
+            inner_thickness = max(1, thickness // 2)
+            # 외부 테두리
+            draw.rounded_rectangle(
+                [card_x, card_y, card_x + card_width, card_y + card_height],
+                radius=int(self.corner_radius * self.scale),
+                outline=color,
+                width=outer_thickness
+            )
+            # 내부 테두리 (간격을 두고)
+            gap = int(6 * self.scale)
+            inner_color = (*color[:3], color[3] // 2)
+            draw.rounded_rectangle(
+                [card_x + gap, card_y + gap, card_x + card_width - gap, card_y + card_height - gap],
+                radius=max(0, int(self.corner_radius * self.scale) - gap),
+                outline=inner_color,
+                width=inner_thickness
+            )
+
+        elif self.decoration_type == "metallic_line":
+            # 메탈릭 라인 (평행선)
+            line_gap = int(8 * self.scale)
+            for i in range(2):
+                y_offset = i * line_gap
+                draw.rectangle([card_x, card_y - int(20 * self.scale) - y_offset,
+                               card_x + card_width, card_y - int(18 * self.scale) - y_offset], fill=color)
+                draw.rectangle([card_x, card_y + card_height + int(18 * self.scale) + y_offset,
+                               card_x + card_width, card_y + card_height + int(20 * self.scale) + y_offset], fill=color)
+
+        elif self.decoration_type == "vintage_border":
+            # 빈티지 보더 (장식적 테두리)
+            border_thickness = max(2, thickness)
+            # 메인 테두리
+            draw.rounded_rectangle(
+                [card_x, card_y, card_x + card_width, card_y + card_height],
+                radius=int(8 * self.scale),
+                outline=color,
+                width=border_thickness
+            )
+            # 코너 장식
+            corner_size = int(15 * self.scale)
+            corners = [
+                (card_x, card_y),
+                (card_x + card_width - corner_size, card_y),
+                (card_x, card_y + card_height - corner_size),
+                (card_x + card_width - corner_size, card_y + card_height - corner_size)
+            ]
+            for cx, cy in corners:
+                draw.rectangle([cx, cy, cx + corner_size, cy + corner_size], outline=color, width=1)
+
         return Image.alpha_composite(image, decoration_layer)
 
-    def _parse_decoration_color(self, color_str) -> tuple:
-        """장식 색상 문자열을 RGBA 튜플로 변환"""
-        if not color_str:
+    def _parse_decoration_color(self, color_input) -> tuple:
+        """장식 색상을 RGBA 튜플로 변환"""
+        if not color_input:
             return (255, 255, 255, 200)
+
+        # 튜플인 경우 (템플릿에서 직접 RGB/RGBA 튜플로 정의된 경우)
+        if isinstance(color_input, (tuple, list)):
+            if len(color_input) == 3:
+                return (*color_input, 200)  # RGB -> RGBA
+            elif len(color_input) == 4:
+                return tuple(color_input)  # RGBA 그대로
+            return (255, 255, 255, 200)
+
+        # 문자열인 경우
+        color_str = str(color_input)
 
         if color_str == "accent":
             # 테마에서 액센트 색상 가져오기

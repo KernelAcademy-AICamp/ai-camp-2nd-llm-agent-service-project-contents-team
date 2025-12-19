@@ -431,31 +431,48 @@ async def sync_posts(
     ).first()
 
     if not connection:
-        raise HTTPException(status_code=404, detail="Facebook not connected")
+        raise HTTPException(status_code=404, detail="Facebook 계정이 연동되어 있지 않습니다.")
 
     if not connection.page_id:
-        raise HTTPException(status_code=400, detail="No page selected")
+        raise HTTPException(status_code=400, detail="페이지가 선택되어 있지 않습니다. 설정에서 페이지를 선택해주세요.")
+
+    if not connection.page_access_token:
+        raise HTTPException(status_code=400, detail="페이지 액세스 토큰이 없습니다. 페이지를 다시 연동해주세요.")
 
     fb_service = FacebookService(
         connection.user_access_token,
         connection.page_access_token
     )
 
-    synced_count = await sync_facebook_posts(
-        fb_service,
-        connection.page_id,
-        connection.id,
-        current_user.id,
-        db
-    )
+    try:
+        sync_result = await sync_facebook_posts(
+            fb_service,
+            connection.page_id,
+            connection.id,
+            current_user.id,
+            db
+        )
 
-    # 마지막 동기화 시간 업데이트
-    connection.last_synced_at = datetime.utcnow()
-    db.commit()
+        # 마지막 동기화 시간 업데이트
+        connection.last_synced_at = datetime.utcnow()
+        db.commit()
 
-    await fb_service.close()
+        return {
+            "message": "Posts synced successfully",
+            "synced_count": sync_result.get("new", 0),
+            "updated_count": sync_result.get("updated", 0),
+            "total_fetched": sync_result.get("total_fetched", 0),
+            "error": sync_result.get("error")
+        }
 
-    return {"message": "Posts synced successfully", "synced_count": synced_count}
+    except Exception as e:
+        logger.error(f"Facebook 동기화 실패: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"동기화 중 오류가 발생했습니다: {str(e)}")
+
+    finally:
+        await fb_service.close()
 
 
 @router.post('/posts/create')

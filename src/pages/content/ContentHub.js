@@ -135,15 +135,13 @@ function ContentHub() {
   const [previews, setPreviews] = useState(DEFAULT_PREVIEWS);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 히스토리 데이터 로드
+  // 히스토리 데이터 로드 (list API에서 미리보기 데이터 포함하여 단일 호출로 처리)
   const fetchHistory = useCallback(async () => {
     try {
       const listData = await contentSessionAPI.list(0, 5); // 최근 5개
       if (listData && listData.length > 0) {
-        // 각 아이템의 전체 데이터를 가져옴
-        const fullDataPromises = listData.map(item => contentSessionAPI.get(item.id));
-        const fullData = await Promise.all(fullDataPromises);
-        const slides = convertHistoryToSlides(fullData);
+        // list API 응답에 미리보기 데이터가 포함되어 있으므로 추가 API 호출 불필요
+        const slides = convertHistoryToSlides(listData);
         if (slides.length > 0) {
           setPreviews(slides.slice(0, 8)); // 최대 8개 슬라이드
         }

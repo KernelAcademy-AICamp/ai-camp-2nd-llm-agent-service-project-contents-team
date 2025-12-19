@@ -202,6 +202,12 @@
   color: var(--text-secondary);
 }
 
+.creator-type-card.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
 .recommended-badge,
 .new-badge {
   position: absolute;
@@ -260,6 +266,11 @@
 
 .creator-textarea::placeholder {
   color: var(--text-tertiary);
+}
+
+.creator-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .creator-generate-btn {
@@ -364,6 +375,12 @@
   transform: translateY(-1px);
 }
 
+.quick-chip:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
 /* ==========================================
    옵션 섹션 (스타일, 플랫폼 등)
    ========================================== */
@@ -406,6 +423,12 @@
   font-weight: 600;
 }
 
+.creator-chip:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
 /* ==========================================
    디자인 템플릿 선택 (카테고리 탭 + 가로 스크롤)
    ========================================== */
@@ -445,6 +468,12 @@
   color: var(--primary-color);
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(102, 51, 153, 0.15);
+}
+
+.category-tab:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
 }
 
 .category-icon {
@@ -515,6 +544,12 @@
   border-color: var(--primary-color);
   background: #E6E6FA;
   box-shadow: 0 4px 16px rgba(102, 51, 153, 0.15);
+}
+
+.creator-template-card:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
 }
 
 .template-color-preview {
@@ -922,6 +957,12 @@
   color: var(--text-primary);
 }
 
+.creator-duration-card.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
 .duration-info {
   font-size: 11px;
   color: var(--text-tertiary);
@@ -955,6 +996,16 @@
   cursor: pointer;
   gap: var(--space-sm);
   color: var(--text-secondary);
+}
+
+.upload-label.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.creator-upload-area.disabled {
+  opacity: 0.5;
 }
 
 .file-input {

@@ -67,7 +67,7 @@ class ContentSessionSaveRequest(BaseModel):
     # 사용자 입력값
     topic: str
     content_type: str  # text, image, both
-    style: str  # casual, professional, friendly, etc.
+    style: Optional[str] = None  # casual, professional, friendly, etc.
     selected_platforms: List[str]  # ["blog", "sns", "x", "threads"]
 
     # 플랫폼별 콘텐츠 (선택한 플랫폼만)
@@ -89,27 +89,28 @@ class ContentSessionSaveRequest(BaseModel):
 
 
 class ContentSessionListResponse(BaseModel):
-    """콘텐츠 생성 세션 목록 응답 (경량화 - 이미지 제외)"""
+    """콘텐츠 생성 세션 목록 응답 (미리보기용 콘텐츠 포함)"""
     id: int
     user_id: int
     topic: str
     content_type: str
-    style: str
+    style: Optional[str] = None
     selected_platforms: List[str]
     generation_attempts: int
     status: str
     created_at: str
     requested_image_count: int = 0
 
-    # 플랫폼별 콘텐츠 존재 여부만 (상세 내용 제외)
+    # 플랫폼별 콘텐츠 (미리보기용 content_preview 포함)
     blog: Optional[Dict[str, Any]] = None
     sns: Optional[Dict[str, Any]] = None
     x: Optional[Dict[str, Any]] = None
     threads: Optional[Dict[str, Any]] = None
     cardnews: Optional[Dict[str, Any]] = None  # 카드뉴스
 
-    # 이미지 갯수만
+    # 이미지 (첫 번째 이미지 URL 포함)
     image_count: int = 0
+    images: Optional[List[Dict[str, Any]]] = None
 
     class Config:
         from_attributes = True
@@ -121,7 +122,7 @@ class ContentSessionResponse(BaseModel):
     user_id: int
     topic: str
     content_type: str
-    style: str
+    style: Optional[str] = None
     selected_platforms: List[str]
     analysis_data: Optional[Dict[str, Any]]
     critique_data: Optional[Dict[str, Any]]
@@ -256,7 +257,7 @@ async def list_content_sessions(
         func.count(GeneratedImage.id).label('image_count')
     ).group_by(GeneratedImage.session_id).subquery()
 
-    # 세션 + 이미지 갯수를 한 번에 조회
+    # 세션 + 이미지 갯수를 한 번에 조회 (이미지도 함께 로드)
     results = db.query(
         ContentGenerationSession,
         func.coalesce(image_count_subq.c.image_count, 0).label('image_count')
@@ -268,7 +269,8 @@ async def list_content_sessions(
         selectinload(ContentGenerationSession.sns_content),
         selectinload(ContentGenerationSession.x_content),
         selectinload(ContentGenerationSession.threads_content),
-        selectinload(ContentGenerationSession.cardnews_content)
+        selectinload(ContentGenerationSession.cardnews_content),
+        selectinload(ContentGenerationSession.images)  # 이미지도 로드
     ).filter(
         ContentGenerationSession.user_id == current_user.id
     ).order_by(
@@ -332,7 +334,7 @@ async def delete_content_session(
 
 
 def _build_session_list_response(session: ContentGenerationSession, image_count: int) -> ContentSessionListResponse:
-    """목록용 세션 응답 객체 생성 (경량화 - 이미지 갯수는 서브쿼리로 전달받음)"""
+    """목록용 세션 응답 객체 생성 (미리보기용 콘텐츠 포함)"""
     return ContentSessionListResponse(
         id=session.id,
         user_id=session.user_id,
@@ -344,17 +346,38 @@ def _build_session_list_response(session: ContentGenerationSession, image_count:
         status=session.status,
         created_at=session.created_at.isoformat(),
         requested_image_count=session.requested_image_count or 0,
-        blog={"id": session.blog_content.id, "title": session.blog_content.title} if session.blog_content else None,
-        sns={"id": session.sns_content.id} if session.sns_content else None,
-        x={"id": session.x_content.id} if session.x_content else None,
-        threads={"id": session.threads_content.id} if session.threads_content else None,
+        blog={
+            "id": session.blog_content.id,
+            "title": session.blog_content.title,
+            "content": session.blog_content.content[:200] if session.blog_content.content else "",
+            "tags": session.blog_content.tags
+        } if session.blog_content else None,
+        sns={
+            "id": session.sns_content.id,
+            "content": session.sns_content.content[:200] if session.sns_content.content else "",
+            "hashtags": session.sns_content.hashtags
+        } if session.sns_content else None,
+        x={
+            "id": session.x_content.id,
+            "content": session.x_content.content[:200] if session.x_content.content else "",
+            "hashtags": session.x_content.hashtags
+        } if session.x_content else None,
+        threads={
+            "id": session.threads_content.id,
+            "content": session.threads_content.content[:200] if session.threads_content.content else "",
+            "hashtags": session.threads_content.hashtags
+        } if session.threads_content else None,
         cardnews={
             "id": session.cardnews_content.id,
             "title": session.cardnews_content.title,
             "page_count": session.cardnews_content.page_count,
             "purpose": session.cardnews_content.purpose
         } if session.cardnews_content else None,
-        image_count=image_count
+        image_count=image_count,
+        images=[
+            {"id": img.id, "image_url": img.image_url}
+            for img in (session.images[:3] if session.images else [])  # 최대 3개만
+        ] if session.images else None
     )
 
 

@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from .routers import auth, oauth, image, generated_videos, cardnews, onboarding, ai_recommendations, user, chat, brand_analysis, ai_video_generation, ai_content, published_content, dashboard, credits, templates
 from .routers.sns import blog, youtube, facebook, instagram, x, threads, tiktok, wordpress
 from .database import engine, Base
+from .scheduler import start_scheduler, stop_scheduler
 
 
 # 루트 .env 파일 먼저 로드 (프로젝트 루트) - 라우터 import 전에 로드 필수!
@@ -182,3 +183,16 @@ def health_check():
     헬스 체크 엔드포인트
     """
     return {"status": "healthy"}
+
+
+# 앱 시작/종료 이벤트
+@app.on_event("startup")
+async def startup_event():
+    """앱 시작 시 스케줄러 시작"""
+    start_scheduler()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """앱 종료 시 스케줄러 정지"""
+    stop_scheduler()

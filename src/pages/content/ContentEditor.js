@@ -147,8 +147,17 @@ function ContentEditor() {
 
       if (isCardnewsOnly && hasImages && !isCardnewsSaved && !cardnewsContentId) {
         try {
-          // 이미지 URL 추출
-          const imageUrls = result.images.map(img => img.url || img.image_url);
+          // 이미지 URL 추출 (base64인 경우 건너뛰기 - 나중에 발행 시 업로드)
+          const imageUrls = result.images
+            .map(img => img.url || img.image_url)
+            .filter(url => url && !url.startsWith('data:')); // base64 제외
+
+          // base64 이미지만 있는 경우 저장하지 않음 (발행 시 처리)
+          if (imageUrls.length === 0) {
+            console.log('카드뉴스 이미지가 base64 형식입니다. 발행 시 업로드됩니다.');
+            setIsCardnewsSaved(true); // 재시도 방지
+            return;
+          }
 
           // 카드뉴스를 PublishedContent에 draft로 저장
           const savedContent = await publishedContentAPI.saveDraft({
@@ -165,6 +174,7 @@ function ContentEditor() {
           console.log('카드뉴스가 콘텐츠 관리에 등록되었습니다:', savedContent.id);
         } catch (error) {
           console.error('카드뉴스 저장 실패:', error);
+          setIsCardnewsSaved(true); // 재시도 방지
         }
       }
     };
@@ -390,6 +400,11 @@ function ContentEditor() {
         ...prev,
         [platform]: { success: true, message: '발행 완료!' },
       }));
+
+      // 발행 성공 시 콘텐츠 관리 > 발행됨 탭으로 이동
+      setTimeout(() => {
+        navigate('/contents?status=published');
+      }, 1000);
     } catch (error) {
       setPublishResults(prev => ({
         ...prev,
@@ -524,11 +539,14 @@ function ContentEditor() {
         }
       }
 
-      // 발행 성공 - 알림 표시 후 팝업 닫기
+      // 발행 성공 - 알림 표시 후 콘텐츠 관리 > 발행됨 탭으로 이동
       alert(`${platformName}에 카드뉴스가 발행되었습니다!`);
       setShowCardnewsPublishModal(false);
       setCardnewsCaption('');
       setSelectedPublishPlatform('instagram');
+
+      // 콘텐츠 관리 > 발행됨 탭으로 이동
+      navigate('/contents?status=published');
 
     } catch (error) {
       console.error('카드뉴스 발행 실패:', error);

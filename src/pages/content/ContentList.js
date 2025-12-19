@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FiEdit3, FiCopy, FiTrash2, FiCalendar, FiX } from 'react-icons/fi';
 import { publishedContentAPI } from '../../services/api';
 import './ContentList.css';
@@ -46,7 +46,14 @@ const formatDateTime = (dateString) => {
 
 function ContentList() {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [filter, setFilter] = useState(() => {
+    // URL 파라미터에서 초기 필터 값 가져오기
+    const statusParam = searchParams.get('status');
+    return statusParam && ['draft', 'scheduled', 'published'].includes(statusParam)
+      ? statusParam
+      : 'all';
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [contents, setContents] = useState([]);
   const [stats, setStats] = useState({ total: 0, draft: 0, scheduled: 0, published: 0 });
@@ -58,6 +65,17 @@ function ContentList() {
     { id: 'scheduled', label: '예약됨' },
     { id: 'published', label: '발행됨' },
   ];
+
+  // 필터 변경 시 URL 파라미터 업데이트
+  const handleFilterChange = (newFilter) => {
+    setFilter(newFilter);
+    if (newFilter === 'all') {
+      searchParams.delete('status');
+    } else {
+      searchParams.set('status', newFilter);
+    }
+    setSearchParams(searchParams);
+  };
 
   // 데이터 로드
   const fetchContents = useCallback(async () => {
@@ -224,7 +242,7 @@ function ContentList() {
           <button
             key={option.id}
             className={`tab-btn ${filter === option.id ? 'active' : ''}`}
-            onClick={() => setFilter(option.id)}
+            onClick={() => handleFilterChange(option.id)}
           >
             {option.label}{' '}
             <span className="tab-count">

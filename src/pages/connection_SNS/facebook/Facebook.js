@@ -154,13 +154,26 @@ function Facebook() {
   // 게시물 동기화
   const handleSync = async () => {
     setSyncing(true);
+    setError(null);
     try {
       const result = await facebookAPI.syncPosts();
-      alert(`동기화 완료! ${result.synced_count}개의 새 게시물을 가져왔습니다.`);
+      const { synced_count, updated_count, total_fetched, error: apiError } = result;
+
+      if (apiError) {
+        // Facebook API에서 반환한 구체적인 에러 메시지
+        setError(apiError);
+        alert(`동기화 실패: ${apiError}`);
+      } else if (total_fetched === 0) {
+        alert('페이지에 게시물이 없거나 가져올 수 없습니다.');
+      } else {
+        alert(`동기화 완료!\n- 가져온 게시물: ${total_fetched}개\n- 새 게시물: ${synced_count}개\n- 업데이트: ${updated_count}개`);
+      }
       fetchPosts();
       fetchStatus();
     } catch (err) {
-      setError('동기화에 실패했습니다.');
+      console.error('Facebook 동기화 실패:', err);
+      const errorMessage = err.response?.data?.detail || '동기화에 실패했습니다.';
+      setError(errorMessage);
     } finally {
       setSyncing(false);
     }

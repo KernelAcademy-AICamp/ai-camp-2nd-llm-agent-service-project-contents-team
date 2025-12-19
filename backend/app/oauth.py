@@ -67,6 +67,7 @@ oauth.register(
             'public_profile',
             'pages_show_list',              # 페이지 목록 조회
             'pages_read_engagement',        # 페이지 인사이트 읽기
+            'pages_read_user_content',      # 페이지 게시물 읽기
             'pages_manage_posts',           # 페이지 게시물 관리 (발행용)
         ]),
     }

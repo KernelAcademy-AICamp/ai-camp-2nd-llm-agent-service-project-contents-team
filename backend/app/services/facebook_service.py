@@ -174,22 +174,50 @@ class FacebookService:
         self,
         page_id: str,
         limit: int = 25
-    ) -> Optional[List[Dict]]:
-        """페이지 게시물 목록 조회"""
-        result = await self._make_request(
-            'GET',
-            f'{page_id}/posts',
-            params={
-                'fields': 'id,message,story,full_picture,permalink_url,created_time,'
-                         'type,is_published,is_hidden,'
-                         'likes.summary(true),comments.summary(true),shares',
-                'limit': limit
-            },
-            use_page_token=True
-        )
-        if result and 'data' in result:
-            return result['data']
-        return None
+    ) -> dict:
+        """페이지 게시물 목록 조회
+
+        Returns:
+            dict: {"data": [...], "error": None} 또는 {"data": None, "error": "에러메시지"}
+        """
+        # posts 엔드포인트 사용 (페이지가 직접 작성한 게시물만)
+        logger.info(f"Fetching posts for page {page_id} with page_token: {self.page_access_token[:20] if self.page_access_token else 'None'}...")
+
+        url = f"{GRAPH_API_BASE_URL}/{page_id}/posts"
+        params = {
+            'fields': 'id,message,full_picture,permalink_url,created_time,shares,reactions.summary(total_count),comments.summary(total_count)',
+            'limit': limit,
+            'access_token': self.page_access_token
+        }
+
+        try:
+            response = await self.client.get(url, params=params)
+
+            if response.status_code == 200:
+                result = response.json()
+                logger.info(f"Facebook get_page_posts result: {len(result.get('data', [])) if result else 0} posts")
+                return {"data": result.get('data', []), "error": None}
+            else:
+                error_data = response.json() if response.text else {}
+                error_message = error_data.get('error', {}).get('message', response.text)
+                error_code = error_data.get('error', {}).get('code', 'unknown')
+                error_type = error_data.get('error', {}).get('type', 'unknown')
+
+                logger.error(f"Facebook API error: {response.status_code} - Code: {error_code} - Type: {error_type} - {error_message}")
+
+                # 사용자 친화적 에러 메시지
+                if error_code == 190:  # 토큰 만료
+                    return {"data": None, "error": "액세스 토큰이 만료되었습니다. Facebook을 다시 연동해주세요."}
+                elif error_code == 200:  # 권한 없음
+                    return {"data": None, "error": f"페이지 게시물 읽기 권한이 없습니다. ({error_message})"}
+                elif error_code == 10 or error_type == 'OAuthException':
+                    return {"data": None, "error": f"Facebook 앱 권한 문제: {error_message}"}
+                else:
+                    return {"data": None, "error": f"Facebook API 오류: {error_message}"}
+
+        except Exception as e:
+            logger.error(f"Facebook API request failed: {e}")
+            return {"data": None, "error": f"요청 실패: {str(e)}"}
 
     async def get_post_details(self, post_id: str) -> Optional[Dict]:
         """게시물 상세 정보 조회"""
@@ -389,26 +417,40 @@ async def sync_facebook_posts(
     connection_id: int,
     user_id: int,
     db
-) -> int:
+) -> dict:
     """Facebook 페이지 게시물 동기화"""
     from .. import models
 
-    posts = await service.get_page_posts(page_id, limit=50)
-    if not posts:
-        return 0
+    result = await service.get_page_posts(page_id, limit=50)
 
-    synced_count = 0
+    # 에러가 있으면 에러 정보 반환
+    if result.get("error"):
+        logger.warning(f"Facebook API error for page {page_id}: {result['error']}")
+        return {"new": 0, "updated": 0, "total_fetched": 0, "error": result["error"]}
+
+    posts = result.get("data", [])
+
+    if not posts:
+        logger.warning(f"No posts returned from Facebook API for page {page_id}")
+        return {"new": 0, "updated": 0, "total_fetched": 0, "error": None}
+
+    logger.info(f"Facebook API returned {len(posts)} posts for page {page_id}")
+
+    new_count = 0
+    updated_count = 0
 
     for post_data in posts:
         post_id = post_data.get('id')
+        if not post_id:
+            continue
 
         # 기존 게시물 확인
         existing = db.query(models.FacebookPost).filter(
             models.FacebookPost.post_id == post_id
         ).first()
 
-        # 통계 추출
-        likes_count = post_data.get('likes', {}).get('summary', {}).get('total_count', 0)
+        # 통계 추출 (reactions로 변경됨)
+        likes_count = post_data.get('reactions', {}).get('summary', {}).get('total_count', 0)
         comments_count = post_data.get('comments', {}).get('summary', {}).get('total_count', 0)
         shares_count = post_data.get('shares', {}).get('count', 0) if post_data.get('shares') else 0
 
@@ -434,6 +476,7 @@ async def sync_facebook_posts(
             existing.is_published = post_data.get('is_published', True)
             existing.is_hidden = post_data.get('is_hidden', False)
             existing.last_stats_updated_at = datetime.utcnow()
+            updated_count += 1
         else:
             # 새로 생성
             new_post = models.FacebookPost(
@@ -454,7 +497,8 @@ async def sync_facebook_posts(
                 last_stats_updated_at=datetime.utcnow()
             )
             db.add(new_post)
-            synced_count += 1
+            new_count += 1
 
     db.commit()
-    return synced_count
+    logger.info(f"Facebook sync complete: {new_count} new, {updated_count} updated")
+    return {"new": new_count, "updated": updated_count, "total_fetched": len(posts), "error": None}
