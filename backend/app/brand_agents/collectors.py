@@ -10,7 +10,6 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 from datetime import datetime
 
-from ..services.naver_blog_service import NaverBlogService
 from ..services.youtube_service import YouTubeService
 from ..services.instagram_service import InstagramService
 from ..services.threads_service import ThreadsService
@@ -38,53 +37,6 @@ class PlatformCollectorAgent(ABC):
             수집된 원시 데이터 리스트
         """
         pass
-
-
-class BlogCollectorAgent(PlatformCollectorAgent):
-    """네이버 블로그 Collector Agent"""
-
-    def __init__(self):
-        self.blog_service = NaverBlogService()
-
-    async def collect(self, url: str, max_items: int = 10) -> List[Dict[str, Any]]:
-        """
-        네이버 블로그 포스트 수집
-
-        Args:
-            url: 블로그 URL
-            max_items: 최대 포스트 수
-
-        Returns:
-            블로그 포스트 리스트
-            [
-                {
-                    'title': str,
-                    'content': str,
-                    'date': str,
-                    'link': str,
-                    'platform': 'naver_blog'
-                },
-                ...
-            ]
-        """
-        try:
-            logger.info(f"📚 [Blog Collector] 블로그 수집 시작: {url}")
-            posts = await self.blog_service.collect_blog_posts(url, max_items)
-
-            if not posts:
-                logger.warning(f"⚠️ [Blog Collector] 수집된 포스트가 없습니다")
-                return []
-
-            # platform 필드 추가
-            for post in posts:
-                post['platform'] = 'naver_blog'
-
-            logger.info(f"✅ [Blog Collector] {len(posts)}개 포스트 수집 완료")
-            return posts
-
-        except Exception as e:
-            logger.error(f"❌ [Blog Collector] 수집 실패: {e}")
-            return []
 
 
 class InstagramCollectorAgent(PlatformCollectorAgent):
