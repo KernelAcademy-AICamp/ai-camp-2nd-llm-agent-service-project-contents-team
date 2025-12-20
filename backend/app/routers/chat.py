@@ -109,13 +109,81 @@ def build_user_context(user: models.User, db: Session) -> str:
     except Exception as e:
         logger.warning(f"사용자 활동 통계 조회 실패: {e}")
 
-    # 브랜드 분석 정보
+    # 브랜드 분석 정보 (brand_profile_json 우선 사용)
     try:
         brand_analysis = db.query(models.BrandAnalysis).filter(
             models.BrandAnalysis.user_id == user.id
         ).first()
 
-        if brand_analysis:
+        if brand_analysis and brand_analysis.brand_profile_json:
+            # brand_profile_json 사용 (풍부한 정보)
+            profile = brand_analysis.brand_profile_json
+            context_parts.append("\n### 브랜드 프로필 (AI 분석)")
+
+            # Identity
+            identity = profile.get('identity', {})
+            if identity.get('brand_personality'):
+                context_parts.append(f"- **브랜드 성격**: {identity['brand_personality']}")
+            if identity.get('brand_values'):
+                values = ', '.join(identity['brand_values']) if isinstance(identity['brand_values'], list) else identity['brand_values']
+                context_parts.append(f"- **브랜드 가치**: {values}")
+            if identity.get('emotional_tone'):
+                context_parts.append(f"- **감정적 톤**: {identity['emotional_tone']}")
+
+            # Tone of Voice (수치화된 정보 추가)
+            tone = profile.get('tone_of_voice', {})
+            if tone.get('formality') is not None or tone.get('warmth') is not None:
+                tone_desc = []
+                if tone.get('formality') is not None:
+                    tone_desc.append(f"격식도 {tone['formality']}/100")
+                if tone.get('warmth') is not None:
+                    tone_desc.append(f"따뜻함 {tone['warmth']}/100")
+                if tone.get('enthusiasm') is not None:
+                    tone_desc.append(f"열정 {tone['enthusiasm']}/100")
+                context_parts.append(f"- **톤 특성**: {', '.join(tone_desc)}")
+
+            if tone.get('sentence_style'):
+                context_parts.append(f"- **문장 스타일**: {tone['sentence_style']}")
+
+            if tone.get('signature_phrases'):
+                phrases = ', '.join(tone['signature_phrases'][:3]) if isinstance(tone['signature_phrases'], list) else tone['signature_phrases']
+                context_parts.append(f"- **시그니처 표현**: {phrases}")
+
+            # Content Strategy
+            strategy = profile.get('content_strategy', {})
+            if strategy.get('primary_topics'):
+                topics = ', '.join(strategy['primary_topics']) if isinstance(strategy['primary_topics'], list) else strategy['primary_topics']
+                context_parts.append(f"- **주요 주제**: {topics}")
+            if strategy.get('call_to_action_style'):
+                context_parts.append(f"- **행동 유도 방식**: {strategy['call_to_action_style']}")
+
+            # Visual Style
+            visual = profile.get('visual_style', {})
+            if visual.get('image_style'):
+                context_parts.append(f"- **이미지 스타일**: {visual['image_style']}")
+            if visual.get('color_palette'):
+                colors = ', '.join(visual['color_palette'][:5]) if isinstance(visual['color_palette'], list) else visual['color_palette']
+                context_parts.append(f"- **컬러 팔레트**: {colors}")
+
+            # 분석 출처 및 신뢰도
+            source_map = {
+                'analyzed_from_sns': 'SNS 분석',
+                'analyzed_from_samples': '샘플 분석',
+                'inferred_from_business_info': '비즈니스 정보 추론',
+                'user_edited': '사용자 수정'
+            }
+            source = source_map.get(brand_analysis.profile_source, brand_analysis.profile_source)
+            confidence = brand_analysis.profile_confidence or 'medium'
+            context_parts.append(f"- **데이터 출처**: {source} (신뢰도: {confidence})")
+
+            # 분석된 플랫폼
+            if profile.get('analyzed_platforms'):
+                platforms_kr = {'instagram': '인스타그램', 'youtube': '유튜브', 'threads': 'Threads'}
+                platforms = [platforms_kr.get(p, p) for p in profile['analyzed_platforms']]
+                context_parts.append(f"- **분석 플랫폼**: {', '.join(platforms)}")
+
+        elif brand_analysis:
+            # Fallback: 개별 필드 사용 (기존 로직)
             context_parts.append("\n### 브랜드 분석 정보")
             if brand_analysis.brand_tone:
                 context_parts.append(f"- **브랜드 톤앤매너**: {brand_analysis.brand_tone}")
@@ -124,17 +192,6 @@ def build_user_context(user: models.User, db: Session) -> str:
             if brand_analysis.emotional_tone:
                 context_parts.append(f"- **감정적 톤**: {brand_analysis.emotional_tone}")
 
-            # 플랫폼별 분석 상태
-            platforms = []
-            if brand_analysis.blog_analysis_status == "completed":
-                platforms.append("블로그")
-            if brand_analysis.instagram_analysis_status == "completed":
-                platforms.append("인스타그램")
-            if brand_analysis.youtube_analysis_status == "completed":
-                platforms.append("유튜브")
-
-            if platforms:
-                context_parts.append(f"- **분석 완료 플랫폼**: {', '.join(platforms)}")
     except Exception as e:
         logger.warning(f"브랜드 분석 정보 조회 실패: {e}")
 

@@ -46,7 +46,8 @@ async def get_user_profile(
 ):
     """
     현재 로그인한 사용자의 프로필 정보 조회
-    - 사용자 기본 정보 (이메일, 이름, 브랜드명, 비즈니스 정보 등)
+    - 사용자 기본 정보 (이메일, 이름 등)
+    - 브랜드 정보 (brand_profile_json에서 가져옴)
     - 사용자 선호도 정보 (텍스트/이미지/비디오 스타일 샘플)
     """
     # 사용자 선호도 조회
@@ -54,9 +55,15 @@ async def get_user_profile(
         models.UserPreference.user_id == current_user.id
     ).first()
 
+    # 브랜드 분석 결과 조회
+    brand_analysis = db.query(models.BrandAnalysis).filter(
+        models.BrandAnalysis.user_id == current_user.id
+    ).first()
+
     return schemas.UserProfile(
         user=current_user,
-        preferences=user_preference
+        preferences=user_preference,
+        brand_analysis=brand_analysis
     )
 
 
@@ -111,21 +118,67 @@ async def update_user_profile(
 ):
     """
     사용자 프로필 정보 수정
-    - 비즈니스 정보 (brand_name, business_type, business_description)
-    - 타겟 고객 (target_audience)
+    - 브랜드 정보 (brand_profile_json.identity 업데이트)
     - 스타일 선호도 (preferences)
-    """
-    # 비즈니스 정보 업데이트
-    if update_data.brand_name is not None:
-        current_user.brand_name = update_data.brand_name
-    if update_data.business_type is not None:
-        current_user.business_type = update_data.business_type
-    if update_data.business_description is not None:
-        current_user.business_description = update_data.business_description
 
-    # 타겟 고객 업데이트
-    if update_data.target_audience is not None:
-        current_user.target_audience = update_data.target_audience
+    브랜드 정보는 brand_profile_json.identity에 저장되며,
+    User 테이블 필드는 Fallback용으로 유지됩니다.
+    """
+    # 브랜드 분석 조회 또는 생성
+    brand_analysis = db.query(models.BrandAnalysis).filter(
+        models.BrandAnalysis.user_id == current_user.id
+    ).first()
+
+    # 브랜드 정보 업데이트 (brand_profile_json.identity)
+    if any([update_data.brand_name, update_data.business_type,
+            update_data.business_description, update_data.target_audience]):
+
+        if not brand_analysis:
+            # BrandAnalysis가 없으면 생성
+            brand_analysis = models.BrandAnalysis(
+                user_id=current_user.id,
+                brand_profile_json={},
+                profile_source="user_edited",
+                profile_confidence="low"
+            )
+            db.add(brand_analysis)
+
+        # brand_profile_json 초기화 (없으면)
+        if not brand_analysis.brand_profile_json:
+            brand_analysis.brand_profile_json = {
+                "identity": {},
+                "tone_of_voice": {},
+                "content_strategy": {},
+                "visual_style": {},
+                "generation_prompts": {}
+            }
+
+        # identity 업데이트
+        identity = brand_analysis.brand_profile_json.get("identity", {})
+
+        if update_data.brand_name is not None:
+            identity["brand_name"] = update_data.brand_name
+            current_user.brand_name = update_data.brand_name  # Fallback용
+
+        if update_data.business_type is not None:
+            identity["business_type"] = update_data.business_type
+            current_user.business_type = update_data.business_type  # Fallback용
+
+        if update_data.business_description is not None:
+            current_user.business_description = update_data.business_description
+
+        if update_data.target_audience is not None:
+            # target_audience를 문자열로 변환
+            if isinstance(update_data.target_audience, dict):
+                # Dict를 간단한 문자열로 변환
+                target_str = f"{update_data.target_audience.get('age_range', '')} {update_data.target_audience.get('gender', '')}".strip()
+                identity["target_audience"] = target_str if target_str else str(update_data.target_audience)
+            else:
+                identity["target_audience"] = str(update_data.target_audience)
+            current_user.target_audience = update_data.target_audience  # Fallback용 (JSON)
+
+        brand_analysis.brand_profile_json["identity"] = identity
+        brand_analysis.profile_source = "user_edited"
 
     # 스타일 선호도 업데이트
     if update_data.preferences is not None:
@@ -150,6 +203,8 @@ async def update_user_profile(
 
     db.commit()
     db.refresh(current_user)
+    if brand_analysis:
+        db.refresh(brand_analysis)
 
     # 업데이트된 프로필 반환
     user_preference = db.query(models.UserPreference).filter(
@@ -158,5 +213,6 @@ async def update_user_profile(
 
     return schemas.UserProfile(
         user=current_user,
-        preferences=user_preference
+        preferences=user_preference,
+        brand_analysis=brand_analysis
     )

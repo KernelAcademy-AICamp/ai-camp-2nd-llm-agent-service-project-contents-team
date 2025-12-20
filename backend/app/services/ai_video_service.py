@@ -371,28 +371,94 @@ class MasterPlanningAgent:
         brand_analysis: Optional[BrandAnalysis],
         visual_features: Optional[Dict[str, Any]] = None
     ) -> str:
-        """브랜드 분석 데이터 및 제품 비주얼 특징을 컨텍스트로 준비"""
+        """브랜드 분석 데이터 및 제품 비주얼 특징을 컨텍스트로 준비 (brand_profile_json 우선 사용)"""
         context_parts = []
 
-        # 사용자 기본 정보
-        if user.brand_name:
-            context_parts.append(f"브랜드명: {user.brand_name}")
-        if user.business_type:
-            context_parts.append(f"업종: {user.business_type}")
-        if user.business_description:
-            context_parts.append(f"비즈니스 설명: {user.business_description}")
+        # brand_profile_json 우선 사용
+        if brand_analysis and brand_analysis.brand_profile_json:
+            profile = brand_analysis.brand_profile_json
 
-        # 브랜드 분석 정보
-        if brand_analysis:
-            if brand_analysis.brand_tone:
-                context_parts.append(f"브랜드 톤앤매너: {brand_analysis.brand_tone}")
-            if brand_analysis.target_audience:
-                context_parts.append(f"타겟 고객: {brand_analysis.target_audience}")
-            if brand_analysis.emotional_tone:
-                context_parts.append(f"감정적 톤: {brand_analysis.emotional_tone}")
-            if brand_analysis.brand_values:
-                values = ", ".join(brand_analysis.brand_values) if isinstance(brand_analysis.brand_values, list) else brand_analysis.brand_values
+            # Identity
+            identity = profile.get('identity', {})
+            if identity.get('brand_name'):
+                context_parts.append(f"브랜드명: {identity['brand_name']}")
+            elif user.brand_name:
+                context_parts.append(f"브랜드명: {user.brand_name}")
+
+            if identity.get('business_type'):
+                context_parts.append(f"업종: {identity['business_type']}")
+            elif user.business_type:
+                context_parts.append(f"업종: {user.business_type}")
+
+            if user.business_description:
+                context_parts.append(f"비즈니스 설명: {user.business_description}")
+
+            if identity.get('brand_personality'):
+                context_parts.append(f"브랜드 성격: {identity['brand_personality']}")
+            if identity.get('target_audience'):
+                context_parts.append(f"타겟 고객: {identity['target_audience']}")
+            if identity.get('emotional_tone'):
+                context_parts.append(f"감정적 톤: {identity['emotional_tone']}")
+            if identity.get('brand_values'):
+                values = ", ".join(identity['brand_values']) if isinstance(identity['brand_values'], list) else identity['brand_values']
                 context_parts.append(f"브랜드 가치: {values}")
+
+            # Tone of Voice (수치화된 정보 활용)
+            tone = profile.get('tone_of_voice', {})
+            if tone.get('formality') is not None:
+                context_parts.append(f"격식도: {tone['formality']}/100 (0=매우 캐주얼, 100=매우 격식있는)")
+            if tone.get('warmth') is not None:
+                context_parts.append(f"따뜻함: {tone['warmth']}/100 (0=차가운, 100=매우 따뜻한)")
+            if tone.get('enthusiasm') is not None:
+                context_parts.append(f"열정도: {tone['enthusiasm']}/100 (0=차분한, 100=열정적인)")
+            if tone.get('sentence_style'):
+                context_parts.append(f"문장 스타일: {tone['sentence_style']}")
+            if tone.get('signature_phrases'):
+                phrases = ", ".join(tone['signature_phrases']) if isinstance(tone['signature_phrases'], list) else tone['signature_phrases']
+                context_parts.append(f"시그니처 표현: {phrases}")
+
+            # Content Strategy
+            strategy = profile.get('content_strategy', {})
+            if strategy.get('primary_topics'):
+                topics = ", ".join(strategy['primary_topics']) if isinstance(strategy['primary_topics'], list) else strategy['primary_topics']
+                context_parts.append(f"주요 주제: {topics}")
+            if strategy.get('content_structure'):
+                context_parts.append(f"콘텐츠 구조: {strategy['content_structure']}")
+            if strategy.get('call_to_action_style'):
+                context_parts.append(f"행동 유도 방식: {strategy['call_to_action_style']}")
+
+            # Visual Style (영상/이미지 생성에 중요!)
+            visual = profile.get('visual_style', {})
+            if visual.get('color_palette'):
+                colors = ", ".join(visual['color_palette']) if isinstance(visual['color_palette'], list) else visual['color_palette']
+                context_parts.append(f"브랜드 컬러 팔레트: {colors}")
+            if visual.get('image_style'):
+                context_parts.append(f"이미지 스타일: {visual['image_style']}")
+            if visual.get('composition_style'):
+                context_parts.append(f"구도 스타일: {visual['composition_style']}")
+            if visual.get('filter_preference'):
+                context_parts.append(f"필터 선호도: {visual['filter_preference']}")
+
+        else:
+            # Fallback: User 테이블 및 개별 필드 사용
+            if user.brand_name:
+                context_parts.append(f"브랜드명: {user.brand_name}")
+            if user.business_type:
+                context_parts.append(f"업종: {user.business_type}")
+            if user.business_description:
+                context_parts.append(f"비즈니스 설명: {user.business_description}")
+
+            # 브랜드 분석 정보 (개별 필드)
+            if brand_analysis:
+                if brand_analysis.brand_tone:
+                    context_parts.append(f"브랜드 톤앤매너: {brand_analysis.brand_tone}")
+                if brand_analysis.target_audience:
+                    context_parts.append(f"타겟 고객: {brand_analysis.target_audience}")
+                if brand_analysis.emotional_tone:
+                    context_parts.append(f"감정적 톤: {brand_analysis.emotional_tone}")
+                if brand_analysis.brand_values:
+                    values = ", ".join(brand_analysis.brand_values) if isinstance(brand_analysis.brand_values, list) else brand_analysis.brand_values
+                    context_parts.append(f"브랜드 가치: {values}")
 
         # 제품 비주얼 특징 (이미지 분석 결과)
         if visual_features:

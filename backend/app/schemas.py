@@ -87,6 +87,7 @@ class UserProfile(BaseModel):
     """사용자 프로필 전체 응답 스키마 (마이페이지용)"""
     user: User
     preferences: Optional[UserPreference] = None
+    brand_analysis: Optional["BrandAnalysis"] = None  # brand_profile_json 포함
 
     class Config:
         from_attributes = True
@@ -95,7 +96,12 @@ class UserProfile(BaseModel):
 # 브랜드 분석 스키마
 class BrandAnalysisBase(BaseModel):
     """브랜드 분석 기본 스키마"""
-    # 전반적 브랜드 요소
+    # 통합 브랜드 프로필 (JSON)
+    brand_profile_json: Optional[Dict[str, Any]] = None  # BrandProfile 전체 객체
+    profile_source: Optional[str] = None  # inferred_from_business_info, analyzed_from_sns, user_edited
+    profile_confidence: Optional[str] = None  # low, medium, high
+
+    # 전반적 브랜드 요소 (개별 필드 - Fallback용)
     brand_name: Optional[str] = None
     business_type: Optional[str] = None
     brand_tone: Optional[str] = None
