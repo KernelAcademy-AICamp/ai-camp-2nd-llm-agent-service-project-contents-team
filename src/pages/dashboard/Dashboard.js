@@ -318,17 +318,13 @@ function Dashboard() {
         {/* 왼쪽 콘텐츠 */}
         <div className="dashboard-left">
           {/* 빠른 작업 */}
-          <div className="quick-actions">
-            <div className="action-buttons">
-              {quickActions.map((action, index) => (
-                <button key={index} className="action-btn" onClick={() => navigate(action.path)}>
-                  <div className="action-text">
-                    <span className="action-label">{action.label}</span>
-                    <span className="action-desc">{action.desc}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
+          <div className="action-buttons">
+            {quickActions.map((action, index) => (
+              <button key={index} className="action-btn" onClick={() => navigate(action.path)}>
+                <span className="action-label">{action.label}</span>
+                <span className="action-desc">{action.desc}</span>
+              </button>
+            ))}
           </div>
 
           {/* 플랫폼별 통계 그래프 */}

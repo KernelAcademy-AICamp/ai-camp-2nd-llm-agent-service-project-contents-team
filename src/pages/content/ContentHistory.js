@@ -115,7 +115,7 @@ function ContentHistory() {
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
   const [historyDetailTab, setHistoryDetailTab] = useState('blog');
   const [popupImage, setPopupImage] = useState(null);
-  const [filterType, setFilterType] = useState('all'); // all, content, video
+  const [filterType, setFilterType] = useState('all'); // all, text, image, cardnews, text_image, video
 
   // ========== 히스토리 관련 함수 ==========
   const fetchHistory = useCallback(async () => {
@@ -280,8 +280,13 @@ function ContentHistory() {
   // 필터링된 히스토리
   const filteredHistory = history.filter(item => {
     if (filterType === 'all') return true;
-    if (filterType === 'content') return item.type === 'content';
     if (filterType === 'video') return item.type === 'video';
+    if (item.type !== 'content') return false;
+
+    if (filterType === 'text') return item.content_type === 'text';
+    if (filterType === 'image') return item.content_type === 'image';
+    if (filterType === 'cardnews') return !!item.cardnews;
+    if (filterType === 'text_image') return item.content_type === 'both' || item.content_type === 'text_image';
     return true;
   });
 
@@ -304,16 +309,34 @@ function ContentHistory() {
           전체
         </button>
         <button
-          className={`filter-tab ${filterType === 'content' ? 'active' : ''}`}
-          onClick={() => setFilterType('content')}
+          className={`filter-tab ${filterType === 'text' ? 'active' : ''}`}
+          onClick={() => setFilterType('text')}
         >
-          텍스트 + 이미지
+          글
+        </button>
+        <button
+          className={`filter-tab ${filterType === 'image' ? 'active' : ''}`}
+          onClick={() => setFilterType('image')}
+        >
+          이미지
+        </button>
+        <button
+          className={`filter-tab ${filterType === 'cardnews' ? 'active' : ''}`}
+          onClick={() => setFilterType('cardnews')}
+        >
+          카드뉴스
+        </button>
+        <button
+          className={`filter-tab ${filterType === 'text_image' ? 'active' : ''}`}
+          onClick={() => setFilterType('text_image')}
+        >
+          글+이미지
         </button>
         <button
           className={`filter-tab ${filterType === 'video' ? 'active' : ''}`}
           onClick={() => setFilterType('video')}
         >
-          숏폼 영상
+          숏폼
         </button>
       </div>
 
