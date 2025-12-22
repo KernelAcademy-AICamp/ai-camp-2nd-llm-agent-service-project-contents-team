@@ -525,7 +525,9 @@ class VideoGenerationJob(Base):
     """
     AI 비디오 생성 작업 모델
     - 사용자가 업로드한 제품 사진과 정보를 기반으로
-    - 스토리보드 생성 → 이미지 생성 → 비디오 트랜지션 생성 → 최종 합성
+    - 4단계 Context Engineering 파이프라인:
+      1. 제품 분석 → 2. 스토리 기획 → 3. 장면 연출 → 4. 품질 검증
+    - 이미지 생성 → 비디오 트랜지션 생성 → 최종 합성
     """
     __tablename__ = "video_generation_jobs"
 
@@ -543,16 +545,57 @@ class VideoGenerationJob(Base):
     cut_count = Column(Integer, nullable=False)  # 4, 6, 8
     duration_seconds = Column(Integer, nullable=False)  # 15, 25, 40
 
-    # 생성 단계별 데이터
+    # ===== 4단계 Agent 파이프라인 결과 =====
+    # 1단계: 제품 분석 결과
+    product_analysis = Column(JSON, nullable=True)
+    # {
+    #   "category": {"main": "...", "sub": "..."},
+    #   "key_features": [...],
+    #   "emotional_value": "...",
+    #   "visual_identity": {"colors": [...], "style": "...", ...},
+    #   "recommended_stories": [...]
+    # }
+
+    # 2단계: 스토리 기획 결과
+    story_plan = Column(JSON, nullable=True)
+    # {
+    #   "selected_structure": "...",
+    #   "selection_reason": "...",
+    #   "cut_allocation": [...],
+    #   "tone_guidelines": {...},
+    #   "cta_approach": "..."
+    # }
+
+    # 3단계: 최종 스토리보드 (기존 필드 유지)
     storyboard = Column(JSON, nullable=True)  # [{"cut": 1, "scene": "...", "image_prompt": "...", "duration": 5}, ...]
+
+    # 4단계: 품질 검증 결과
+    quality_evaluation = Column(JSON, nullable=True)
+    # {
+    #   "evaluation": {"story_coherence": {...}, "visual_consistency": {...}, ...},
+    #   "total_score": 8.5,
+    #   "passed": true,
+    #   "issues": [...],
+    #   "summary": "..."
+    # }
+
+    # ===== 생성 단계별 데이터 =====
     generated_image_urls = Column(JSON, nullable=True)  # [{"cut": 1, "url": "..."}, ...]
     generated_video_urls = Column(JSON, nullable=True)  # [{"transition": "1-2", "url": "..."}, ...]
     final_video_url = Column(String, nullable=True)  # 최종 합성된 비디오 URL
 
-    # 상태 추적
+    # ===== 메타데이터 =====
+    generation_attempts = Column(Integer, nullable=True, default=1)  # 품질 검증 재시도 횟수
+    brand_confidence_used = Column(String, nullable=True)  # 적용된 브랜드 신뢰도 (high/medium/low)
+    processing_time_seconds = Column(Float, nullable=True)  # 총 처리 시간
+
+    # ===== 상태 추적 =====
     status = Column(String, nullable=False, default="pending")
     # pending: 대기 중
-    # planning: 스토리보드 생성 중
+    # analyzing_product: 1단계 - 제품 분석 중
+    # planning_story: 2단계 - 스토리 기획 중
+    # designing_scenes: 3단계 - 장면 연출 설계 중
+    # validating_quality: 4단계 - 품질 검증 중
     # generating_images: 이미지 생성 중
     # generating_videos: 비디오 트랜지션 생성 중
     # composing: 최종 비디오 합성 중

@@ -1,0 +1,194 @@
+/* 진행 중인 작업 인디케이터 (오른쪽 상단) */
+.video-job-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 280px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  z-index: 1000;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.video-job-indicator__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.video-job-indicator__icon {
+  font-size: 18px;
+}
+
+.video-job-indicator__title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+
+.video-job-indicator__content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.video-job-indicator__product-name {
+  font-size: 13px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.video-job-indicator__progress-bar {
+  height: 6px;
+  background: #e9ecef;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.video-job-indicator__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.video-job-indicator__status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #888;
+}
+
+.video-job-indicator__percentage {
+  font-weight: 600;
+  color: #667eea;
+}
+
+/* 완료/실패 토스트 알림 */
+.video-job-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 320px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  padding: 16px;
+  z-index: 1001;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.video-job-toast--success {
+  border-left: 4px solid #28a745;
+}
+
+.video-job-toast--failed {
+  border-left: 4px solid #dc3545;
+}
+
+.video-job-toast__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.video-job-toast__icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.video-job-toast__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.video-job-toast__text strong {
+  font-size: 14px;
+  color: #333;
+}
+
+.video-job-toast__text span {
+  font-size: 13px;
+  color: #666;
+}
+
+.video-job-toast__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.video-job-toast__btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.video-job-toast__btn--primary {
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  color: white;
+}
+
+.video-job-toast__btn--primary:hover {
+  opacity: 0.9;
+}
+
+.video-job-toast__btn--close {
+  background: #f1f3f4;
+  color: #666;
+}
+
+.video-job-toast__btn--close:hover {
+  background: #e8eaeb;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .video-job-indicator {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+  }
+
+  .video-job-toast {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    bottom: 10px;
+  }
+}

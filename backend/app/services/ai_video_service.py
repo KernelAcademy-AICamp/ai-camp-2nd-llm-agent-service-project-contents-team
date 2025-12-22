@@ -1,8 +1,12 @@
 """
 AI 비디오 생성 서비스
-- Master Planning Agent: 제품 분석 + 스토리보드 생성 (Gemini 2.5 Flash)
+- Master Planning Agent: 4단계 Context Engineering 파이프라인으로 스토리보드 생성
+  1. ProductAnalysisAgent: 제품 이미지 분석
+  2. StoryPlanningAgent: 스토리 구조 선택
+  3. SceneDirectorAgent: 장면별 연출 설계
+  4. QualityValidatorAgent: 품질 검증 및 자동 수정
 - Image Generation: Gemini 2.5 Flash Image (일반) / Gemini 3 Pro Image (텍스트 특화)
-- Video Generation: MiniMax Hailuo-02 (First-Last Frame) 컷 사이 트랜지션 비디오 생성
+- Video Generation: Kling 2.1 Standard (via fal.ai) - Image-to-Video 트랜지션 생성
 - Video Composition: moviepy로 최종 비디오 합성 (빠른 컷 전환)
 """
 import os
@@ -61,13 +65,18 @@ except Exception as e:
 class MasterPlanningAgent:
     """
     Master Planning Agent
-    - 제품 이미지와 정보를 분석
-    - 브랜드 분석 데이터 활용
-    - 스토리보드 생성 (컷 수, 각 컷의 장면 설명, 이미지 프롬프트)
+    - 4단계 Context Engineering 파이프라인으로 스토리보드 생성
+    - 1단계: 제품 이미지 분석 (ProductAnalysisAgent)
+    - 2단계: 스토리 구조 선택 (StoryPlanningAgent)
+    - 3단계: 장면별 연출 설계 (SceneDirectorAgent)
+    - 4단계: 품질 검증 및 자동 수정 (QualityValidatorAgent)
     """
 
     def __init__(self, model: str = "gemini-2.5-flash"):
         self.model = model
+        # 새로운 4단계 파이프라인 오케스트레이터
+        from ..video_agents import VideoStoryboardOrchestrator
+        self.orchestrator = VideoStoryboardOrchestrator()
 
     async def analyze_and_plan(
         self,
@@ -77,7 +86,7 @@ class MasterPlanningAgent:
         db: Session
     ) -> List[Dict[str, Any]]:
         """
-        제품을 분석하고 스토리보드 생성
+        4단계 Context Engineering 파이프라인으로 스토리보드 생성
 
         Args:
             job: VideoGenerationJob 인스턴스
@@ -98,45 +107,21 @@ class MasterPlanningAgent:
             ]
         """
         try:
-            # Job 상태 업데이트
-            job.status = "planning"
-            job.current_step = "Analyzing product image for visual features"
-            db.commit()
+            logger.info(f"Starting Master Planning Agent (4-Stage Pipeline) for job {job.id}")
 
-            logger.info(f"Starting Master Planning Agent for job {job.id}")
-
-            # 제품 이미지 다운로드 및 base64 인코딩
-            image_data = await self._download_and_encode_image(job.uploaded_image_url)
-
-            # 제품 이미지 비주얼 특징 분석
-            logger.info(f"Analyzing product image for visual consistency...")
-            visual_features = await self.analyze_uploaded_image(image_data)
-
-            # Job 상태 업데이트
-            job.current_step = "Generating storyboard with visual consistency"
-            db.commit()
-
-            # 브랜드 정보 + 비주얼 특징 준비
-            brand_context = self._prepare_brand_context(user, brand_analysis, visual_features)
-
-            # Claude에게 스토리보드 생성 요청
-            storyboard = await self._generate_storyboard(
-                product_name=job.product_name,
-                product_description=job.product_description,
-                cut_count=job.cut_count,
-                duration_seconds=job.duration_seconds,
-                image_data=image_data,
-                brand_context=brand_context
+            # 4단계 파이프라인 실행
+            storyboard = await self.orchestrator.generate_storyboard(
+                job=job,
+                user=user,
+                brand_analysis=brand_analysis,
+                db=db
             )
-
-            # 비주얼 일관성 검증
-            self._validate_visual_consistency(storyboard, visual_features)
 
             # 스토리보드 저장
             job.storyboard = storyboard
             db.commit()
 
-            logger.info(f"Storyboard generated for job {job.id}: {len(storyboard)} cuts")
+            logger.info(f"Storyboard generated for job {job.id}: {len([s for s in storyboard if 'cut' in s])} cuts")
             return storyboard
 
         except Exception as e:
@@ -615,20 +600,20 @@ class MasterPlanningAgent:
    **기본값**: needs_text: false
 
 **전환 정보 (컷과 컷 사이):**
-1. method: "minimax" 또는 "ffmpeg"
-   - **minimax**: 역동적 움직임 또는 실제 액션이 필요한 경우 - MiniMax Hailuo-02 AI 비디오 생성
+1. method: "kling" 또는 "ffmpeg"
+   - **kling**: 역동적 움직임 또는 실제 액션이 필요한 경우 - Kling 2.1 AI 비디오 생성
      * 카메라 움직임: 줌인/아웃, 회전, 복잡한 패닝
      * 객체 동작: 휘젓기, 붓기, 들기, 움직이는 손/사람
      * 역동적 장면 전환: 빠른 모션, 유체 움직임
    - **ffmpeg**: 정적 장면 간 단순 전환만 필요한 경우 - 기본 효과
      * 디졸브, 페이드, 크로스페이드
      * 비슷한 구도의 정적 컷 사이
-   - **사용 전략**: 전체 전환의 50-70%는 minimax 사용 (퀄리티 우선)
-   - **minimax 비용**: $0.28/video (768P, 6초)
+   - **사용 전략**: 전체 전환의 50-70%는 kling 사용 (퀄리티 우선)
+   - **kling 비용**: $0.25/video (5초)
 2. effect: 전환 효과명 (참고용)
-   - minimax: "dynamic_zoom_in", "dynamic_zoom_out", "dynamic_pan", "complex_transition"
+   - kling: "dynamic_zoom_in", "dynamic_zoom_out", "dynamic_pan", "complex_transition"
    - ffmpeg: "dissolve", "fade", "zoom_in", "zoom_out", "pan_left", "pan_right"
-3. video_prompt: **구체적인 비디오 생성 프롬프트** (minimax 사용 시 필수!)
+3. video_prompt: **구체적인 비디오 생성 프롬프트** (kling 사용 시 필수!)
    - 제품 특징, 브랜드 톤, 장면 설명 포함
    - 카메라 움직임, 조명, 분위기 상세히 기술
    - 앞 컷과 뒤 컷의 연결을 자연스럽게 설명
@@ -658,7 +643,7 @@ class MasterPlanningAgent:
 
    - ffmpeg 사용 시에는 간단히 작성 (효과명만 참고)
 4. duration: 전환 길이 (초)
-   - **minimax**: 평균 {avg_transition_duration:.1f}초 (최소 4초, 최대 6초 권장)
+   - **kling**: 평균 {avg_transition_duration:.1f}초 (5초 권장)
    - **ffmpeg**: 0.5-2초
 5. reason: 이 방식을 선택한 이유 (한 줄)
 
@@ -667,10 +652,10 @@ class MasterPlanningAgent:
 - 중간 컷들: 제품 특징, 사용 시나리오, 혜택
 - 마지막 컷: CTA 또는 브랜드 메시지 (hero shot)
 - **전환 전략 (퀄리티 우선):**
-  * 실제 동작/액션이 있는 장면 → 무조건 minimax 사용
-  * 역동적 카메라 움직임 필요 → minimax 사용
+  * 실제 동작/액션이 있는 장면 → 무조건 kling 사용
+  * 역동적 카메라 움직임 필요 → kling 사용
   * 정적 컷 간 단순 전환만 → ffmpeg 사용 가능
-  * 전체의 50-70%는 minimax로 구성하여 영상의 퀘리티 확보
+  * 전체의 50-70%는 kling으로 구성하여 영상의 퀘리티 확보
 - **동작 및 도구 사용 (중요!):**
   * 사람의 모든 동작은 자연스럽고 일반적인 방식으로 (과장 금지)
   * 재료/소재를 다룰 때는 적절한 도구를 구체적으로 명시 (손으로만 하는 것 금지)
@@ -700,7 +685,7 @@ class MasterPlanningAgent:
     }},
   {{
     "transition": {{
-      "method": "minimax",
+      "method": "kling",
       "effect": "dynamic_zoom_out",
       "video_prompt": "Camera smoothly zooms out from extreme close-up of product detail, gradually revealing full product in elegant setting with professional lighting",
       "duration": {avg_transition_duration:.1f},
@@ -879,29 +864,25 @@ class ImageGenerationAgent:
 
             generated_images = []
 
-            for i, cut in enumerate(cuts, 1):
+            # 단일 이미지 생성 헬퍼 함수
+            async def generate_single_image(cut, cut_index):
+                """단일 이미지 생성 및 업로드"""
                 try:
                     cut_number = cut['cut']
                     resolution = cut.get('resolution', '720p')
                     is_hero_shot = cut.get('is_hero_shot', False)
                     needs_text = cut.get('needs_text', False)
 
-                    # AI로 모든 이미지 생성 (9:16 비율 보장)
                     logger.info(f"Generating image for cut {cut_number}/{len(cuts)}: {cut['image_prompt'][:50]}... (resolution: {resolution}, hero: {is_hero_shot}, needs_text: {needs_text})")
 
-                    # Job 상태 업데이트
-                    job.current_step = f"Generating image {i}/{len(cuts)}"
-                    db.commit()
-
-                    # Gemini로 이미지 생성 (needs_text에 따라 Flash 또는 Pro 모델 선택)
-                    # TODO: 해상도 최적화 지원 시 resolution 파라미터 활용
+                    # Gemini로 이미지 생성
                     image_bytes = await self._generate_with_gemini_image(cut['image_prompt'], needs_text=needs_text)
 
                     if not image_bytes:
                         raise ValueError(f"Failed to generate image for cut {cut_number}")
 
                     # 이미지를 Supabase Storage에 저장
-                    image_url = await self._upload_to_cloudinary(
+                    image_url = await self._upload_to_supabase(
                         image_bytes,
                         job.user_id,
                         job.id,
@@ -909,34 +890,55 @@ class ImageGenerationAgent:
                         job.session_id
                     )
 
-                    generated_images.append({
+                    logger.info(f"Image generated and uploaded for cut {cut_number}: {image_url}")
+
+                    return {
                         "cut": cut_number,
                         "url": image_url,
                         "prompt": cut['image_prompt'],
                         "resolution": resolution,
                         "is_hero_shot": is_hero_shot,
                         "source": "generated"
-                    })
-
-                    logger.info(f"Image generated and uploaded for cut {cut_number}: {image_url}")
-
-                    # 쿼터 초과 방지를 위한 요청 간격 추가
-                    if i < len(cuts):
-                        wait_time = 3  # 3초 대기
-                        logger.info(f"다음 이미지 생성 전 {wait_time}초 대기 중... (쿼터 최적화)")
-                        await asyncio.sleep(wait_time)
+                    }
 
                 except Exception as e:
-                    logger.error(f"Error generating image for cut {cut.get('cut', i)}: {str(e)}")
-                    # 일부 이미지 생성 실패해도 계속 진행
-                    generated_images.append({
-                        "cut": cut.get('cut', i),
+                    logger.error(f"Error generating image for cut {cut.get('cut', cut_index)}: {str(e)}")
+                    return {
+                        "cut": cut.get('cut', cut_index),
                         "url": None,
                         "error": str(e),
                         "prompt": cut.get('image_prompt', ''),
                         "resolution": cut.get('resolution', '720p'),
                         "is_hero_shot": cut.get('is_hero_shot', False)
-                    })
+                    }
+
+            # 2개씩 병렬 처리
+            batch_size = 2
+            for batch_start in range(0, len(cuts), batch_size):
+                batch_end = min(batch_start + batch_size, len(cuts))
+                batch_cuts = cuts[batch_start:batch_end]
+                batch_num = (batch_start // batch_size) + 1
+                total_batches = (len(cuts) + batch_size - 1) // batch_size
+
+                # Job 상태 업데이트
+                job.current_step = f"Generating images batch {batch_num}/{total_batches} (cuts {batch_start+1}-{batch_end})"
+                db.commit()
+
+                logger.info(f"Processing batch {batch_num}/{total_batches}: cuts {batch_start+1}-{batch_end}")
+
+                # 배치 내 이미지들을 병렬로 생성
+                batch_tasks = [
+                    generate_single_image(cut, batch_start + i + 1)
+                    for i, cut in enumerate(batch_cuts)
+                ]
+                batch_results = await asyncio.gather(*batch_tasks)
+                generated_images.extend(batch_results)
+
+                # 다음 배치 전 쿼터 초과 방지를 위한 대기
+                if batch_end < len(cuts):
+                    wait_time = 1  # 1초 대기 (기존 3초에서 단축)
+                    logger.info(f"다음 배치 생성 전 {wait_time}초 대기 중... (쿼터 최적화)")
+                    await asyncio.sleep(wait_time)
 
             # 생성된 이미지 저장
             job.generated_image_urls = generated_images
@@ -1033,7 +1035,7 @@ class ImageGenerationAgent:
                     logger.error(f"❌ {model_display} 생성 실패: {error_str}")
                     raise
 
-    async def _upload_to_cloudinary(
+    async def _upload_to_supabase(
         self,
         image_data: bytes,
         user_id: int,
@@ -1074,12 +1076,9 @@ class KlingVideoGenerationAgent:
 
     def __init__(self, model: str = "fal-ai/kling-video/v2.1/standard/image-to-video"):
         self.model = model
-        self.api_key = os.getenv("FAL_API_KEY")
+        self.api_key = os.getenv("FAL_KEY")
         if not self.api_key:
-            raise ValueError("FAL_API_KEY not found in environment variables")
-
-        # API 키 설정
-        os.environ["FAL_KEY"] = self.api_key
+            raise ValueError("FAL_KEY not found in environment variables")
         logger.info(f"KlingVideoGenerationAgent initialized with model: {self.model}")
 
     def image_to_data_url(self, image_path: str) -> str:
@@ -1727,14 +1726,14 @@ class VideoGenerationAgent:
             logger.error(f"Failed to download image from {url}: {str(e)}")
             raise
 
-    async def _upload_to_cloudinary(
+    async def _save_transition_to_local(
         self,
         video_data: bytes,
         user_id: int,
         job_id: int,
         transition_name: str
     ) -> str:
-        """비디오를 로컬 파일 시스템에 저장"""
+        """전환 비디오를 로컬 파일 시스템에 임시 저장"""
         try:
             # 저장 경로 생성
             save_dir = Path("uploads") / "ai_video_transitions" / str(user_id) / str(job_id)
@@ -1754,34 +1753,33 @@ class VideoGenerationAgent:
             raise
 
 
-class MiniMaxVideoGenerationAgent:
+class KlingVideoGenerationAgent:
     """
-    MiniMax Hailuo Video Generation Agent
-    - MiniMax Hailuo-02 API를 사용하여 이미지 간 트랜지션 비디오 생성
-    - First-Last Frame 파이프라인 지원
-    - 9:16 세로 비율 지원 (입력 이미지 비율 따름)
-    - 생성된 비디오를 로컬 파일 시스템에 저장
+    Kling 2.1 Standard Video Generation Agent (via fal.ai)
+    - fal.ai API를 통해 Kling 2.1 Standard 모델로 트랜지션 비디오 생성
+    - Image-to-Video 방식 (First Frame → Motion → Last Frame)
+    - 9:16 세로 비율 네이티브 지원
+    - 생성 시간: 5초 영상 약 30초 (MiniMax 대비 33% 단축)
+    - 비용: $0.25/5초 (MiniMax 대비 10% 절감)
     """
 
     def __init__(
         self,
-        model: str = "MiniMax-Hailuo-02",
-        resolution: str = "768P",
-        duration: int = 6
+        duration: str = "5",  # "5" or "10" seconds
+        aspect_ratio: str = "9:16"
     ):
-        self.model = model
-        self.resolution = resolution
         self.duration = duration
-        self.api_key = os.getenv("MINIMAX_API_KEY")
-        self.base_url = "https://api.minimax.io/v1/video_generation"
+        self.aspect_ratio = aspect_ratio
+        self.api_key = os.getenv("FAL_KEY")
+        self.model_id = "fal-ai/kling-video/v2.1/standard/image-to-video"
 
         if not self.api_key:
-            raise ValueError("MINIMAX_API_KEY not found in environment variables")
+            raise ValueError("FAL_KEY not found in environment variables")
 
         # API Key 디버깅 (처음 10자만 표시)
         api_key_preview = self.api_key[:10] + "..." if len(self.api_key) > 10 else self.api_key
-        logger.info(f"MiniMaxVideoGenerationAgent initialized: model={self.model}, resolution={self.resolution}, duration={self.duration}s")
-        logger.info(f"API Key loaded: {api_key_preview} (length: {len(self.api_key)})")
+        logger.info(f"KlingVideoGenerationAgent initialized: model=Kling 2.1 Standard, duration={self.duration}s, aspect_ratio={self.aspect_ratio}")
+        logger.info(f"FAL API Key loaded: {api_key_preview} (length: {len(self.api_key)})")
 
     async def generate_transition_videos(
         self,
@@ -1791,30 +1789,21 @@ class MiniMaxVideoGenerationAgent:
         db: Session
     ) -> List[Dict[str, str]]:
         """
-        이미지 간 트랜지션 비디오 생성 (MiniMax Hailuo 방식)
-
-        Args:
-            job: VideoGenerationJob 인스턴스
-            storyboard: 스토리보드 데이터 (전환 정보 포함)
-            images: 생성된 이미지 리스트
-            db: Database session
-
-        Returns:
-            List[Dict]: 생성된 비디오 URL 리스트
+        이미지 간 트랜지션 비디오 생성 (Kling 2.1 via fal.ai)
         """
         try:
-            # 스토리보드에서 minimax 방식의 전환만 필터링
+            # 스토리보드에서 AI 비디오 방식의 전환만 필터링 (minimax → kling으로 처리)
             transitions = [
                 item['transition'] for item in storyboard
-                if 'transition' in item and item['transition'].get('method') == 'minimax'
+                if 'transition' in item and item['transition'].get('method') in ['minimax', 'kling']
             ]
 
             # Job 상태 업데이트
             job.status = "generating_videos"
-            job.current_step = f"Generating {len(transitions)} MiniMax Hailuo transition videos"
+            job.current_step = f"Generating {len(transitions)} Kling 2.1 transition videos"
             db.commit()
 
-            logger.info(f"Starting MiniMax Hailuo video generation for job {job.id}: {len(transitions)} transitions")
+            logger.info(f"Starting Kling 2.1 video generation for job {job.id}: {len(transitions)} transitions")
 
             if not transitions:
                 logger.info("No transitions needed - all transitions will use FFmpeg")
@@ -1838,7 +1827,7 @@ class MiniMaxVideoGenerationAgent:
                 try:
                     video_prompt = transition_data.get('video_prompt', '')
                     effect = transition_data.get('effect', 'smooth_transition')
-                    duration = transition_data.get('duration', self.duration)
+                    duration = transition_data.get('duration', 5)
                     reason = transition_data.get('reason', '')
 
                     # 전환이 어느 컷 사이인지 추론
@@ -1876,46 +1865,46 @@ class MiniMaxVideoGenerationAgent:
 
                     transition_name = f"{from_cut}-{to_cut}"
 
-                    logger.info(f"Generating MiniMax Hailuo video {idx}/{len(transitions)}: {transition_name}")
-                    job.current_step = f"Generating MiniMax Hailuo transition {idx}/{len(transitions)}"
+                    logger.info(f"Generating Kling 2.1 video {idx}/{len(transitions)}: {transition_name}")
+                    job.current_step = f"Generating Kling 2.1 transition {idx}/{len(transitions)}"
                     db.commit()
 
-                    # 시작/종료 이미지 경로
+                    # 시작 이미지 URL (Kling은 first frame 기반)
                     start_image_url = image_by_cut[from_cut]['url']
-                    end_image_url = image_by_cut[to_cut]['url']
 
-                    # MiniMax API 호출 (exponential backoff 포함)
+                    # Kling API 호출 (fal.ai subscribe)
                     video_url = await self._generate_video_with_retry(
-                        start_image_url=start_image_url,
-                        end_image_url=end_image_url,
+                        image_url=start_image_url,
                         prompt=video_prompt,
-                        duration=int(duration),
                         job=job,
                         transition_name=transition_name
                     )
+
+                    # 비용 계산: $0.25/5초, $0.50/10초
+                    cost = 0.25 if self.duration == "5" else 0.50
 
                     generated_videos.append({
                         "transition": transition_name,
                         "url": video_url,
                         "from_cut": from_cut,
                         "to_cut": to_cut,
-                        "method": "minimax",
+                        "method": "kling",
                         "effect": effect,
-                        "duration": duration,
+                        "duration": int(self.duration),
                         "reason": reason,
-                        "cost": 0.28  # 768P 6초 기준
+                        "cost": cost
                     })
 
-                    logger.info(f"MiniMax Hailuo video generated: {transition_name} -> {video_url}")
+                    logger.info(f"Kling 2.1 video generated: {transition_name} -> {video_url}")
 
                 except Exception as e:
-                    logger.error(f"Error generating MiniMax Hailuo video: {str(e)}")
+                    logger.error(f"Error generating Kling 2.1 video: {str(e)}")
                     if 'transition_name' in locals():
                         generated_videos.append({
                             "transition": transition_name,
                             "url": None,
                             "error": str(e),
-                            "method": "minimax",
+                            "method": "kling",
                             "effect": transition_data.get('effect', '')
                         })
 
@@ -1923,51 +1912,59 @@ class MiniMaxVideoGenerationAgent:
             job.generated_video_urls = generated_videos
             db.commit()
 
-            logger.info(f"MiniMax Hailuo video generation completed for job {job.id}: {len([v for v in generated_videos if v.get('url')])} successful")
+            logger.info(f"Kling 2.1 video generation completed for job {job.id}: {len([v for v in generated_videos if v.get('url')])} successful")
             return generated_videos
 
         except Exception as e:
-            logger.error(f"Error in MiniMax Hailuo video generation for job {job.id}: {str(e)}")
+            logger.error(f"Error in Kling 2.1 video generation for job {job.id}: {str(e)}")
             job.status = "failed"
-            job.error_message = f"MiniMax Hailuo video generation failed: {str(e)}"
+            job.error_message = f"Kling 2.1 video generation failed: {str(e)}"
             db.commit()
             raise
 
     async def _generate_video_with_retry(
         self,
-        start_image_url: str,
-        end_image_url: str,
+        image_url: str,
         prompt: str,
-        duration: int,
         job: VideoGenerationJob,
         transition_name: str,
         max_retries: int = 3
     ) -> str:
         """
-        MiniMax API 호출 with exponential backoff
+        fal.ai Kling API 호출 with retry
         """
+        import fal_client
+
         base_delay = 2
 
         for attempt in range(max_retries):
             try:
-                # 1. Task 생성
-                task_id = await self._create_task(
-                    start_image_url=start_image_url,
-                    end_image_url=end_image_url,
-                    prompt=prompt,
-                    duration=duration
+                logger.info(f"Calling fal.ai Kling 2.1 API (attempt {attempt + 1}/{max_retries})")
+
+                # fal.ai subscribe (동기 대기)
+                result = await asyncio.to_thread(
+                    fal_client.subscribe,
+                    self.model_id,
+                    arguments={
+                        "prompt": prompt,
+                        "image_url": image_url,
+                        "duration": self.duration,
+                        "aspect_ratio": self.aspect_ratio
+                    }
                 )
 
-                logger.info(f"MiniMax task created: {task_id}")
+                # 결과에서 비디오 URL 추출
+                video_data = result.get("video", {})
+                fal_video_url = video_data.get("url")
 
-                # 2. Task 완료 대기 (polling)
-                file_id = await self._poll_task_status(task_id, timeout=600)  # 10분 타임아웃
+                if not fal_video_url:
+                    raise Exception(f"No video URL in fal.ai response: {result}")
 
-                logger.info(f"MiniMax task completed: file_id={file_id}")
+                logger.info(f"Kling 2.1 video generated via fal.ai: {fal_video_url}")
 
-                # 3. 비디오 다운로드
-                video_url = await self._download_video(
-                    file_id=file_id,
+                # 비디오를 다운로드하여 Supabase Storage에 저장
+                video_url = await self._download_and_store_video(
+                    fal_video_url=fal_video_url,
                     job=job,
                     transition_name=transition_name
                 )
@@ -1977,8 +1974,8 @@ class MiniMaxVideoGenerationAgent:
             except Exception as e:
                 error_str = str(e)
 
-                # 429 또는 503 에러인 경우 재시도
-                if '429' in error_str or '503' in error_str or 'rate limit' in error_str.lower():
+                # Rate limit 에러인 경우 재시도
+                if '429' in error_str or 'rate limit' in error_str.lower() or 'quota' in error_str.lower():
                     if attempt < max_retries - 1:
                         delay = base_delay * (2 ** attempt)
                         logger.warning(f"Rate limit detected (attempt {attempt + 1}/{max_retries}), retrying in {delay}s...")
@@ -1987,140 +1984,23 @@ class MiniMaxVideoGenerationAgent:
                         logger.error(f"Max retries ({max_retries}) reached, giving up")
                         raise
                 else:
-                    # 다른 에러는 재시도하지 않음
                     raise
 
-    async def _create_task(
+    async def _download_and_store_video(
         self,
-        start_image_url: str,
-        end_image_url: str,
-        prompt: str,
-        duration: int
-    ) -> str:
-        """
-        MiniMax API에 비디오 생성 task 생성
-        """
-        # 이미지를 base64로 인코딩
-        start_image_base64 = await self._image_url_to_base64(start_image_url)
-        end_image_base64 = await self._image_url_to_base64(end_image_url)
-
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "first_frame_image": start_image_base64,
-            "last_frame_image": end_image_base64,
-            "prompt_optimizer": True
-        }
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-
-        # Authorization 헤더 디버깅
-        auth_preview = headers["Authorization"][:17] + "..." if len(headers["Authorization"]) > 17 else headers["Authorization"]
-        logger.info(f"MiniMax API request: POST {self.base_url}")
-        logger.info(f"Authorization header: {auth_preview}")
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                self.base_url,
-                json=payload,
-                headers=headers
-            )
-
-            if response.status_code != 200:
-                raise Exception(f"MiniMax API error: {response.status_code} - {response.text}")
-
-            result = response.json()
-
-            if "task_id" not in result:
-                raise Exception(f"No task_id in MiniMax response: {result}")
-
-            return result["task_id"]
-
-    async def _poll_task_status(
-        self,
-        task_id: str,
-        timeout: int = 600,
-        poll_interval: int = 10
-    ) -> str:
-        """
-        Task 완료 대기 (polling)
-        """
-        start_time = asyncio.get_event_loop().time()
-        query_url = f"https://api.minimax.io/v1/query/video_generation?task_id={task_id}"
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}"
-        }
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            while True:
-                elapsed = asyncio.get_event_loop().time() - start_time
-
-                if elapsed > timeout:
-                    raise Exception(f"MiniMax task timeout after {timeout}s")
-
-                response = await client.get(query_url, headers=headers)
-
-                if response.status_code != 200:
-                    raise Exception(f"MiniMax query error: {response.status_code} - {response.text}")
-
-                result = response.json()
-                status = result.get("status")
-
-                if status == "Success":
-                    file_id = result.get("file_id")
-                    if not file_id:
-                        raise Exception(f"No file_id in completed task: {result}")
-                    return file_id
-                elif status == "Failed":
-                    raise Exception(f"MiniMax task failed: {result.get('error', 'Unknown error')}")
-                elif status in ["Queueing", "Preparing", "Processing"]:
-                    logger.info(f"MiniMax task {task_id} status: {status}, waiting {poll_interval}s...")
-                    await asyncio.sleep(poll_interval)
-                else:
-                    raise Exception(f"Unknown MiniMax task status: {status}")
-
-    async def _download_video(
-        self,
-        file_id: str,
+        fal_video_url: str,
         job: VideoGenerationJob,
         transition_name: str
     ) -> str:
         """
-        완료된 비디오 다운로드
+        fal.ai에서 생성된 비디오를 다운로드하여 Supabase Storage에 저장
         """
-        # Step 1: Get file metadata with CDN download URL
-        metadata_url = f"https://api.minimax.io/v1/files/retrieve?file_id={file_id}"
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}"
-        }
-
-        # 파일 메타데이터 조회
+        # 비디오 다운로드
         async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.get(metadata_url, headers=headers)
+            response = await client.get(fal_video_url)
 
             if response.status_code != 200:
-                raise Exception(f"Failed to get file metadata: {response.status_code}")
-
-            metadata = response.json()
-
-            # 메타데이터에서 CDN download_url 추출
-            if "file" not in metadata or "download_url" not in metadata["file"]:
-                raise Exception(f"No download_url in metadata: {metadata}")
-
-            cdn_url = metadata["file"]["download_url"]
-            logger.info(f"MiniMax CDN URL: {cdn_url}")
-
-        # Step 2: Download actual video from CDN (no auth needed)
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.get(cdn_url)
-
-            if response.status_code != 200:
-                raise Exception(f"Failed to download video from CDN: {response.status_code}")
+                raise Exception(f"Failed to download video from fal.ai: {response.status_code}")
 
             video_bytes = response.content
 
@@ -2137,31 +2017,16 @@ class MiniMaxVideoGenerationAgent:
             content_type="video/mp4"
         )
 
-        logger.info(f"MiniMax video saved to Supabase Storage: {video_url} ({len(video_bytes)} bytes)")
+        logger.info(f"Kling video saved to Supabase Storage: {video_url} ({len(video_bytes)} bytes)")
 
         return video_url
-
-    async def _image_url_to_base64(self, image_url: str) -> str:
-        """
-        이미지 URL을 base64로 인코딩 (Supabase Storage URL 사용)
-        """
-        # 모든 URL은 HTTP/HTTPS URL (Supabase Storage)
-        async with httpx.AsyncClient() as client:
-            response = await client.get(image_url)
-            if response.status_code != 200:
-                raise Exception(f"Failed to download image from {image_url}: {response.status_code}")
-            image_bytes = response.content
-
-        # base64 인코딩
-        base64_str = base64.b64encode(image_bytes).decode('utf-8')
-        return f"data:image/jpeg;base64,{base64_str}"
 
 
 class VideoCompositionAgent:
     """
     Video Composition Agent
     - moviepy/ffmpeg를 사용하여 이미지와 트랜지션 비디오를 최종 비디오로 합성
-    - AI 비디오 (Veo/MiniMax) + FFmpeg 기반 간단한 전환 효과 혼합 지원
+    - AI 비디오 (Kling) + FFmpeg 기반 간단한 전환 효과 혼합 지원
     - 생성된 최종 비디오를 로컬 파일 시스템에 저장
     """
 
@@ -2289,7 +2154,7 @@ class VideoCompositionAgent:
             job: VideoGenerationJob 인스턴스
             storyboard: 스토리보드 데이터 (컷과 전환이 혼합된 배열)
             images: 생성된 이미지 리스트
-            transition_videos: 생성된 AI 트랜지션 비디오 리스트 (Veo/MiniMax)
+            transition_videos: 생성된 AI 트랜지션 비디오 리스트 (Kling)
             db: Database session
 
         Returns:
@@ -2334,7 +2199,7 @@ class VideoCompositionAgent:
             if not image_by_cut:
                 raise ValueError("No valid images to compose video")
 
-            # AI 트랜지션 비디오 매핑 (Veo/MiniMax)
+            # AI 트랜지션 비디오 매핑 (Kling)
             ai_videos = {
                 tv['transition']: tv
                 for tv in transition_videos
@@ -2408,8 +2273,8 @@ class VideoCompositionAgent:
                     transition_key = f"{from_cut}-{to_cut}"
 
                     try:
-                        if method in ["veo", "minimax"]:
-                            # AI 생성 비디오 사용 (Veo/MiniMax)
+                        if method in ["veo", "minimax", "kling"]:
+                            # AI 생성 비디오 사용 (Kling)
                             if transition_key in ai_videos:
                                 transition_path = os.path.join(temp_dir, f"ai_transition_{transition_key}.mp4")
                                 video_bytes = await self._download_file(ai_videos[transition_key]['url'])
@@ -2499,7 +2364,7 @@ class VideoCompositionAgent:
             db.commit()
 
             with open(output_path, 'rb') as f:
-                video_url = await self._upload_to_cloudinary(
+                video_url = await self._upload_final_to_supabase(
                     f.read(),
                     job.user_id,
                     job.id,
@@ -2599,7 +2464,7 @@ class VideoCompositionAgent:
                 logger.error(f"Failed to download file from {url}: {str(e)}")
                 raise
 
-    async def _upload_to_cloudinary(
+    async def _upload_final_to_supabase(
         self,
         video_data: bytes,
         user_id: int,
@@ -2671,13 +2536,12 @@ async def run_video_generation_pipeline(job_id: int, db: Session):
         image_agent = ImageGenerationAgent()
         images = await image_agent.generate_images(job, storyboard, db)
 
-        # 3. Video Generation (MiniMax Hailuo transitions)
-        logger.info(f"Step 3/4: Generating MiniMax Hailuo transition videos")
-        # video_agent = VideoGenerationAgent()  # ← Veo 3.1 Fast
-        video_agent = MiniMaxVideoGenerationAgent()  # ← MiniMax Hailuo-02 사용
+        # 3. Video Generation (Kling 2.1 Standard transitions via fal.ai)
+        logger.info(f"Step 3/4: Generating Kling 2.1 transition videos")
+        video_agent = KlingVideoGenerationAgent()  # ← Kling 2.1 Standard via fal.ai
         videos = await video_agent.generate_transition_videos(job, storyboard, images, db)
 
-        # 4. Video Composition (mixed: Veo + FFmpeg transitions)
+        # 4. Video Composition (mixed: Kling + FFmpeg transitions)
         logger.info(f"Step 4/4: Composing final video with mixed transitions")
         composition_agent = VideoCompositionAgent()
         final_video_url = await composition_agent.compose_final_video(

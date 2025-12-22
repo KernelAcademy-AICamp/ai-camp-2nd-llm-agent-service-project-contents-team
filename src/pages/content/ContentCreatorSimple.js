@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import api, { contentSessionAPI, creditsAPI, userAPI, cardnewsAPI } from '../../services/api';
 import { generateAgenticContent } from '../../services/agenticService';
+import { useVideoJob } from '../../contexts/VideoJobContext';
 import CreditChargeModal from '../../components/credits/CreditChargeModal';
 import './ContentCreatorSimple.css';
 
@@ -150,6 +151,7 @@ const collectAllTags = (textResult) => {
 // ========== 메인 컴포넌트 ==========
 function ContentCreatorSimple() {
   const navigate = useNavigate();
+  const { addJob } = useVideoJob();
 
   // 입력 상태
   const [contentType, setContentType] = useState(null);
@@ -1428,10 +1430,21 @@ function ContentCreatorSimple() {
             let currentPhase = 0;
             let progressPercent = 0;
 
-            if (currentStep.includes('Analyzing') || currentStep.includes('storyboard')) {
+            // 1단계: 스토리보드 생성 (4 Agents 포함)
+            if (currentStep.includes('1단계') || currentStep.includes('제품 분석') || currentStep.includes('로딩')) {
               currentPhase = 0;
-              progressPercent = currentStep.includes('storyboard') ? 20 : 10;
-            } else if (currentStep.includes('Generating image')) {
+              progressPercent = 5;
+            } else if (currentStep.includes('2단계') || currentStep.includes('스토리 기획')) {
+              currentPhase = 0;
+              progressPercent = 10;
+            } else if (currentStep.includes('3단계') || currentStep.includes('장면 연출')) {
+              currentPhase = 0;
+              progressPercent = 15;
+            } else if (currentStep.includes('4단계') || currentStep.includes('품질 검증')) {
+              currentPhase = 0;
+              progressPercent = 20;
+            } else if (currentStep.includes('Generating image') || currentStep.includes('이미지')) {
+              // 2단계: 이미지 생성
               currentPhase = 1;
               const match = currentStep.match(/(\d+)\/(\d+)/);
               if (match) {
@@ -1441,7 +1454,8 @@ function ContentCreatorSimple() {
               } else {
                 progressPercent = 30;
               }
-            } else if (currentStep.includes('transition')) {
+            } else if (currentStep.includes('transition') || currentStep.includes('Kling') || currentStep.includes('Veo')) {
+              // 3단계: 전환 비디오 생성
               currentPhase = 2;
               const match = currentStep.match(/(\d+)\/(\d+)/);
               if (match) {
@@ -1452,6 +1466,7 @@ function ContentCreatorSimple() {
                 progressPercent = 55;
               }
             } else if (currentStep.includes('Composing') || currentStep.includes('Concatenating') || currentStep.includes('Rendering') || currentStep.includes('Uploading')) {
+              // 4단계: 최종 합성
               currentPhase = 3;
               if (currentStep.includes('Composing')) progressPercent = 85;
               else if (currentStep.includes('Concatenating')) progressPercent = 90;
@@ -1542,6 +1557,37 @@ function ContentCreatorSimple() {
                       <p style={{ fontSize: '15px', fontWeight: '500', color: '#111827' }}>
                         {currentStep || 'AI가 영상을 생성하고 있습니다...'}
                       </p>
+                    </div>
+
+                    {/* 다른 기능 둘러보기 버튼 */}
+                    <div style={{ textAlign: 'center', marginTop: '32px' }}>
+                      <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '12px' }}>
+                        영상 생성은 백그라운드에서 계속 진행됩니다
+                      </p>
+                      <button
+                        onClick={() => {
+                          // VideoJobContext에 작업 등록 후 홈으로 이동
+                          if (result.videoJobId) {
+                            addJob(result.videoJobId, topic || '숏폼 영상');
+                          }
+                          navigate('/');
+                        }}
+                        style={{
+                          padding: '12px 24px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#374151',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#e5e7eb'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                      >
+                        다른 기능 둘러보기
+                      </button>
                     </div>
                   </div>
                 </div>

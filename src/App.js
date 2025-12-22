@@ -2,7 +2,9 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ContentProvider } from './contexts/ContentContext';
+import { VideoJobProvider } from './contexts/VideoJobContext';
 import Layout from './components/Layout';
+import VideoJobIndicator from './components/VideoJobIndicator';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/auth/Login';
 import OAuthCallback from './pages/auth/OAuthCallback';
@@ -34,6 +36,7 @@ function App() {
     <Router>
       <AuthProvider>
         <ContentProvider>
+        <VideoJobProvider>
         <Routes>
           {/* 공개 라우트 */}
           <Route path="/login" element={<Login />} />
@@ -235,6 +238,8 @@ function App() {
           {/* 404 페이지 */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <VideoJobIndicator />
+        </VideoJobProvider>
         </ContentProvider>
       </AuthProvider>
     </Router>
