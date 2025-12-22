@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { dashboardAPI, youtubeAPI, facebookAPI, instagramAPI, twitterAPI, threadsAPI, tiktokAPI, wordpressAPI } from '../../services/api';
 import { FaYoutube, FaFacebookF, FaInstagram, FaThreads, FaTiktok, FaWordpress } from 'react-icons/fa6';
 import { RiTwitterXFill } from 'react-icons/ri';
-import { FiCheck, FiPlus, FiRefreshCw } from 'react-icons/fi';
+import { FiCheck } from 'react-icons/fi';
 import './Dashboard.css';
 
 // 플랫폼 설정 (상수)
@@ -151,46 +151,22 @@ const StatsCard = ({ title, subtitle, data, total, valueKey }) => {
   );
 };
 
-// 섹션 헤더 컴포넌트
-const SectionHeader = ({ title, description, children }) => (
-  <div className="section-title">
-    <div className="section-title-left">
-      <h3>{title}</h3>
-      <p className="section-description">{description}</p>
-    </div>
-    {children}
-  </div>
-);
-
 // 플랫폼 카드 컴포넌트
 const PlatformCard = ({ platform, status }) => {
   const Icon = platform.icon;
-  const { connected, loading } = status;
+  const { connected } = status;
 
   return (
-    <div className={`sns-platform-card ${connected ? 'connected' : 'disconnected'}`}>
-      <div className="platform-card-header">
-        <div className="platform-icon-wrapper">
-          <div className="platform-icon" style={{ color: platform.color }}>
-            <Icon />
-          </div>
-          {connected && (
-            <div className="connected-badge"><FiCheck /></div>
-          )}
+    <Link to={platform.path} className={`sns-platform-card ${connected ? 'connected' : 'disconnected'}`}>
+      <div className="platform-icon-wrapper">
+        <div className="platform-icon" style={{ color: platform.color }}>
+          <Icon />
         </div>
+        {connected && (
+          <div className="connected-badge"><FiCheck /></div>
+        )}
       </div>
-      <div className="platform-card-body">
-        <h4 className="platform-name">{platform.name}</h4>
-        <span className={`platform-status ${loading ? 'loading' : connected ? 'connected' : 'disconnected'}`}>
-          {loading ? '확인 중...' : connected ? '연동됨' : '미연동'}
-        </span>
-      </div>
-      <div className="platform-card-footer">
-        <Link to={platform.path} className={`platform-btn ${connected ? 'secondary' : 'connect'}`}>
-          {connected ? '관리' : <><FiPlus /> 연동하기</>}
-        </Link>
-      </div>
-    </div>
+    </Link>
   );
 };
 
@@ -203,18 +179,15 @@ function Dashboard() {
       { loading: true, connected: false, data: null, posts: [], videos: [], analytics: null }
     ]))
   );
-  const [refreshing, setRefreshing] = useState(false);
-
   const quickActions = [
     { label: '콘텐츠 생성', path: '/create', desc: 'AI로 블로그/SNS 콘텐츠 생성' },
     { label: '생성 내역', path: '/history', desc: '이전에 생성한 콘텐츠 보기' },
     { label: '콘텐츠 관리', path: '/contents', desc: '임시저장/발행 콘텐츠 관리' },
+    { label: '템플릿 갤러리', path: '/templates', desc: '다양한 콘텐츠 템플릿 보기' },
   ];
 
   // 1단계: 통합 API로 모든 플랫폼 상태를 한 번에 조회
   const fetchConnectionStatus = useCallback(async () => {
-    setRefreshing(true);
-
     try {
       // 통합 API로 한 번에 모든 상태 조회 (7번 호출 → 1번 호출)
       const allStatus = await dashboardAPI.getAllStatus();
@@ -230,8 +203,6 @@ function Dashboard() {
         tiktok: { ...prev.tiktok, loading: false, connected: !!tiktok, data: tiktok },
         wordpress: { ...prev.wordpress, loading: false, connected: !!wordpress, data: wordpress },
       }));
-
-      setRefreshing(false);
 
       // 2단계: 연동된 플랫폼의 추가 데이터를 백그라운드에서 조회
       const connectedPlatforms = {
@@ -291,7 +262,6 @@ function Dashboard() {
     }
     } catch (error) {
       console.error('Failed to fetch platform status:', error);
-      setRefreshing(false);
     }
   }, []);
 
@@ -343,69 +313,55 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* 플랫폼별 통계 그래프 */}
-      <div className="dashboard-charts">
-        <StatsCard
-          title="총 팔로워"
-          subtitle="연동된 플랫폼의 총 팔로워"
-          data={platformFollowers}
-          total={totalFollowers}
-          valueKey="followers"
-        />
-        <StatsCard
-          title="총 콘텐츠"
-          subtitle="연동된 플랫폼의 총 콘텐츠"
-          data={platformContents}
-          total={totalContents}
-          valueKey="contents"
-        />
-        <StatsCard
-          title="총 조회수"
-          subtitle="연동된 플랫폼의 총 조회/노출"
-          data={platformViews}
-          total={totalViews}
-          valueKey="views"
-        />
-      </div>
+      {/* 메인 콘텐츠 영역 */}
+      <div className="dashboard-main">
+        {/* 왼쪽 콘텐츠 */}
+        <div className="dashboard-left">
+          {/* 빠른 작업 */}
+          <div className="quick-actions">
+            <div className="action-buttons">
+              {quickActions.map((action, index) => (
+                <button key={index} className="action-btn" onClick={() => navigate(action.path)}>
+                  <div className="action-text">
+                    <span className="action-label">{action.label}</span>
+                    <span className="action-desc">{action.desc}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <div className="dashboard-content">
-        {/* SNS 연동 상태 섹션 */}
-        <div className="sns-connection-section">
-          <SectionHeader
-            title="SNS 연동 상태"
-            description="각 플랫폼을 클릭하여 상세 정보를 확인하거나 연동하세요"
-          >
-            <button
-              className={`sns-refresh-btn ${refreshing ? 'spinning' : ''}`}
-              onClick={fetchConnectionStatus}
-              disabled={refreshing}
-            >
-              <FiRefreshCw />
-            </button>
-          </SectionHeader>
-          <div className="sns-platform-grid">
-            {platforms.map((platform) => (
-              <PlatformCard key={platform.key} platform={platform} status={platform.status} />
-            ))}
+          {/* 플랫폼별 통계 그래프 */}
+          <div className="dashboard-charts">
+            <StatsCard
+              title="총 팔로워"
+              subtitle="연동된 플랫폼의 총 팔로워"
+              data={platformFollowers}
+              total={totalFollowers}
+              valueKey="followers"
+            />
+            <StatsCard
+              title="총 콘텐츠"
+              subtitle="연동된 플랫폼의 총 콘텐츠"
+              data={platformContents}
+              total={totalContents}
+              valueKey="contents"
+            />
+            <StatsCard
+              title="총 조회수"
+              subtitle="연동된 플랫폼의 총 조회/노출"
+              data={platformViews}
+              total={totalViews}
+              valueKey="views"
+            />
           </div>
         </div>
 
-        {/* 빠른 작업 */}
-        <div className="quick-actions">
-          <SectionHeader
-            title="빠른 작업"
-            description="자주 사용하는 기능에 빠르게 접근하세요"
-          />
-          <div className="action-buttons">
-            {quickActions.map((action, index) => (
-              <button key={index} className="action-btn" onClick={() => navigate(action.path)}>
-                <div className="action-text">
-                  <span className="action-label">{action.label}</span>
-                  <span className="action-desc">{action.desc}</span>
-                </div>
-              </button>
-            ))}
-          </div>
+        {/* SNS 플랫폼 카드 (오른쪽 세로) */}
+        <div className="sns-platform-grid">
+          {platforms.map((platform) => (
+            <PlatformCard key={platform.key} platform={platform} status={platform.status} />
+          ))}
         </div>
       </div>
     </div>

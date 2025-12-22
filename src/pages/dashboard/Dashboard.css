@@ -40,37 +40,24 @@
    ========================================== */
 
 .dashboard .sns-platform-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--space-sm);
-  margin-bottom: var(--space-lg);
-  width: 100%;
 }
 
 .dashboard .sns-platform-card {
-  overflow: hidden;
-  flex-direction: column;
+  display: flex;
   align-items: center;
-  text-align: center;
-  width: 100%;
-  min-width: 0;
-  min-height: 140px;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
 }
 
 /* 연동됨 상태 */
 .dashboard .sns-platform-card.connected {
   background: var(--brand-light-bg, #F8F8FF);
 }
-
-/* .dashboard .sns-platform-card.connected::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--brand-gradient, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
-} */
 
 .dashboard .sns-platform-card.connected:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
@@ -86,13 +73,6 @@
   opacity: 1;
   background: var(--brand-light-bg, #F8F8FF);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-}
-
-/* 카드 헤더 (아이콘 영역) */
-.dashboard .platform-card-header {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
 }
 
 .dashboard .platform-icon-wrapper {
@@ -123,95 +103,22 @@
   border: 2px solid var(--bg-primary);
 }
 
-/* 카드 바디 */
-.dashboard .platform-card-body {
-  flex: 1;
-  min-width: 0;
-}
+/* ==========================================
+   Dashboard Main Layout
+   ========================================== */
 
-.dashboard .platform-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 2px 0;
-}
-
-.dashboard .platform-status {
-  display: block;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.dashboard .platform-status.loading {
-  color: var(--text-tertiary);
-}
-
-.dashboard .platform-status.connected {
-  color: var(--brand-color, #667eea);
-  font-weight: 600;
-}
-
-.dashboard .platform-status.disconnected {
-  color: var(--text-tertiary);
-}
-
-/* 카드 푸터 */
-.dashboard .platform-card-footer {
+.dashboard-main {
   display: flex;
-  gap: var(--space-xs);
-  flex-shrink: 0;
+  gap: var(--space-md);
+  flex: 1;
 }
 
-.dashboard .platform-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-xs);
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: all 0.15s ease;
-  cursor: pointer;
-  border: none;
-  white-space: nowrap;
-}
-
-.dashboard .platform-btn.primary {
-  background: var(--brand-gradient, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
-  color: white;
-}
-
-.dashboard .platform-btn.primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-.dashboard .platform-btn.secondary {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-}
-
-.dashboard .platform-btn.secondary:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--brand-color, #667eea);
-  color: var(--brand-color, #667eea);
-}
-
-.dashboard .platform-btn.connect {
-  background: var(--bg-primary);
-  border: 2px dashed var(--border-color);
-  color: var(--text-secondary);
-  padding: var(--space-xs) var(--space-md);
-}
-
-.dashboard .platform-btn.connect:hover {
-  border-color: var(--brand-color, #667eea);
-  border-style: solid;
-  color: var(--brand-color, #667eea);
-  background: var(--brand-light-bg, #F8F8FF);
+.dashboard-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
 }
 
 /* ==========================================
@@ -222,7 +129,6 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-md);
-  margin-bottom: var(--space-md);
 }
 
 .reach-dashboard {
@@ -325,27 +231,10 @@
   transition: width 0.5s ease-out;
 }
 
-/* Dashboard Content Grid */
-.dashboard-content {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: var(--space-md);
-  flex: 1;
-  min-height: 0;
-}
-
-/* Section Title (공통) */
-.section-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
 /* ==========================================
-   공통 섹션 스타일 (SNS Connection & Quick Actions)
+   Quick Actions 섹션
    ========================================== */
 
-.sns-connection-section,
 .quick-actions {
   background: var(--bg-primary);
   border: var(--border-thin) solid var(--border-color);
@@ -356,35 +245,9 @@
   flex-direction: column;
 }
 
-.sns-connection-section .section-title,
-.quick-actions .section-title {
-  margin-bottom: var(--space-sm);
-}
 
-.sns-connection-section .section-title h3,
-.quick-actions .section-title h3 {
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
 
-.sns-connection-section .section-title-left,
-.quick-actions .section-title-left {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.sns-connection-section .section-description,
-.quick-actions .section-description {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  margin: 0;
-}
-
-/* 공통 카드 아이템 스타일 (SNS Card & Action Button) */
-.dashboard .sns-platform-card,
+/* Action Button 스타일 */
 .action-btn {
   display: flex;
   align-items: center;
@@ -401,11 +264,12 @@
 
 .action-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: var(--space-sm);
 }
 
 .action-btn {
+  flex: 1;
   text-align: left;
 }
 
@@ -431,40 +295,6 @@
   color: var(--text-tertiary);
 }
 
-/* SNS Connection Section - 고유 스타일 */
-.sns-refresh-btn {
-  background: var(--bg-secondary);
-  border: var(--border-thin) solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: var(--space-xs) var(--space-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
-}
-
-.sns-refresh-btn:hover {
-  background: var(--accent-color);
-  color: var(--text-primary);
-}
-
-.sns-refresh-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.sns-refresh-btn.spinning svg {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-
 /* Responsive */
 @media (max-width: 1024px) {
   .dashboard {
@@ -473,13 +303,18 @@
     overflow: auto;
   }
 
-  .dashboard-charts {
-    grid-template-columns: 1fr;
+  .dashboard-main {
+    flex-direction: column;
   }
 
-  .dashboard-content {
+  .dashboard .sns-platform-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .dashboard-charts {
     grid-template-columns: 1fr;
-    flex: none;
   }
 }
 
@@ -492,15 +327,15 @@
     font-size: var(--text-xl);
   }
 
-  /* 공통 섹션 반응형 */
-  .sns-connection-section,
   .quick-actions {
     padding: var(--space-sm);
     border-radius: var(--radius-md);
   }
 
-  /* 공통 카드 아이템 반응형 */
-  .dashboard .sns-platform-card,
+  .action-buttons {
+    flex-direction: column;
+  }
+
   .action-btn {
     padding: var(--space-sm) var(--space-md);
     gap: var(--space-md);
@@ -508,18 +343,13 @@
 }
 
 @media (max-width: 480px) {
-  .dashboard .sns-platform-grid {
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  .dashboard .sns-platform-card {
+    width: 48px;
+    height: 48px;
   }
 
-  .dashboard .sns-platform-card,
   .action-btn {
     flex-wrap: wrap;
     gap: var(--space-sm);
-  }
-
-  .dashboard .platform-card-footer {
-    width: 100%;
-    justify-content: flex-end;
   }
 }
