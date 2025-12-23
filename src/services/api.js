@@ -895,62 +895,62 @@ export const twitterAPI = xAPI;
 export const templatesAPI = {
   // 탭 목록 조회
   getTabs: async () => {
-    const response = await api.get('/templates/tabs');
+    const response = await api.get('/api/templates/tabs');
     return response.data;
   },
 
   // 탭 생성
   createTab: async (data) => {
-    const response = await api.post('/templates/tabs', data);
+    const response = await api.post('/api/templates/tabs', data);
     return response.data;
   },
 
   // 탭 수정
   updateTab: async (tabId, data) => {
-    const response = await api.put(`/templates/tabs/${tabId}`, data);
+    const response = await api.put(`/api/templates/tabs/${tabId}`, data);
     return response.data;
   },
 
   // 탭 삭제
   deleteTab: async (tabId) => {
-    const response = await api.delete(`/templates/tabs/${tabId}`);
+    const response = await api.delete(`/api/templates/tabs/${tabId}`);
     return response.data;
   },
 
   // 템플릿 목록 조회 (탭별 필터링 가능)
   getTemplates: async (tabId = null) => {
     const params = tabId ? { tab_id: tabId } : {};
-    const response = await api.get('/templates/', { params });
+    const response = await api.get('/api/templates/', { params });
     return response.data;
   },
 
   // 템플릿 생성
   createTemplate: async (data) => {
-    const response = await api.post('/templates/', data);
+    const response = await api.post('/api/templates/', data);
     return response.data;
   },
 
   // 템플릿 수정
   updateTemplate: async (templateId, data) => {
-    const response = await api.put(`/templates/${templateId}`, data);
+    const response = await api.put(`/api/templates/${templateId}`, data);
     return response.data;
   },
 
   // 템플릿 삭제
   deleteTemplate: async (templateId) => {
-    const response = await api.delete(`/templates/${templateId}`);
+    const response = await api.delete(`/api/templates/${templateId}`);
     return response.data;
   },
 
   // 템플릿 사용 (사용 횟수 증가)
   useTemplate: async (templateId) => {
-    const response = await api.post(`/templates/${templateId}/use`);
+    const response = await api.post(`/api/templates/${templateId}/use`);
     return response.data;
   },
 
   // 템플릿 복제
   duplicateTemplate: async (templateId) => {
-    const response = await api.post(`/templates/${templateId}/duplicate`);
+    const response = await api.post(`/api/templates/${templateId}/duplicate`);
     return response.data;
   },
 };
