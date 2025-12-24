@@ -627,6 +627,15 @@ export const contentSessionAPI = {
     const response = await api.delete(`/api/ai-content/v2/${sessionId}`);
     return response.data;
   },
+
+  // Base64 이미지를 Supabase Storage에 업로드
+  uploadImage: async (imageData, prompt = null) => {
+    const response = await api.post('/api/ai-content/v2/upload-image', {
+      image_data: imageData,
+      prompt: prompt
+    });
+    return response.data;
+  },
 };
 
 // ==========================================

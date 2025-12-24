@@ -9,28 +9,32 @@ import './ContentEditor.css';
 // 플랫폼 설정
 const PLATFORM_CONFIG = {
   blog: {
-    name: '네이버 블로그',
+    name: '블로그',
     icon: '📝',
     maxLength: null,
-    hasTitle: true
+    hasTitle: true,
+    canPublish: false  // 블로그는 직접 발행 불가
   },
   sns: {
     name: 'Instagram / Facebook',
     icon: '📷',
     maxLength: 2200,
-    hasTitle: false
+    hasTitle: false,
+    canPublish: true
   },
   x: {
     name: 'X',
     icon: '𝕏',
     maxLength: 280,
-    hasTitle: false
+    hasTitle: false,
+    canPublish: true
   },
   threads: {
     name: 'Threads',
     icon: '🧵',
     maxLength: 500,
-    hasTitle: false
+    hasTitle: false,
+    canPublish: true
   },
 };
 
@@ -234,6 +238,17 @@ function ContentEditor() {
         throw new Error('저장할 콘텐츠가 없습니다.');
       }
 
+      // 이미지 URL 결정: 직접 업로드 > AI 생성 이미지 > 세션 이미지 ID
+      let imageUrl = null;
+      if (uploadedImages.length > 0) {
+        imageUrl = uploadedImages[0].url;
+      } else if (result?.images?.length > 0) {
+        const firstImg = result.images[0].url || result.images[0].image_url;
+        if (firstImg && !firstImg.startsWith('data:')) {
+          imageUrl = firstImg;
+        }
+      }
+
       const savedContent = await publishedContentAPI.saveDraft({
         id: savedContentIds[activePlatform] || null,  // 기존 ID가 있으면 전달 (업데이트)
         session_id: sessionId || null,
@@ -242,7 +257,7 @@ function ContentEditor() {
         content: data.content,
         tags: data.tags,
         image_ids: imageIds.length > 0 ? imageIds : null,
-        uploaded_image_url: uploadedImages.length > 0 ? uploadedImages[0].url : null,
+        uploaded_image_url: imageUrl,
       });
 
       // 저장된 콘텐츠 ID 업데이트
@@ -260,7 +275,7 @@ function ContentEditor() {
     } finally {
       setIsSaving(false);
     }
-  }, [editedContent, activePlatform, sessionId, imageIds, isSaved, isSaving, savedContentIds, uploadedImages]);
+  }, [editedContent, activePlatform, sessionId, imageIds, isSaved, isSaving, savedContentIds, uploadedImages, result]);
 
   // 뒤로가기 핸들러 (저장 확인)
   const handleGoBack = useCallback(() => {
@@ -322,6 +337,17 @@ function ContentEditor() {
         throw new Error('예약할 콘텐츠가 없습니다.');
       }
 
+      // 이미지 URL 결정: 직접 업로드 > AI 생성 이미지 > 세션 이미지 ID
+      let imageUrl = null;
+      if (uploadedImages.length > 0) {
+        imageUrl = uploadedImages[0].url;
+      } else if (result?.images?.length > 0) {
+        const firstImg = result.images[0].url || result.images[0].image_url;
+        if (firstImg && !firstImg.startsWith('data:')) {
+          imageUrl = firstImg;
+        }
+      }
+
       await publishedContentAPI.schedule({
         id: savedContentIds[activePlatform] || null,  // 기존 ID가 있으면 전달
         session_id: sessionId || null,
@@ -330,7 +356,7 @@ function ContentEditor() {
         content: data.content,
         tags: data.tags,
         image_ids: imageIds.length > 0 ? imageIds : null,
-        uploaded_image_url: uploadedImages.length > 0 ? uploadedImages[0].url : null,
+        uploaded_image_url: imageUrl,
         scheduled_at: scheduledAt.toISOString(),
       });
 
@@ -355,6 +381,21 @@ function ContentEditor() {
     }
   };
 
+  // base64 이미지를 서버에 업로드하고 공개 URL 반환
+  const uploadBase64Image = async (base64DataUrl) => {
+    // base64 데이터를 Blob으로 변환
+    const response = await fetch(base64DataUrl);
+    const blob = await response.blob();
+
+    // Blob을 File 객체로 변환
+    const ext = blob.type.split('/')[1] || 'png';
+    const file = new File([blob], `ai-generated-${Date.now()}.${ext}`, { type: blob.type });
+
+    // 서버에 업로드
+    const uploadResponse = await publishedContentAPI.uploadImage(file);
+    return uploadResponse.image_url;
+  };
+
   // 즉시 발행 핸들러
   const handlePublish = async (platform) => {
     // 저장되지 않은 변경사항이 있으면 먼저 저장
@@ -367,11 +408,41 @@ function ContentEditor() {
       }
     }
 
+    // base64 이미지가 있으면 먼저 업로드 (Instagram/SNS 발행 시 필수)
+    let uploadedImageUrl = null;
+    if ((platform === 'sns' || platform === 'instagram') && result?.images?.length > 0) {
+      const firstImg = result.images[0].url || result.images[0].image_url;
+      if (firstImg && firstImg.startsWith('data:')) {
+        try {
+          setPublishingPlatform(platform); // 로딩 표시
+          uploadedImageUrl = await uploadBase64Image(firstImg);
+          console.log('AI 생성 이미지 업로드 완료:', uploadedImageUrl);
+        } catch (uploadError) {
+          console.error('이미지 업로드 실패:', uploadError);
+          alert('이미지 업로드에 실패했습니다. 다시 시도해주세요.');
+          setPublishingPlatform(null);
+          return;
+        }
+      }
+    }
+
     // 저장된 콘텐츠 ID가 없으면 먼저 저장
     let contentId = savedContentIds[platform];
     if (!contentId) {
       try {
         const data = editedContent[platform];
+
+        // 이미지 URL 결정: 방금 업로드한 이미지 > 직접 업로드 > AI 생성 이미지 URL
+        let imageUrl = uploadedImageUrl;
+        if (!imageUrl && uploadedImages.length > 0) {
+          imageUrl = uploadedImages[0].url;
+        } else if (!imageUrl && result?.images?.length > 0) {
+          const firstImg = result.images[0].url || result.images[0].image_url;
+          if (firstImg && !firstImg.startsWith('data:')) {
+            imageUrl = firstImg;
+          }
+        }
+
         const savedContent = await publishedContentAPI.saveDraft({
           id: savedContentIds[platform] || null,  // 기존 ID가 있으면 전달
           session_id: sessionId || null,
@@ -380,14 +451,26 @@ function ContentEditor() {
           content: data.content,
           tags: data.tags,
           image_ids: imageIds.length > 0 ? imageIds : null,
-          uploaded_image_url: uploadedImages.length > 0 ? uploadedImages[0].url : null,
+          uploaded_image_url: imageUrl,
         });
         contentId = savedContent.id;
         setSavedContentIds(prev => ({ ...prev, [platform]: contentId }));
       } catch (error) {
         console.error('저장 실패:', error);
         alert('발행 전 저장에 실패했습니다.');
+        setPublishingPlatform(null);
         return;
+      }
+    } else if (uploadedImageUrl) {
+      // 이미 저장된 콘텐츠가 있지만 base64 이미지를 새로 업로드한 경우, 콘텐츠 업데이트
+      try {
+        await publishedContentAPI.update(contentId, {
+          uploaded_image_url: uploadedImageUrl,
+        });
+        console.log('콘텐츠에 업로드된 이미지 URL 업데이트 완료');
+      } catch (updateError) {
+        console.error('콘텐츠 업데이트 실패:', updateError);
+        // 업데이트 실패해도 발행 시도는 계속
       }
     }
 
@@ -478,9 +561,21 @@ function ContentEditor() {
 
   // Instagram/SNS 플랫폼에서 이미지가 필요한지 확인
   const needsImageUpload = (platform) => {
-    return (platform === 'sns' || platform === 'instagram') &&
-           (!result.images || result.images.length === 0) &&
-           uploadedImages.length === 0;
+    if (platform !== 'sns' && platform !== 'instagram') return false;
+
+    // 업로드된 이미지가 있으면 필요 없음
+    if (uploadedImages.length > 0) return false;
+
+    // AI 생성 이미지가 있고, base64가 아닌 URL이면 필요 없음
+    if (result?.images?.length > 0) {
+      const hasValidUrl = result.images.some(img => {
+        const url = img.url || img.image_url;
+        return url && !url.startsWith('data:');
+      });
+      if (hasValidUrl) return false;
+    }
+
+    return true;
   };
 
   // 현재 플랫폼에서 사용할 이미지 URL 가져오기
@@ -489,11 +584,30 @@ function ContentEditor() {
     if (uploadedImages.length > 0) {
       return uploadedImages[0].url;
     }
-    // 세션에서 가져온 이미지가 있으면 사용
-    if (result.images?.length > 0) {
-      return result.images[0].url || result.images[0].image_url;
+    // 세션에서 가져온 이미지가 있으면 사용 (AI 생성 이미지 포함)
+    if (result?.images?.length > 0) {
+      const imgUrl = result.images[0].url || result.images[0].image_url;
+      // base64 이미지는 발행 전에 업로드해야 함
+      if (imgUrl && !imgUrl.startsWith('data:')) {
+        return imgUrl;
+      }
     }
     return null;
+  };
+
+  // 발행에 사용할 모든 이미지 URL 가져오기 (AI 생성 이미지 포함)
+  const getAllImageUrlsForPublish = () => {
+    // 업로드된 이미지가 있으면 우선 사용
+    if (uploadedImages.length > 0) {
+      return uploadedImages.map(img => img.url);
+    }
+    // 세션에서 가져온 이미지가 있으면 사용 (AI 생성 이미지 포함)
+    if (result?.images?.length > 0) {
+      return result.images
+        .map(img => img.url || img.image_url)
+        .filter(url => url && !url.startsWith('data:')); // base64 제외
+    }
+    return [];
   };
 
   // 카드뉴스 발행 모달 열기
@@ -721,26 +835,31 @@ function ContentEditor() {
                 <button className="btn-copy" onClick={() => handleCopy(activePlatform)}>
                   <FiCopy /> 복사하기
                 </button>
-                <button
-                  className="btn-schedule"
-                  onClick={openScheduleModal}
-                  disabled={publishResults[activePlatform]?.success}
-                >
-                  <FiClock /> 예약 발행
-                </button>
-                <button
-                  className={`btn-publish-platform ${publishResults[activePlatform]?.success ? 'published' : ''}`}
-                  onClick={() => handlePublish(activePlatform)}
-                  disabled={publishingPlatform === activePlatform || publishResults[activePlatform]?.success}
-                >
-                  {publishingPlatform === activePlatform ? (
-                    <>발행 중...</>
-                  ) : publishResults[activePlatform]?.success ? (
-                    <><FiCheck /> {publishResults[activePlatform]?.scheduled ? '예약됨' : '발행 완료'}</>
-                  ) : (
-                    <><FiSend /> 즉시 발행</>
-                  )}
-                </button>
+                {/* 블로그는 직접 발행 불가 - 예약/즉시 발행 버튼 숨김 */}
+                {currentConfig?.canPublish !== false && (
+                  <>
+                    <button
+                      className="btn-schedule"
+                      onClick={openScheduleModal}
+                      disabled={publishResults[activePlatform]?.success}
+                    >
+                      <FiClock /> 예약 발행
+                    </button>
+                    <button
+                      className={`btn-publish-platform ${publishResults[activePlatform]?.success ? 'published' : ''}`}
+                      onClick={() => handlePublish(activePlatform)}
+                      disabled={publishingPlatform === activePlatform || publishResults[activePlatform]?.success}
+                    >
+                      {publishingPlatform === activePlatform ? (
+                        <>발행 중...</>
+                      ) : publishResults[activePlatform]?.success ? (
+                        <><FiCheck /> {publishResults[activePlatform]?.scheduled ? '예약됨' : '발행 완료'}</>
+                      ) : (
+                        <><FiSend /> 즉시 발행</>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* 발행 결과 메시지 */}

@@ -30,6 +30,9 @@ const fileToDataURL = (file) => {
 const cleanJsonString = (jsonStr) => {
   let cleaned = jsonStr;
 
+  // 0. 마크다운 코드 블록 제거
+  cleaned = cleaned.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+
   // 1. JSON 문자열 내의 이스케이프되지 않은 줄바꿈을 \\n으로 변환
   // 문자열 값 내부만 처리 (키는 제외)
   cleaned = cleaned.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (_, content) => {
@@ -48,7 +51,248 @@ const cleanJsonString = (jsonStr) => {
   // 3. 마지막 쉼표 제거 (trailing comma)
   cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
 
+  // 4. 이스케이프되지 않은 따옴표 수정 (문자열 내부)
+  // 예: "내용: "이것"입니다" -> "내용: \"이것\"입니다"
+  cleaned = cleaned.replace(/"([^"]*)":\s*"([^"]*)"/g, (_, key, value) => {
+    // 값 내부의 이스케이프되지 않은 따옴표를 이스케이프
+    const escapedValue = value.replace(/(?<!\\)"/g, '\\"');
+    return `"${key}": "${escapedValue}"`;
+  });
+
   return cleaned;
+};
+
+// 네트워크 오류 시 재시도하는 래퍼 함수
+const withRetry = async (fn, maxRetries = 3, delayMs = 1000) => {
+  let lastError;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const isNetworkError =
+        error.message?.includes('Failed to fetch') ||
+        error.message?.includes('network') ||
+        error.message?.includes('NETWORK') ||
+        error.message?.includes('timeout') ||
+        error.message?.includes('ERR_');
+
+      if (isNetworkError && attempt < maxRetries) {
+        console.warn(`네트워크 오류, 재시도 중... (${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delayMs * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+};
+
+// 불완전한 JSON 배열 수정 함수
+const fixIncompleteArray = (jsonStr) => {
+  let result = jsonStr;
+
+  // 불완전한 문자열 처리 - 문자열이 중간에 끊긴 경우
+  // 마지막으로 올바르게 닫힌 문자열 위치 찾기
+  let inString = false;
+  let lastValidPos = 0;
+  let escapeNext = false;
+
+  for (let i = 0; i < result.length; i++) {
+    const char = result[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      if (!inString) {
+        inString = true;
+      } else {
+        inString = false;
+        // 문자열이 제대로 닫혔을 때의 위치 기록
+        lastValidPos = i;
+      }
+    }
+
+    // 문자열 밖에서 구조적 문자가 나오면 유효 위치 업데이트
+    if (!inString && (char === ',' || char === ':' || char === '{' || char === '}' || char === '[' || char === ']')) {
+      lastValidPos = i;
+    }
+  }
+
+  // 문자열이 열린 채로 끝났으면 마지막 유효 위치까지만 사용
+  if (inString && lastValidPos > 0) {
+    // 마지막 유효 위치에서 가장 가까운 쉼표나 여는 괄호 찾기
+    const beforeValid = result.substring(0, lastValidPos + 1);
+    const lastCommaOrBrace = Math.max(beforeValid.lastIndexOf(','), beforeValid.lastIndexOf('{'), beforeValid.lastIndexOf('['));
+    if (lastCommaOrBrace > 0) {
+      result = result.substring(0, lastCommaOrBrace + 1);
+    }
+  }
+
+  // 마지막 따옴표 이후 확인
+  const lastQuoteIndex = result.lastIndexOf('"');
+  const afterLastQuote = result.substring(lastQuoteIndex + 1);
+
+  // 마지막 따옴표 이후에 닫는 괄호만 있어야 정상
+  if (!/^[\s\],}:]*$/.test(afterLastQuote) && lastQuoteIndex > 0) {
+    // 불완전한 문자열이 있음 - 마지막 완전한 속성까지만 사용
+    // 마지막으로 제대로 된 key-value 쌍 찾기
+    const propPattern = /"[^"]*"\s*:\s*(?:"[^"]*"|[\d.]+|true|false|null|\{[^}]*\}|\[[^\]]*\])/g;
+    let lastMatch = null;
+    let match;
+    while ((match = propPattern.exec(result)) !== null) {
+      lastMatch = match;
+    }
+
+    if (lastMatch) {
+      const endPos = lastMatch.index + lastMatch[0].length;
+      result = result.substring(0, endPos);
+    } else {
+      // 정규식 매칭 실패 시 마지막 쉼표까지 자르기
+      const lastCommaIndex = result.lastIndexOf(',');
+      if (lastCommaIndex > 0) {
+        result = result.substring(0, lastCommaIndex);
+      }
+    }
+  }
+
+  // 다시 괄호 수 세기
+  const finalOpenBrackets = (result.match(/\[/g) || []).length;
+  const finalCloseBrackets = (result.match(/\]/g) || []).length;
+  const finalOpenBraces = (result.match(/\{/g) || []).length;
+  const finalCloseBraces = (result.match(/\}/g) || []).length;
+
+  // 닫는 대괄호 부족하면 추가
+  for (let i = 0; i < finalOpenBrackets - finalCloseBrackets; i++) {
+    result += ']';
+  }
+
+  // 닫는 중괄호 부족하면 추가
+  for (let i = 0; i < finalOpenBraces - finalCloseBraces; i++) {
+    result += '}';
+  }
+
+  return result;
+};
+
+// 안전한 JSON 파싱 함수
+// silent: true이면 콘솔 에러 출력 안함
+const safeJsonParse = (jsonStr, silent = false) => {
+  // 빈 문자열 또는 null/undefined 처리
+  if (!jsonStr || typeof jsonStr !== 'string' || jsonStr.trim() === '') {
+    throw new Error('빈 응답');
+  }
+
+  // 1차 시도: JSON 부분 추출 후 직접 파싱
+  const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('JSON 형식을 찾을 수 없음');
+  }
+
+  let jsonPart = jsonMatch[0];
+
+  try {
+    return JSON.parse(jsonPart);
+  } catch (e1) {
+    // 2차 시도: 정제 후 파싱
+    try {
+      const cleaned = cleanJsonString(jsonPart);
+      return JSON.parse(cleaned);
+    } catch (e2) {
+      // 3차 시도: 문자열 값 내 줄바꿈 강제 처리
+      try {
+        let fixed = jsonPart;
+        // 모든 실제 줄바꿈을 이스케이프
+        fixed = fixed.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+        return JSON.parse(fixed);
+      } catch (e3) {
+        // 4차 시도: 불완전한 배열/객체 수정
+        try {
+          let fixed = jsonPart;
+          fixed = fixed.replace(/[\x00-\x1F\x7F]/g, ' ');
+          fixed = fixIncompleteArray(fixed);
+          fixed = cleanJsonString(fixed);
+          return JSON.parse(fixed);
+        } catch (e4) {
+          // 5차 시도: 문자열 내 특수문자 완전 제거
+          try {
+            let aggressive = jsonPart;
+            // 모든 제어 문자와 문제 되는 문자 제거
+            aggressive = aggressive.replace(/[\x00-\x1F\x7F]/g, ' ');
+            // 연속 공백 정리
+            aggressive = aggressive.replace(/\s+/g, ' ');
+            // 불완전한 배열/객체 수정
+            aggressive = fixIncompleteArray(aggressive);
+            aggressive = cleanJsonString(aggressive);
+            return JSON.parse(aggressive);
+          } catch (e5) {
+            // 6차 시도: 잘린 문자열 값 복구
+            try {
+              let truncated = jsonPart;
+              // 제어 문자 제거
+              truncated = truncated.replace(/[\x00-\x1F\x7F]/g, ' ');
+
+              // 잘린 문자열 찾아서 닫기
+              // 열린 따옴표 찾기 (이스케이프되지 않은 것만)
+              let inStr = false;
+              let lastStrStart = -1;
+              let escNext = false;
+
+              for (let i = 0; i < truncated.length; i++) {
+                if (escNext) {
+                  escNext = false;
+                  continue;
+                }
+                if (truncated[i] === '\\') {
+                  escNext = true;
+                  continue;
+                }
+                if (truncated[i] === '"') {
+                  if (!inStr) {
+                    inStr = true;
+                    lastStrStart = i;
+                  } else {
+                    inStr = false;
+                  }
+                }
+              }
+
+              // 문자열이 열린 채로 끝났으면 닫아주기
+              if (inStr && lastStrStart >= 0) {
+                // 마지막 열린 문자열 앞의 마지막 완전한 속성까지만 사용
+                const beforeStr = truncated.substring(0, lastStrStart);
+                const lastComma = beforeStr.lastIndexOf(',');
+                const cutPoint = Math.max(lastComma, 0);
+                if (cutPoint > 0) {
+                  truncated = truncated.substring(0, cutPoint);
+                } else {
+                  // 잘린 문자열에 따옴표 추가
+                  truncated = truncated + '"';
+                }
+              }
+
+              truncated = fixIncompleteArray(truncated);
+              return JSON.parse(truncated);
+            } catch (e6) {
+              if (!silent) {
+                console.error('모든 JSON 파싱 시도 실패:', e6.message);
+                console.error('원본 JSON (처음 500자):', jsonPart.substring(0, 500));
+              }
+              throw e6;
+            }
+          }
+        }
+      }
+    }
+  }
 };
 
 // ============================================
@@ -90,20 +334,19 @@ JSON 형식으로 답변:
   "confidence": 0-1
 }`;
 
-    const result = await this.model.generateContent(prompt);
+    const result = await withRetry(() => this.model.generateContent(prompt));
     const response = result.response.text();
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
 
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    try {
+      return safeJsonParse(response);
+    } catch {
+      return {
+        contentType: "일반 콘텐츠",
+        needsMultiModalAnalysis: images.length > 0,
+        missingInfo: [],
+        confidence: 0.5
+      };
     }
-
-    return {
-      contentType: "일반 콘텐츠",
-      needsMultiModalAnalysis: images.length > 0,
-      missingInfo: [],
-      confidence: 0.5
-    };
   }
 
   async decideNextStep(critiqueResult) {
@@ -189,16 +432,10 @@ JSON 형식으로 답변:
 }`;
 
     const contentParts = imageParts.length > 0 ? [prompt, ...imageParts] : prompt;
-    const result = await this.model.generateContent(contentParts);
+    const result = await withRetry(() => this.model.generateContent(contentParts));
     const response = result.response.text();
 
-
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-
-    throw new Error('분석 결과 파싱 실패');
+    return safeJsonParse(response);
   }
 }
 
@@ -362,22 +599,11 @@ ${imageInstructions}
 
 JSON만 응답하세요.`;
 
-    const result = await this.model.generateContent(prompt);
+    const result = await withRetry(() => this.model.generateContent(prompt));
     const response = result.response.text();
 
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
-        // JSON 파싱 실패 시 문자열 정제 후 재시도
-        console.warn('JSON 파싱 1차 실패, 정제 후 재시도:', parseError.message);
-        const cleanedJson = cleanJsonString(jsonMatch[0]);
-        return JSON.parse(cleanedJson);
-      }
-    }
-
-    throw new Error('콘텐츠 생성 결과 파싱 실패');
+    // safeJsonParse를 사용하여 더 강력한 파싱
+    return safeJsonParse(response);
   }
 }
 
@@ -543,26 +769,22 @@ ${JSON.stringify(outputFormat, null, 2)}
 엄격하게 평가하세요. 평범한 콘텐츠는 70점대입니다.
 위에 명시된 플랫폼만 평가하세요.`;
 
-    const result = await this.model.generateContent(prompt);
+    const result = await withRetry(() => this.model.generateContent(prompt));
     const response = result.response.text();
 
-
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
-        // JSON 파싱 실패 시 기본 평가 반환
-      }
+    try {
+      // critique 파싱 실패 시 조용히 기본값 반환 (silent: true)
+      return safeJsonParse(response, true);
+    } catch {
+      // 기본값 반환 (선택된 플랫폼만) - 재시도 위해 점수를 약간 낮춤
+      console.log('품질 평가 파싱 실패, 기본값 사용');
+      const defaultResult = { overallRecommendation: '통과' };
+      if (hasBlog) defaultResult.blog = { score: 75, strengths: ['콘텐츠 생성 완료'], weaknesses: ['품질 평가 데이터 없음'], improvements: [] };
+      if (hasSNS) defaultResult.sns = { score: 75, strengths: ['콘텐츠 생성 완료'], weaknesses: ['품질 평가 데이터 없음'], improvements: [] };
+      if (hasX) defaultResult.x = { score: 75, strengths: ['콘텐츠 생성 완료'], weaknesses: ['품질 평가 데이터 없음'], improvements: [] };
+      if (hasThreads) defaultResult.threads = { score: 75, strengths: ['콘텐츠 생성 완료'], weaknesses: ['품질 평가 데이터 없음'], improvements: [] };
+      return defaultResult;
     }
-
-    // 기본값 반환 (선택된 플랫폼만)
-    const defaultResult = { overallRecommendation: '통과' };
-    if (hasBlog) defaultResult.blog = { score: 80, strengths: ['콘텐츠 생성 완료'], weaknesses: [], improvements: [] };
-    if (hasSNS) defaultResult.sns = { score: 80, strengths: ['콘텐츠 생성 완료'], weaknesses: [], improvements: [] };
-    if (hasX) defaultResult.x = { score: 80, strengths: ['콘텐츠 생성 완료'], weaknesses: [], improvements: [] };
-    if (hasThreads) defaultResult.threads = { score: 80, strengths: ['콘텐츠 생성 완료'], weaknesses: [], improvements: [] };
-    return defaultResult;
   }
 }
 
@@ -875,15 +1097,10 @@ ${JSON.stringify(outputFormat, null, 2)}
 중요: JSON만 응답하세요. 위에 명시된 플랫폼만 생성하세요.`;
 
     const contentParts = imageParts.length > 0 ? [prompt, ...imageParts] : prompt;
-    const result = await model.generateContent(contentParts);
+    const result = await withRetry(() => model.generateContent(contentParts));
     const response = result.response.text();
 
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('응답 파싱 실패');
-    }
-
-    let content = JSON.parse(jsonMatch[0]);
+    let content = safeJsonParse(response);
     const imageDataUrls = await imageDataUrlsPromise;
 
     // 분석 데이터 기본값 설정

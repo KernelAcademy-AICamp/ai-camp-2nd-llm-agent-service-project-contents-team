@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { FiCopy, FiArrowRight, FiEdit3, FiChevronLeft, FiChevronRight, FiPlus, FiTrash2, FiMove } from 'react-icons/fi';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import ReactMarkdown from 'react-markdown';
@@ -150,6 +150,7 @@ const collectAllTags = (textResult) => {
 // ========== 메인 컴포넌트 ==========
 function ContentCreatorSimple() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // 입력 상태
   const [contentType, setContentType] = useState(null);
@@ -175,6 +176,7 @@ function ContentCreatorSimple() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState('');
   const [result, setResult] = useState(null);
+  const hasSavedRef = useRef(false); // 현재 생성 결과 저장 여부 추적
 
   // 팝업 상태
   const [popupImage, setPopupImage] = useState(null);
@@ -227,6 +229,25 @@ function ContentCreatorSimple() {
     fetchCreditBalance();
     fetchUserContext();
   }, []);
+
+  // 템플릿에서 넘어온 경우 데이터 설정
+  useEffect(() => {
+    if (location.state?.fromTemplate && location.state?.template) {
+      const template = location.state.template;
+      // 템플릿의 프롬프트를 topic에 설정
+      setTopic(template.prompt || template.name || '');
+      // 기본 콘텐츠 타입 설정 (글+이미지 추천)
+      setContentType('both');
+      // 기본 플랫폼 설정
+      setSelectedPlatforms(['blog', 'sns']);
+      // 이미지 형태 기본값 설정
+      setImageFormat('ai-image');
+      setImageCount(1);
+
+      // state 정리 (뒤로가기 시 중복 적용 방지)
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // 디자인 템플릿 목록 조회 (카테고리별 - 새 템플릿 시스템만 사용)
   useEffect(() => {
@@ -309,25 +330,66 @@ function ContentCreatorSimple() {
 
   // ========== 자동 저장 ==========
   const autoSaveContent = async (content, imageUrls, platforms, currentStyle, currentContentType, requestedImageCount) => {
+    // 이미 저장된 경우 스킵
+    if (hasSavedRef.current) {
+      console.log('이미 저장됨, 중복 저장 스킵');
+      return;
+    }
+
+    // 저장할 콘텐츠가 없으면 스킵
+    if (!content.blog && !content.sns && !content.x && !content.threads) {
+      console.log('저장할 콘텐츠가 없음, 스킵');
+      return;
+    }
+
+    // 플랫폼이 선택되지 않았으면 스킵
+    if (!platforms || platforms.length === 0) {
+      console.log('선택된 플랫폼이 없음, 스킵');
+      return;
+    }
+
     try {
+      // Base64 이미지가 너무 크면 저장하지 않음 (URL만 저장)
+      const processedImageUrls = imageUrls.map(url => {
+        // Base64 이미지인 경우 크기 체크 (1MB 이상이면 저장 스킵)
+        if (url && url.startsWith('data:') && url.length > 1000000) {
+          console.warn('이미지가 너무 커서 저장을 건너뜁니다.');
+          return null;
+        }
+        return url;
+      }).filter(Boolean);
+
+      // 이미지 데이터 준비 (빈 배열이면 null로 처리)
+      const imageData = processedImageUrls.length > 0
+        ? processedImageUrls.map(url => ({ image_url: url, prompt: topic }))
+        : null;
+
       const saveData = {
         topic,
         content_type: currentContentType,
-        style: currentStyle,
+        style: currentStyle || 'default',
         selected_platforms: platforms,
-        blog: content.blog ? { title: content.blog.title, content: content.blog.content, tags: content.blog.tags, score: content.critique?.blog?.score || null } : null,
-        sns: content.sns ? { content: content.sns.content, hashtags: content.sns.tags, score: content.critique?.sns?.score || null } : null,
-        x: content.x ? { content: content.x.content, hashtags: content.x.tags, score: content.critique?.x?.score || null } : null,
-        threads: content.threads ? { content: content.threads.content, hashtags: content.threads.tags, score: content.critique?.threads?.score || null } : null,
-        images: imageUrls.map(url => ({ image_url: url, prompt: topic })),
-        requested_image_count: requestedImageCount,
+        blog: content.blog ? { title: content.blog.title || '제목 없음', content: content.blog.content || '', tags: content.blog.tags || [], score: content.critique?.blog?.score || null } : null,
+        sns: content.sns ? { content: content.sns.content || '', hashtags: content.sns.tags || content.sns.hashtags || [], score: content.critique?.sns?.score || null } : null,
+        x: content.x ? { content: content.x.content || '', hashtags: content.x.tags || content.x.hashtags || [], score: content.critique?.x?.score || null } : null,
+        threads: content.threads ? { content: content.threads.content || '', hashtags: content.threads.tags || content.threads.hashtags || [], score: content.critique?.threads?.score || null } : null,
+        images: imageData,
+        requested_image_count: requestedImageCount || 0,
         analysis_data: content.analysis || null,
         critique_data: content.critique || null,
         generation_attempts: content.metadata?.attempts || 1
       };
+
       await contentSessionAPI.save(saveData);
+      hasSavedRef.current = true; // 저장 성공 표시
+      console.log('콘텐츠 저장 성공');
     } catch (error) {
+      // 저장 실패해도 사용자 경험에 영향 없이 조용히 실패
       console.error('콘텐츠 저장 실패:', error);
+      if (error.response?.data) {
+        console.error('서버 응답:', error.response.data);
+      }
+      // 에러가 발생해도 hasSavedRef는 false로 유지하여 재시도 가능
     }
   };
 
@@ -356,6 +418,7 @@ function ContentCreatorSimple() {
     setIsGenerating(true);
     setResult(null);
     setProgress('콘텐츠 생성 준비 중...');
+    hasSavedRef.current = false; // 새 생성 시 저장 상태 초기화
 
     try {
       const generatedResult = { text: null, images: [] };
@@ -524,7 +587,7 @@ function ContentCreatorSimple() {
           analysis: original.analysis || generatedResult.text?.analysis,
           critique: original.critique || generatedResult.text?.critique,
           metadata: { attempts: original.metadata?.attempts || 1 }
-        }, imageUrls, platforms, null, contentType, imageCount);
+        }, imageUrls, platforms, 'default', contentType, imageCount);
       }
 
       // 크레딧 차감 (이미지/카드뉴스 생성 성공 시)

@@ -9,6 +9,9 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+import base64
+import uuid
+from datetime import datetime
 
 from ..database import get_db
 from ..models import (
@@ -17,6 +20,10 @@ from ..models import (
     GeneratedXContent, GeneratedThreadsContent, GeneratedImage, GeneratedCardnewsContent
 )
 from ..auth import get_current_user
+from ..services.supabase_storage import get_storage_service
+from ..logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/ai-content", tags=["ai-content"])
 
@@ -496,3 +503,90 @@ def _build_session_response(session: ContentGenerationSession) -> ContentSession
         ] if session.images else None,
         requested_image_count=session.requested_image_count or 0
     )
+
+
+# ============================================
+# 이미지 업로드 API
+# ============================================
+
+class ImageUploadRequest(BaseModel):
+    """Base64 이미지 업로드 요청"""
+    image_data: str  # Base64 encoded image (with or without data URL prefix)
+    prompt: Optional[str] = None
+
+
+class ImageUploadResponse(BaseModel):
+    """이미지 업로드 응답"""
+    success: bool
+    image_url: str
+    message: str
+
+
+@router.post("/v2/upload-image", response_model=ImageUploadResponse)
+async def upload_generated_image(
+    request: ImageUploadRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    생성된 이미지를 Supabase Storage에 업로드
+    - Base64 이미지를 받아서 Storage에 저장
+    - Public URL 반환
+    """
+    try:
+        # Base64 데이터에서 이미지 추출
+        image_data = request.image_data
+
+        # data:image/png;base64, 형식인 경우 prefix 제거
+        if ',' in image_data:
+            header, image_data = image_data.split(',', 1)
+            # MIME 타입 추출
+            if 'png' in header.lower():
+                content_type = 'image/png'
+                ext = 'png'
+            elif 'jpeg' in header.lower() or 'jpg' in header.lower():
+                content_type = 'image/jpeg'
+                ext = 'jpg'
+            elif 'webp' in header.lower():
+                content_type = 'image/webp'
+                ext = 'webp'
+            else:
+                content_type = 'image/png'
+                ext = 'png'
+        else:
+            content_type = 'image/png'
+            ext = 'png'
+
+        # Base64 디코딩
+        try:
+            image_bytes = base64.b64decode(image_data)
+        except Exception as decode_error:
+            logger.error(f"Base64 디코딩 실패: {decode_error}")
+            raise HTTPException(status_code=400, detail="잘못된 이미지 데이터입니다.")
+
+        # 파일 경로 생성 (user_id/generated-images/timestamp_uuid.ext)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        file_path = f"{current_user.id}/generated-images/{timestamp}_{unique_id}.{ext}"
+
+        # Supabase Storage에 업로드
+        storage = get_storage_service()
+        public_url = storage.upload_file(
+            bucket="ai-generated-content",  # 생성 콘텐츠용 버킷
+            file_path=file_path,
+            file_data=image_bytes,
+            content_type=content_type
+        )
+
+        logger.info(f"이미지 업로드 성공: {public_url[:80]}...")
+
+        return ImageUploadResponse(
+            success=True,
+            image_url=public_url,
+            message="이미지 업로드 완료"
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"이미지 업로드 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"이미지 업로드 실패: {str(e)}")

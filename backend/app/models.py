@@ -831,7 +831,7 @@ class GeneratedImage(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # 이미지 정보
-    image_url = Column(String, nullable=False)  # 이미지 URL
+    image_url = Column(Text, nullable=False)  # 이미지 URL (Base64 데이터 포함 가능)
     prompt = Column(Text, nullable=True)  # 생성에 사용된 프롬프트
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

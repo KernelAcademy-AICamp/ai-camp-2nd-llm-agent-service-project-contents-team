@@ -203,18 +203,18 @@ function Templates() {
   const handleUseTemplate = async (template) => {
     try {
       await templatesAPI.useTemplate(template.id);
-      const tab = tabs.find(t => t.id === template.tab_id);
-      navigate('/ai-content', {
-        state: { template: template, purpose: tab?.tab_key || 'promotion' }
-      });
     } catch (error) {
       console.error('템플릿 사용 기록 실패:', error);
-      // 에러가 나도 페이지 이동은 진행
-      const tab = tabs.find(t => t.id === template.tab_id);
-      navigate('/ai-content', {
-        state: { template: template, purpose: tab?.tab_key || 'promotion' }
-      });
     }
+    // /create 페이지로 템플릿 데이터 전달
+    const tab = tabs.find(t => t.id === template.tab_id);
+    navigate('/create', {
+      state: {
+        template: template,
+        purpose: tab?.tab_key || 'promotion',
+        fromTemplate: true
+      }
+    });
   };
 
   const handleDuplicateTemplate = async (template) => {

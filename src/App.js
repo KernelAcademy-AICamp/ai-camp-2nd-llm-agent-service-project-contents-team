@@ -14,7 +14,7 @@ import Templates from './pages/content/Templates';
 import Settings from './pages/settings/Settings';
 import MyPage from './pages/profile/MyPage';
 import ContentHub from './pages/content/ContentHub';
-import ContentCreatorSimple from './pages/content/ContentCreatorSimple';
+import { ContentCreator } from './pages/content/creator';
 import ContentHistory from './pages/content/ContentHistory';
 import ContentEditor from './pages/content/ContentEditor';
 import YouTube from './pages/connection_SNS/youtube/YouTube';
@@ -86,7 +86,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <Layout>
-                  <ContentCreatorSimple />
+                  <ContentCreator />
                 </Layout>
               </ProtectedRoute>
             }
