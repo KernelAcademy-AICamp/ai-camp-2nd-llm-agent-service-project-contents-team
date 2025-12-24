@@ -765,6 +765,12 @@ export const publishedContentAPI = {
     return response.data;
   },
 
+  // 세션 ID로 기존 draft 콘텐츠 조회 (중복 체크용)
+  getBySession: async (sessionId) => {
+    const response = await api.get(`/api/published-contents/by-session/${sessionId}`);
+    return response.data;
+  },
+
   // 이미지 업로드 (Instagram/SNS 발행용)
   uploadImage: async (file) => {
     const formData = new FormData();

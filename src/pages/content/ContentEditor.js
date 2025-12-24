@@ -78,11 +78,15 @@ function ContentEditor() {
   const [cardnewsCaption, setCardnewsCaption] = useState('');
   const [selectedPublishPlatform, setSelectedPublishPlatform] = useState('instagram');
   const [isPublishingCardnews, setIsPublishingCardnews] = useState(false);
+
+  // SNS 플랫폼 선택 모달 (Instagram/Facebook)
+  const [showSnsSelectModal, setShowSnsSelectModal] = useState(false);
+  const [snsSelectMode, setSnsSelectMode] = useState('publish'); // 'publish' | 'schedule'
   const [cardnewsPublishResult, setCardnewsPublishResult] = useState(null);
 
-  // 카드뉴스 저장 상태
-  const [cardnewsContentId, setCardnewsContentId] = useState(null);
-  const [isCardnewsSaved, setIsCardnewsSaved] = useState(false);
+  // 카드뉴스 저장 상태 (자동 저장 비활성화로 현재 미사용)
+  // const [cardnewsContentId, setCardnewsContentId] = useState(null);
+  // const [isCardnewsSaved, setIsCardnewsSaved] = useState(false);
 
   // 초기 데이터 설정
   useEffect(() => {
@@ -142,49 +146,10 @@ function ContentEditor() {
     }
   }, [result, navigate]);
 
-  // 카드뉴스 편집 시 자동으로 콘텐츠 관리에 등록
-  useEffect(() => {
-    const saveCardnewsToContentManagement = async () => {
-      // 텍스트 콘텐츠가 없고 이미지만 있는 경우 = 카드뉴스
-      const isCardnewsOnly = !editedContent || Object.keys(editedContent).length === 0;
-      const hasImages = result?.images?.length > 0;
-
-      if (isCardnewsOnly && hasImages && !isCardnewsSaved && !cardnewsContentId) {
-        try {
-          // 이미지 URL 추출 (base64인 경우 건너뛰기 - 나중에 발행 시 업로드)
-          const imageUrls = result.images
-            .map(img => img.url || img.image_url)
-            .filter(url => url && !url.startsWith('data:')); // base64 제외
-
-          // base64 이미지만 있는 경우 저장하지 않음 (발행 시 처리)
-          if (imageUrls.length === 0) {
-            console.log('카드뉴스 이미지가 base64 형식입니다. 발행 시 업로드됩니다.');
-            setIsCardnewsSaved(true); // 재시도 방지
-            return;
-          }
-
-          // 카드뉴스를 PublishedContent에 draft로 저장
-          const savedContent = await publishedContentAPI.saveDraft({
-            session_id: sessionId || null,
-            platform: 'cardnews',
-            title: topic || '카드뉴스',
-            content: `카드뉴스 ${result.images.length}장`,
-            tags: ['카드뉴스'],
-            card_image_urls: imageUrls,
-          });
-
-          setCardnewsContentId(savedContent.id);
-          setIsCardnewsSaved(true);
-          console.log('카드뉴스가 콘텐츠 관리에 등록되었습니다:', savedContent.id);
-        } catch (error) {
-          console.error('카드뉴스 저장 실패:', error);
-          setIsCardnewsSaved(true); // 재시도 방지
-        }
-      }
-    };
-
-    saveCardnewsToContentManagement();
-  }, [result, editedContent, sessionId, topic, isCardnewsSaved, cardnewsContentId]);
+  // 카드뉴스 자동 저장 비활성화
+  // 카드뉴스는 사용자가 직접 "SNS 발행하기" 버튼을 클릭했을 때만 발행됨
+  // (이전에는 편집 페이지 진입 시 자동으로 draft 저장되었으나,
+  //  글+이미지 모드에서도 카드뉴스로 잘못 저장되는 문제가 있었음)
 
   // 변경 감지
   useEffect(() => {
@@ -398,6 +363,9 @@ function ContentEditor() {
 
   // 즉시 발행 핸들러
   const handlePublish = async (platform) => {
+    // instagram/facebook은 sns 콘텐츠를 사용
+    const contentKey = (platform === 'instagram' || platform === 'facebook') ? 'sns' : platform;
+
     // 저장되지 않은 변경사항이 있으면 먼저 저장
     if (!isSaved) {
       const confirmed = window.confirm('발행 전에 변경사항을 저장해야 합니다. 저장하시겠습니까?');
@@ -408,9 +376,9 @@ function ContentEditor() {
       }
     }
 
-    // base64 이미지가 있으면 먼저 업로드 (Instagram/SNS 발행 시 필수)
+    // base64 이미지가 있으면 먼저 업로드 (Instagram/Facebook 발행 시 필수)
     let uploadedImageUrl = null;
-    if ((platform === 'sns' || platform === 'instagram') && result?.images?.length > 0) {
+    if ((platform === 'instagram' || platform === 'facebook') && result?.images?.length > 0) {
       const firstImg = result.images[0].url || result.images[0].image_url;
       if (firstImg && firstImg.startsWith('data:')) {
         try {
@@ -430,7 +398,8 @@ function ContentEditor() {
     let contentId = savedContentIds[platform];
     if (!contentId) {
       try {
-        const data = editedContent[platform];
+        // sns 콘텐츠를 사용하되 발행 플랫폼은 instagram/facebook으로 지정
+        const data = editedContent[contentKey];
 
         // 이미지 URL 결정: 방금 업로드한 이미지 > 직접 업로드 > AI 생성 이미지 URL
         let imageUrl = uploadedImageUrl;
@@ -446,7 +415,7 @@ function ContentEditor() {
         const savedContent = await publishedContentAPI.saveDraft({
           id: savedContentIds[platform] || null,  // 기존 ID가 있으면 전달
           session_id: sessionId || null,
-          platform: platform,
+          platform: platform,  // 실제 발행 플랫폼 (instagram/facebook)
           title: data.title || null,
           content: data.content,
           tags: data.tags,
@@ -641,18 +610,6 @@ function ContentEditor() {
       const platformName = selectedPublishPlatform === 'instagram' ? 'Instagram' :
                           selectedPublishPlatform === 'facebook' ? 'Facebook' : 'Threads';
 
-      // 콘텐츠 관리에 저장된 카드뉴스가 있으면 상태를 published로 업데이트
-      if (cardnewsContentId) {
-        try {
-          await publishedContentAPI.update(cardnewsContentId, {
-            content: cardnewsCaption || `카드뉴스 ${result.images.length}장`,
-          });
-          // 발행 상태는 별도 API로 업데이트해야 하므로, 여기서는 캡션만 업데이트
-        } catch (updateError) {
-          console.error('카드뉴스 콘텐츠 업데이트 실패:', updateError);
-        }
-      }
-
       // 발행 성공 - 알림 표시 후 콘텐츠 관리 > 발행됨 탭으로 이동
       alert(`${platformName}에 카드뉴스가 발행되었습니다!`);
       setShowCardnewsPublishModal(false);
@@ -838,26 +795,60 @@ function ContentEditor() {
                 {/* 블로그는 직접 발행 불가 - 예약/즉시 발행 버튼 숨김 */}
                 {currentConfig?.canPublish !== false && (
                   <>
-                    <button
-                      className="btn-schedule"
-                      onClick={openScheduleModal}
-                      disabled={publishResults[activePlatform]?.success}
-                    >
-                      <FiClock /> 예약 발행
-                    </button>
-                    <button
-                      className={`btn-publish-platform ${publishResults[activePlatform]?.success ? 'published' : ''}`}
-                      onClick={() => handlePublish(activePlatform)}
-                      disabled={publishingPlatform === activePlatform || publishResults[activePlatform]?.success}
-                    >
-                      {publishingPlatform === activePlatform ? (
-                        <>발행 중...</>
-                      ) : publishResults[activePlatform]?.success ? (
-                        <><FiCheck /> {publishResults[activePlatform]?.scheduled ? '예약됨' : '발행 완료'}</>
-                      ) : (
-                        <><FiSend /> 즉시 발행</>
-                      )}
-                    </button>
+                    {/* SNS 플랫폼은 Instagram/Facebook 선택 팝업 */}
+                    {activePlatform === 'sns' ? (
+                      <>
+                        <button
+                          className="btn-schedule"
+                          onClick={() => {
+                            setSnsSelectMode('schedule');
+                            setShowSnsSelectModal(true);
+                          }}
+                          disabled={publishResults[activePlatform]?.success}
+                        >
+                          <FiClock /> 예약 발행
+                        </button>
+                        <button
+                          className={`btn-publish-platform ${publishResults[activePlatform]?.success ? 'published' : ''}`}
+                          onClick={() => {
+                            setSnsSelectMode('publish');
+                            setShowSnsSelectModal(true);
+                          }}
+                          disabled={publishingPlatform === activePlatform || publishResults[activePlatform]?.success}
+                        >
+                          {publishingPlatform === activePlatform ? (
+                            <>발행 중...</>
+                          ) : publishResults[activePlatform]?.success ? (
+                            <><FiCheck /> {publishResults[activePlatform]?.scheduled ? '예약됨' : '발행 완료'}</>
+                          ) : (
+                            <><FiSend /> 즉시 발행</>
+                          )}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="btn-schedule"
+                          onClick={openScheduleModal}
+                          disabled={publishResults[activePlatform]?.success}
+                        >
+                          <FiClock /> 예약 발행
+                        </button>
+                        <button
+                          className={`btn-publish-platform ${publishResults[activePlatform]?.success ? 'published' : ''}`}
+                          onClick={() => handlePublish(activePlatform)}
+                          disabled={publishingPlatform === activePlatform || publishResults[activePlatform]?.success}
+                        >
+                          {publishingPlatform === activePlatform ? (
+                            <>발행 중...</>
+                          ) : publishResults[activePlatform]?.success ? (
+                            <><FiCheck /> {publishResults[activePlatform]?.scheduled ? '예약됨' : '발행 완료'}</>
+                          ) : (
+                            <><FiSend /> 즉시 발행</>
+                          )}
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -1136,6 +1127,62 @@ function ContentEditor() {
                   {isPublishingCardnews ? '발행 중...' : '발행하기'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SNS 플랫폼 선택 모달 (Instagram/Facebook) */}
+      {showSnsSelectModal && (
+        <div className="schedule-modal-overlay" onClick={() => setShowSnsSelectModal(false)}>
+          <div className="schedule-modal sns-select-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="schedule-modal-header">
+              <h3>{snsSelectMode === 'publish' ? '발행할 플랫폼 선택' : '예약 발행할 플랫폼 선택'}</h3>
+              <button className="btn-close" onClick={() => setShowSnsSelectModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="schedule-modal-body">
+              <p className="sns-select-desc">어떤 플랫폼에 발행하시겠습니까?</p>
+              <div className="sns-platform-buttons">
+                <button
+                  className="sns-platform-btn instagram"
+                  onClick={async () => {
+                    setShowSnsSelectModal(false);
+                    if (snsSelectMode === 'publish') {
+                      await handlePublish('instagram');
+                    } else {
+                      openScheduleModal();
+                    }
+                  }}
+                  disabled={publishingPlatform}
+                >
+                  <span className="platform-icon">📷</span>
+                  <span className="platform-name">Instagram</span>
+                  <span className="platform-desc">사진/이미지 게시물</span>
+                </button>
+                <button
+                  className="sns-platform-btn facebook"
+                  onClick={async () => {
+                    setShowSnsSelectModal(false);
+                    if (snsSelectMode === 'publish') {
+                      await handlePublish('facebook');
+                    } else {
+                      openScheduleModal();
+                    }
+                  }}
+                  disabled={publishingPlatform}
+                >
+                  <span className="platform-icon">📘</span>
+                  <span className="platform-name">Facebook</span>
+                  <span className="platform-desc">페이지 게시물</span>
+                </button>
+              </div>
+            </div>
+            <div className="schedule-modal-footer">
+              <button className="btn-cancel" onClick={() => setShowSnsSelectModal(false)}>
+                취소
+              </button>
             </div>
           </div>
         </div>

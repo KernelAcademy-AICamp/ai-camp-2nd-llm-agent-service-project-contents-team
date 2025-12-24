@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FiCopy, FiTrash2, FiArrowLeft, FiEdit3, FiDownload } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
-import { contentSessionAPI, generatedVideoAPI } from '../../services/api';
+import { contentSessionAPI, generatedVideoAPI, publishedContentAPI } from '../../services/api';
 import './ContentHistory.css';
 
 // ========== 상수 정의 ==========
@@ -243,7 +243,26 @@ function ContentHistory() {
   };
 
   // 편집 페이지로 이동
-  const handleGoToEditor = (item) => {
+  const handleGoToEditor = async (item) => {
+    try {
+      // 먼저 이 세션에 대해 이미 편집 중인 콘텐츠가 있는지 확인
+      const existingContent = await publishedContentAPI.getBySession(item.id);
+
+      if (existingContent.exists) {
+        // 이미 편집 중인 콘텐츠가 있으면 사용자에게 확인
+        const confirmMessage = `이 콘텐츠는 이미 콘텐츠 관리에서 편집 중입니다.\n\n제목: ${existingContent.title || '(제목 없음)'}\n\n기존 편집 내역으로 이동하시겠습니까?`;
+
+        if (window.confirm(confirmMessage)) {
+          // 콘텐츠 관리 페이지로 이동 (draft 필터)
+          navigate('/list?status=draft');
+        }
+        return;
+      }
+    } catch (error) {
+      console.error('기존 콘텐츠 확인 실패:', error);
+      // 에러가 발생해도 새 편집으로 진행
+    }
+
     // ContentEditor가 기대하는 형식으로 데이터 변환
     // 카드뉴스 이미지가 있으면 카드뉴스 이미지 사용, 없으면 일반 이미지 사용
     let images = [];
