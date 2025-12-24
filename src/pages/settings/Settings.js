@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../services/api';
+import { useBrandAnalysis } from '../../contexts/BrandAnalysisContext';
 import './Settings.css';
 
 // ==================== 상수 정의 ====================
@@ -168,6 +169,7 @@ const StyleForm = ({ editData, onChange }) => (
 // ==================== 메인 컴포넌트 ====================
 function Settings() {
   const navigate = useNavigate();
+  const { isAnalyzing } = useBrandAnalysis();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editModal, setEditModal] = useState({ open: false, type: null });
@@ -338,15 +340,27 @@ function Settings() {
         <div className="settings-section">
           <div className="section-header">
             <h3>비즈니스 정보</h3>
-            <button className="btn-edit" onClick={() => openEditModal('business')}>수정</button>
-          </div>
-          <div className="profile-info-grid">
-            {user.brand_name && <InfoCard label="브랜드명" value={user.brand_name} />}
-            {user.business_type && <InfoCard label="업종" value={getLabel(BUSINESS_TYPES, user.business_type)} className="business-type" />}
-            {user.business_description && (
-              <InfoCard label="비즈니스 설명" value={parseBusinessDescription(user.business_description).mainDescription} className="full-width description" />
+            {!isAnalyzing && (
+              <button className="btn-edit" onClick={() => openEditModal('business')}>수정</button>
             )}
           </div>
+          {isAnalyzing ? (
+            <div className="analyzing-placeholder">
+              <div className="analyzing-spinner"></div>
+              <div className="analyzing-text">
+                <span>SNS 분석 중...</span>
+                <small>분석이 완료되면 자동으로 업데이트됩니다</small>
+              </div>
+            </div>
+          ) : (
+            <div className="profile-info-grid">
+              {user.brand_name && <InfoCard label="브랜드명" value={user.brand_name} />}
+              {user.business_type && <InfoCard label="업종" value={getLabel(BUSINESS_TYPES, user.business_type)} className="business-type" />}
+              {user.business_description && (
+                <InfoCard label="비즈니스 설명" value={parseBusinessDescription(user.business_description).mainDescription} className="full-width description" />
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -355,22 +369,34 @@ function Settings() {
         <div className="settings-section">
           <div className="section-header">
             <h3>타겟 고객</h3>
-            <button className="btn-edit" onClick={() => openEditModal('target')}>수정</button>
-          </div>
-          <div className="profile-info-grid">
-            {user.target_audience.age_range && <InfoCard label="연령대" value={user.target_audience.age_range} />}
-            {user.target_audience.gender && <InfoCard label="성별" value={getLabel(GENDERS, user.target_audience.gender)} />}
-            {user.target_audience.interests?.length > 0 && (
-              <div className="info-card full-width">
-                <div className="info-label">관심사</div>
-                <div className="interests-tags">
-                  {user.target_audience.interests.map((interest, idx) => (
-                    <span key={idx} className="interest-tag">{interest}</span>
-                  ))}
-                </div>
-              </div>
+            {!isAnalyzing && (
+              <button className="btn-edit" onClick={() => openEditModal('target')}>수정</button>
             )}
           </div>
+          {isAnalyzing ? (
+            <div className="analyzing-placeholder">
+              <div className="analyzing-spinner"></div>
+              <div className="analyzing-text">
+                <span>SNS 분석 중...</span>
+                <small>분석이 완료되면 자동으로 업데이트됩니다</small>
+              </div>
+            </div>
+          ) : (
+            <div className="profile-info-grid">
+              {user.target_audience.age_range && <InfoCard label="연령대" value={user.target_audience.age_range} />}
+              {user.target_audience.gender && <InfoCard label="성별" value={getLabel(GENDERS, user.target_audience.gender)} />}
+              {user.target_audience.interests?.length > 0 && (
+                <div className="info-card full-width">
+                  <div className="info-label">관심사</div>
+                  <div className="interests-tags">
+                    {user.target_audience.interests.map((interest, idx) => (
+                      <span key={idx} className="interest-tag">{interest}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

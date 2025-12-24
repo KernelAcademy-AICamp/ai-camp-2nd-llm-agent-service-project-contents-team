@@ -14,10 +14,25 @@ from ..database import get_db, SessionLocal
 from ..models import User, BrandAnalysis, YouTubeConnection, InstagramConnection, ThreadsConnection
 from ..auth import get_current_user
 from ..services.brand_analyzer_service import BrandAnalyzerService
+from ..services.supabase_storage import get_storage_service
 from ..brand_agents import BrandAnalysisPipeline
+import uuid
 
 router = APIRouter(prefix="/api/brand-analysis", tags=["brand-analysis"])
 logger = logging.getLogger(__name__)
+
+
+def update_analysis_progress(db: Session, user_id: int, progress: int, step: str):
+    """분석 진행률 업데이트 헬퍼 함수"""
+    try:
+        brand_analysis = db.query(BrandAnalysis).filter(BrandAnalysis.user_id == user_id).first()
+        if brand_analysis:
+            brand_analysis.analysis_progress = progress
+            brand_analysis.analysis_step = step
+            db.commit()
+            logger.info(f"📊 Progress 업데이트: {progress}% ({step})")
+    except Exception as e:
+        logger.error(f"Progress 업데이트 실패: {e}")
 
 
 class MultiPlatformAnalysisRequest(BaseModel):
@@ -132,6 +147,12 @@ async def multi_platform_analysis_background(
             brand_analysis = BrandAnalysis(user_id=user_id)
             db.add(brand_analysis)
 
+        # 분석 시작 상태 설정
+        brand_analysis.analysis_status = "analyzing"
+        brand_analysis.analysis_error = None
+        brand_analysis.analysis_progress = 5
+        brand_analysis.analysis_step = "collecting"
+
         # 플랫폼 URL 구성
         platform_urls = {}
         if instagram_url:
@@ -187,13 +208,23 @@ async def multi_platform_analysis_background(
 
         db.commit()
 
+        # Progress: 플랫폼 연동 확인 완료 (20%)
+        update_analysis_progress(db, user_id, 20, "collecting")
+
         # ===== Multi-Agent Pipeline 실행 =====
         pipeline = BrandAnalysisPipeline(db=db)
+
+        # Progress: 분석 시작 (30%)
+        update_analysis_progress(db, user_id, 30, "analyzing")
+
         brand_profile = await pipeline.run(
             user_id=user_id,  # int 타입으로 전달
             platform_urls=platform_urls,
             max_items=max_posts
         )
+
+        # Progress: 분석 완료, 프로필 저장 중 (80%)
+        update_analysis_progress(db, user_id, 80, "synthesizing")
 
         # ===== BrandProfile → BrandAnalysis 변환 =====
         # Overall 데이터
@@ -227,10 +258,17 @@ async def multi_platform_analysis_background(
             brand_analysis.youtube_analysis_status = "completed"
 
         # ===== 통합 브랜드 프로필 저장 =====
-        brand_analysis.brand_profile_json = brand_profile.dict()
+        # mode="json"으로 datetime을 문자열로 변환하여 JSON 직렬화 가능하게 함
+        brand_analysis.brand_profile_json = brand_profile.model_dump(mode="json")
         brand_analysis.profile_source = brand_profile.source
         brand_analysis.profile_confidence = brand_profile.confidence_level
         brand_analysis.profile_updated_at = datetime.utcnow()
+
+        # 분석 완료 상태 설정
+        brand_analysis.analysis_status = "completed"
+        brand_analysis.analysis_error = None
+        brand_analysis.analysis_progress = 100
+        brand_analysis.analysis_step = "completed"
 
         db.commit()
         logger.info(f"사용자 {user_id}의 멀티 플랫폼 분석 완료")
@@ -242,6 +280,10 @@ async def multi_platform_analysis_background(
         try:
             brand_analysis = db.query(BrandAnalysis).filter(BrandAnalysis.user_id == user_id).first()
             if brand_analysis:
+                # 전체 분석 상태를 실패로 설정
+                brand_analysis.analysis_status = "failed"
+                brand_analysis.analysis_error = str(e)[:500]  # 에러 메시지 저장 (최대 500자)
+
                 if instagram_url:
                     brand_analysis.instagram_analysis_status = "failed"
                 if youtube_url:
@@ -249,8 +291,8 @@ async def multi_platform_analysis_background(
                 if threads_url:
                     pass  # Note: BrandAnalysis 모델에 threads_* 필드가 추가되면 여기에 상태 업데이트 추가
                 db.commit()
-        except:
-            pass
+        except Exception as commit_error:
+            logger.error(f"실패 상태 저장 중 오류: {commit_error}")
     finally:
         # DB 세션 닫기
         db.close()
@@ -335,6 +377,8 @@ async def get_analysis_status(
 
     if not brand_analysis:
         return {
+            "analysis_status": "pending",
+            "analysis_error": None,
             "overall": None,
             "blog": {"status": "pending", "url": None, "analyzed_at": None},
             "instagram": {"status": "pending", "url": None, "analyzed_at": None},
@@ -396,6 +440,10 @@ async def get_analysis_status(
         }
 
     return {
+        "analysis_status": brand_analysis.analysis_status or "pending",
+        "analysis_progress": brand_analysis.analysis_progress or 0,
+        "analysis_step": brand_analysis.analysis_step,
+        "analysis_error": brand_analysis.analysis_error,
         "overall": overall,
         "blog": blog_data,
         "instagram": instagram_data,
@@ -406,13 +454,24 @@ async def get_analysis_status(
 async def manual_content_analysis_background(
     user_id: int,
     text_samples: Optional[List[str]],
-    image_samples: Optional[List[str]],  # 저장된 파일 경로
-    video_samples: Optional[List[str]],  # 저장된 파일 경로
-    db: Session
+    image_urls: Optional[List[str]],  # Supabase Storage URL
+    video_urls: Optional[List[str]],  # Supabase Storage URL
 ):
     """
     백그라운드에서 수동 콘텐츠 분석 수행 (Multi-Agent Pipeline 사용)
+
+    주의: 백그라운드 태스크용 새 DB 세션 생성
     """
+    logger.info(f"🚀 백그라운드 태스크 시작 - 사용자 ID: {user_id}")
+
+    # 백그라운드 태스크용 새 DB 세션 생성
+    try:
+        db = SessionLocal()
+        logger.info("✅ DB 세션 생성 성공")
+    except Exception as e:
+        logger.error(f"❌ DB 세션 생성 실패: {e}")
+        return
+
     try:
         logger.info(f"사용자 {user_id}의 수동 콘텐츠 분석 시작 (Multi-Agent Pipeline)")
 
@@ -427,16 +486,31 @@ async def manual_content_analysis_background(
         if not brand_analysis:
             brand_analysis = BrandAnalysis(user_id=user_id)
             db.add(brand_analysis)
-            db.commit()
+
+        # 분석 시작 상태 및 진행률 설정
+        brand_analysis.analysis_status = "analyzing"
+        brand_analysis.analysis_error = None
+        brand_analysis.analysis_progress = 5
+        brand_analysis.analysis_step = "collecting"
+        db.commit()
+
+        # Progress: 샘플 수집 완료 (20%)
+        update_analysis_progress(db, user_id, 20, "collecting")
 
         # ===== Multi-Agent Pipeline 실행 =====
         pipeline = BrandAnalysisPipeline(db=db)
+
+        # Progress: 분석 시작 (30%)
+        update_analysis_progress(db, user_id, 30, "analyzing")
         brand_profile = await pipeline.run_from_manual_samples(
-            user_id=user_id,  # int 타입으로 전달
+            user_id=str(user_id),  # str 타입으로 변환
             text_samples=text_samples,
-            image_samples=image_samples,
-            video_samples=video_samples
+            image_samples=image_urls,
+            video_samples=video_urls
         )
+
+        # Progress: 분석 완료, 프로필 저장 중 (80%)
+        update_analysis_progress(db, user_id, 80, "synthesizing")
 
         # ===== BrandProfile → BrandAnalysis 매핑 (기존 컬럼 호환성) =====
         logger.info("BrandProfile → BrandAnalysis 매핑 중...")
@@ -452,41 +526,64 @@ async def manual_content_analysis_background(
         brand_analysis.key_themes = brand_profile.content_strategy.primary_topics
 
         # Instagram 필드 (이미지 샘플 분석 결과)
-        if image_samples:
+        if image_urls:
             brand_analysis.instagram_caption_style = brand_profile.tone_of_voice.sentence_style
             brand_analysis.instagram_image_style = brand_profile.visual_style.image_style or "기본 스타일"
             brand_analysis.instagram_hashtag_pattern = "분석 기반 패턴"
             brand_analysis.instagram_color_palette = brand_profile.visual_style.color_palette
-            brand_analysis.instagram_analyzed_posts = len(image_samples)
+            brand_analysis.instagram_analyzed_posts = len(image_urls)
             brand_analysis.instagram_analyzed_at = datetime.utcnow()
             brand_analysis.instagram_analysis_status = "completed"
 
         # YouTube 필드 (영상 샘플 분석 결과)
-        if video_samples:
+        if video_urls:
             brand_analysis.youtube_content_style = brand_profile.content_strategy.content_structure
             brand_analysis.youtube_title_pattern = brand_profile.tone_of_voice.sentence_style
             brand_analysis.youtube_description_style = brand_profile.tone_of_voice.sentence_style
             brand_analysis.youtube_thumbnail_style = brand_profile.visual_style.image_style or "기본 스타일"
-            brand_analysis.youtube_analyzed_videos = len(video_samples)
+            brand_analysis.youtube_analyzed_videos = len(video_urls)
             brand_analysis.youtube_analyzed_at = datetime.utcnow()
             brand_analysis.youtube_analysis_status = "completed"
 
         # ===== 통합 브랜드 프로필 저장 =====
-        brand_analysis.brand_profile_json = brand_profile.dict()
+        # mode="json"으로 datetime을 문자열로 변환하여 JSON 직렬화 가능하게 함
+        brand_analysis.brand_profile_json = brand_profile.model_dump(mode="json")
         brand_analysis.profile_source = brand_profile.source
         brand_analysis.profile_confidence = brand_profile.confidence_level
         brand_analysis.profile_updated_at = datetime.utcnow()
+
+        # 분석 완료 상태 설정
+        brand_analysis.analysis_status = "completed"
+        brand_analysis.analysis_error = None
+        brand_analysis.analysis_progress = 100
+        brand_analysis.analysis_step = "completed"
 
         db.commit()
         logger.info(f"사용자 {user_id}의 수동 콘텐츠 분석 완료 (신뢰도: {brand_profile.confidence_level})")
 
         # BrandProfile JSON 로그 (디버깅용)
-        logger.info(f"생성된 BrandProfile: {brand_profile.dict()}")
+        logger.info(f"생성된 BrandProfile: {brand_profile.model_dump(mode='json')}")
 
     except Exception as e:
-        logger.error(f"수동 콘텐츠 분석 중 오류: {e}")
+        logger.error(f"❌ 수동 콘텐츠 분석 중 오류: {e}")
         import traceback
         traceback.print_exc()
+
+        # 에러 발생 시 분석 상태를 failed로 설정
+        try:
+            brand_analysis = db.query(BrandAnalysis).filter(BrandAnalysis.user_id == user_id).first()
+            if brand_analysis:
+                brand_analysis.analysis_status = "failed"
+                brand_analysis.analysis_error = str(e)[:500]  # 에러 메시지 저장 (최대 500자)
+                brand_analysis.analysis_step = "failed"
+                db.commit()
+                logger.info(f"❌ 분석 실패 상태 저장 완료: {user_id}")
+        except Exception as commit_error:
+            logger.error(f"❌ 실패 상태 저장 중 오류: {commit_error}")
+    finally:
+        # DB 세션 닫기
+        db.close()
+        logger.info("✅ DB 세션 닫기 완료")
 
 
 @router.post("/manual", response_model=AnalysisResponse)
@@ -502,8 +599,8 @@ async def analyze_manual_content(
     수동 콘텐츠 업로드 분석 시작 (비동기)
 
     - 텍스트, 이미지, 영상 샘플 중 최소 1개 타입에서 2개 이상 제공 필요
+    - 파일을 Supabase Storage에 업로드 후 URL을 백그라운드 태스크에 전달
     - 백그라운드에서 처리되며, 완료 후 DB에 저장
-    - 샘플이 부족한 경우 AI 보완 분석 수행
     """
     try:
         import json
@@ -527,28 +624,76 @@ async def analyze_manual_content(
                 detail="최소 1개 콘텐츠 타입에서 2개 이상의 샘플이 필요합니다."
             )
 
-        # 파일 저장 (TODO: 실제 저장 로직 구현)
-        image_paths = []
-        video_paths = []
+        # ===== Supabase Storage에 파일 업로드 =====
+        image_urls = []
+        video_urls = []
 
-        if image_files:
-            for img in image_files:
-                # TODO: 실제 파일 저장 로직
-                image_paths.append(f"/tmp/{img.filename}")
+        try:
+            storage = get_storage_service()
+            bucket_name = "brand-samples"  # Supabase에 미리 생성 필요
+            user_folder = f"user_{current_user.id}"
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
-        if video_files:
-            for vid in video_files:
-                # TODO: 실제 파일 저장 로직
-                video_paths.append(f"/tmp/{vid.filename}")
+            # 이미지 파일 업로드
+            if image_files:
+                for idx, img in enumerate(image_files):
+                    # 파일 확장자 추출
+                    ext = img.filename.split('.')[-1] if '.' in img.filename else 'jpg'
+                    file_path = f"{user_folder}/images/{timestamp}_{idx}.{ext}"
 
-        # 백그라운드 태스크로 분석 시작
+                    # 파일 데이터 읽기
+                    file_data = await img.read()
+
+                    # Content-Type 결정
+                    content_type = img.content_type or f"image/{ext}"
+
+                    # Supabase에 업로드
+                    url = storage.upload_file(
+                        bucket=bucket_name,
+                        file_path=file_path,
+                        file_data=file_data,
+                        content_type=content_type
+                    )
+                    image_urls.append(url)
+                    logger.info(f"✅ 이미지 업로드 완료: {url}")
+
+            # 영상 파일 업로드
+            if video_files:
+                for idx, vid in enumerate(video_files):
+                    # 파일 확장자 추출
+                    ext = vid.filename.split('.')[-1] if '.' in vid.filename else 'mp4'
+                    file_path = f"{user_folder}/videos/{timestamp}_{idx}.{ext}"
+
+                    # 파일 데이터 읽기
+                    file_data = await vid.read()
+
+                    # Content-Type 결정
+                    content_type = vid.content_type or f"video/{ext}"
+
+                    # Supabase에 업로드
+                    url = storage.upload_file(
+                        bucket=bucket_name,
+                        file_path=file_path,
+                        file_data=file_data,
+                        content_type=content_type
+                    )
+                    video_urls.append(url)
+                    logger.info(f"✅ 영상 업로드 완료: {url}")
+
+        except Exception as upload_error:
+            logger.error(f"❌ 파일 업로드 실패: {upload_error}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"파일 업로드에 실패했습니다: {str(upload_error)}"
+            )
+
+        # 백그라운드 태스크로 분석 시작 (DB 세션 전달 안 함 - 백그라운드에서 새로 생성)
         background_tasks.add_task(
             manual_content_analysis_background,
             current_user.id,
             text_list,
-            image_paths if image_paths else None,
-            video_paths if video_paths else None,
-            db
+            image_urls if image_urls else None,
+            video_urls if video_urls else None,
         )
 
         content_types = []
@@ -662,7 +807,8 @@ async def create_basic_profile_background(
             brand_analysis.key_themes = brand_profile.content_strategy.primary_topics
 
             # ===== 통합 브랜드 프로필 저장 =====
-            brand_analysis.brand_profile_json = brand_profile.dict()
+            # mode="json"으로 datetime을 문자열로 변환하여 JSON 직렬화 가능하게 함
+            brand_analysis.brand_profile_json = brand_profile.model_dump(mode="json")
             brand_analysis.profile_source = brand_profile.source
             brand_analysis.profile_confidence = brand_profile.confidence_level
             brand_analysis.profile_updated_at = datetime.utcnow()
@@ -671,7 +817,7 @@ async def create_basic_profile_background(
             logger.info(f"사용자 {user_id}의 기본 BrandProfile 생성 완료 (신뢰도: {brand_profile.confidence_level})")
 
             # BrandProfile JSON 로그 (디버깅용)
-            logger.info(f"생성된 BrandProfile: {brand_profile.dict()}")
+            logger.info(f"생성된 BrandProfile: {brand_profile.model_dump(mode='json')}")
 
     except Exception as e:
         logger.error(f"기본 BrandProfile 생성 중 오류: {e}")

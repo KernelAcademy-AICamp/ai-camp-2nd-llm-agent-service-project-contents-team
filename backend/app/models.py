@@ -185,6 +185,12 @@ class BrandAnalysis(Base):
     profile_confidence = Column(String, nullable=True)  # low, medium, high
     profile_updated_at = Column(DateTime(timezone=True), nullable=True)  # 프로필 마지막 업데이트 시간
 
+    # ===== 전체 분석 상태 (Overall Analysis Status) =====
+    analysis_status = Column(String, default="pending")  # pending, analyzing, completed, failed
+    analysis_progress = Column(Integer, default=0)  # 0-100 진행률 (%)
+    analysis_step = Column(String, nullable=True)  # 현재 분석 단계 (collecting, analyzing, synthesizing, finalizing)
+    analysis_error = Column(Text, nullable=True)  # 실패 시 에러 메시지
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

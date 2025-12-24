@@ -623,6 +623,23 @@ class SceneDirectorAgent:
 </timing>
 
 ═══════════════════════════════════════
+🎨 공통 비주얼 설정 (중요!)
+═══════════════════════════════════════
+
+⚠️ **모든 컷에서 일관된 배경/조명/분위기를 유지하세요!**
+
+먼저 shared_visual_context를 정의하고, 모든 컷이 이를 기반으로 작성되어야 합니다:
+- primary_setting: 주요 배경 장소 (예: "modern minimalist kitchen", "cozy cafe interior")
+- lighting_style: 일관된 조명 스타일 (예: "warm natural daylight from left")
+- color_atmosphere: 전체 색감 분위기 (예: "warm beige and cream tones")
+- consistent_props: 반복 등장할 소품들 (예: ["marble surface", "soft fabric napkin"])
+
+**왜 중요한가?**
+- 컷 1에서 2로 전환될 때 배경이 갑자기 바뀌면 영상이 어색해짐
+- 카메라 구도와 제품 배치만 변경하고, 배경/조명/분위기는 일관되게 유지
+- 예외: 스토리상 장소 이동이 필요한 경우에만 배경 변경 (명확한 이유 필요)
+
+═══════════════════════════════════════
 🎨 이미지 프롬프트 작성 규칙
 ═══════════════════════════════════════
 
@@ -635,9 +652,9 @@ class SceneDirectorAgent:
 
 1. **주요 피사체**: 무엇이 화면에 있는지 (제품 외관 정확히 묘사)
 2. **구도**: extreme close-up / close-up / medium shot / wide shot (9:16 세로 비율 기준)
-3. **조명**: natural / warm / cool / dramatic / soft studio
-4. **배경**: 배경 설명 (시즌 분위기 반영 가능)
-5. **분위기**: 전체적인 무드 (story_plan의 seasonal_adaptation 참고)
+3. **조명**: shared_visual_context.lighting_style과 일치
+4. **배경**: shared_visual_context.primary_setting 기반 (구도에 따라 보이는 범위만 다름)
+5. **분위기**: shared_visual_context.color_atmosphere와 일치
 6. **제품 비주얼**: product_analysis의 visual_identity 요소 반드시 포함
 7. **시즌 요소**: story_plan의 seasonal_adaptation.color_hints를 배경/소품에 자연스럽게 반영
 8. **비율 명시**: 프롬프트 끝에 "vertical 9:16 aspect ratio" 추가
@@ -647,8 +664,11 @@ class SceneDirectorAgent:
 - 여름: "bright white background with fresh green plants, refreshing summer vibes"
 - 봄/벚꽃: "soft pink cherry blossom petals scattered, gentle spring atmosphere"
 
-**프롬프트 예시:**
-"Elegant white cosmetic bottle with golden cap (정확한 제품 묘사), extreme close-up shot, soft warm natural lighting, minimalist marble background with subtle winter greenery, luxury premium aesthetic, featuring soft beige and gold color palette, vertical 9:16 aspect ratio"
+**일관된 배경의 프롬프트 예시 (컷 1→2→3):**
+- 컷 1: "Strawberry cake on marble table, extreme close-up, warm natural lighting, cozy cafe interior with soft bokeh, cream and pink tones, vertical 9:16 aspect ratio"
+- 컷 2: "Strawberry cake on marble table, medium shot showing cafe setting, warm natural lighting, cozy cafe interior with wooden chairs visible, cream and pink tones, vertical 9:16 aspect ratio"
+- 컷 3: "Hand reaching for strawberry cake on marble table, close-up, warm natural lighting, cozy cafe interior, cream and pink tones, vertical 9:16 aspect ratio"
+→ 배경(cafe interior, marble table), 조명(warm natural), 색감(cream and pink)이 일관됨
 
 ═══════════════════════════════════════
 🎬 전환(Transition) 설계 규칙
@@ -674,12 +694,19 @@ class SceneDirectorAgent:
 ═══════════════════════════════════════
 
 {{
+  "shared_visual_context": {{
+    "primary_setting": "주요 배경 장소 (영어, 예: cozy cafe interior with warm ambiance)",
+    "lighting_style": "일관된 조명 (영어, 예: warm natural daylight from window)",
+    "color_atmosphere": "색감 분위기 (영어, 예: cream, soft pink, and gold tones)",
+    "consistent_props": ["반복 소품1", "반복 소품2"],
+    "setting_reason": "이 배경을 선택한 이유 (한국어, 1문장)"
+  }},
   "storyboard": [
     {{
       "cut": 1,
       "scene_description": "장면 설명 (한국어, 2-3문장)",
       "story_role": "스토리에서의 역할",
-      "image_prompt": "상세한 영어 이미지 프롬프트 (제품 비주얼 정확히 반영)",
+      "image_prompt": "상세한 영어 이미지 프롬프트 (shared_visual_context 기반, 제품 비주얼 정확히 반영)",
       "duration": {cut_duration},
       "is_hero_shot": true,
       "resolution": "1080p",
@@ -700,7 +727,7 @@ class SceneDirectorAgent:
       "cut": 2,
       "scene_description": "...",
       "story_role": "...",
-      "image_prompt": "...",
+      "image_prompt": "... (shared_visual_context의 배경/조명/색감 일관되게 유지)",
       "duration": {cut_duration},
       "is_hero_shot": false,
       "resolution": "720p",
@@ -709,19 +736,30 @@ class SceneDirectorAgent:
   ]
 }}
 
+⚠️ 모든 컷의 image_prompt는 shared_visual_context를 기반으로 작성하세요.
+배경/조명/색감이 컷마다 달라지면 안 됩니다!
+
 모든 {cut_count}개 컷과 {num_transitions}개 전환을 포함하세요.
 다른 설명 없이 JSON만 반환하세요."""
 
         response = gemini_model.generate_content([prompt, image_part])
         result = parse_json_response(response.text)
 
-        storyboard = result.get("storyboard", result)
-        if isinstance(storyboard, dict):
-            storyboard = storyboard.get("storyboard", [])
+        # shared_visual_context와 storyboard 추출
+        shared_visual_context = result.get("shared_visual_context", {})
+        storyboard_items = result.get("storyboard", result)
+        if isinstance(storyboard_items, dict):
+            storyboard_items = storyboard_items.get("storyboard", [])
 
-        logger.info(f"[3단계] 장면 연출 완료: {len([s for s in storyboard if 'cut' in s])}컷 생성")
+        logger.info(f"[3단계] 장면 연출 완료: {len([s for s in storyboard_items if 'cut' in s])}컷 생성")
+        if shared_visual_context:
+            logger.info(f"[3단계] 공통 비주얼 설정: {shared_visual_context.get('primary_setting', 'N/A')}")
 
-        return storyboard
+        # shared_visual_context와 storyboard를 함께 반환
+        return {
+            "shared_visual_context": shared_visual_context,
+            "storyboard": storyboard_items
+        }
 
     def _build_visual_style_prompt(self, brand_context: Dict[str, Any]) -> str:
         """브랜드 비주얼 스타일 프롬프트 구성"""
@@ -779,23 +817,27 @@ class QualityValidatorAgent:
     """
     4단계: 브랜드 일관성 및 품질 검증, 자동 수정
 
+    2단계 분리 구조:
+    1. evaluate(): 평가만 수행 (빠름) - 스토리보드 재생성 없음
+    2. fix_issues(): 실패 시에만 문제 컷 수정 (필요할 때만 호출)
+
     입력: 제품 이미지, 3단계 스토리보드, 1단계 분석, 브랜드 프로필
-    출력: 평가 점수, 수정된 스토리보드
+    출력: 평가 점수, (필요시) 수정된 스토리보드
     """
 
     def __init__(self, model: str = "gemini-2.5-flash"):
         self.model = model
 
-    async def validate(
+    async def evaluate(
         self,
         image_data: Dict[str, str],
         storyboard: List[Dict[str, Any]],
         product_analysis: Dict[str, Any],
         brand_context: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """품질 검증 실행"""
+        """1단계: 평가만 수행 (스토리보드 재생성 없음)"""
 
-        logger.info(f"[4단계] 품질 검증 시작")
+        logger.info(f"[4단계] 품질 평가 시작")
 
         gemini_model = VertexGenerativeModel(self.model)
         image_part = image_data_to_vertex_part(image_data)
@@ -838,7 +880,10 @@ class QualityValidatorAgent:
 **2. 비주얼 일관성 (visual_consistency)** ⭐ 가장 중요
 - 제품 이미지의 색상, 형태, 질감이 모든 image_prompt에 정확히 반영되었는가?
 - 제품의 key_elements(로고, 캡, 디테일)가 언급되었는가?
-- 조명/분위기가 일관되는가?
+- **배경 일관성**: shared_visual_context가 모든 컷에 일관되게 적용되었는가?
+  - 배경 장소(primary_setting)가 컷마다 갑자기 바뀌지 않는가?
+  - 조명 스타일(lighting_style)이 일관되는가?
+  - 색감 분위기(color_atmosphere)가 일관되는가?
 
 **3. 브랜드 적합성 (brand_fit)**
 - 신뢰도 {confidence}: {"브랜드 가이드라인 엄격 준수 필요" if confidence == "high" else "참고 수준으로 확인" if confidence == "medium" else "제품 중심으로 확인"}
@@ -847,7 +892,6 @@ class QualityValidatorAgent:
 **4. 기술적 완성도 (technical_quality)**
 - image_prompt가 충분히 상세한가?
 - video_prompt에 카메라/동작이 명확한가?
-- needs_text 설정이 적절한가?
 
 **5. 마케팅 효과 (marketing_effectiveness)**
 - 첫 컷이 시선을 끄는가?
@@ -855,18 +899,17 @@ class QualityValidatorAgent:
 - CTA가 효과적인가?
 
 ═══════════════════════════════════════
-📤 출력 형식 (JSON)
+📤 출력 형식 (JSON) - 평가만, 스토리보드 재생성 없음
 ═══════════════════════════════════════
 
 {{
   "evaluation": {{
-    "story_coherence": {{ "score": 8, "comment": "평가" }},
-    "visual_consistency": {{ "score": 7, "comment": "평가" }},
-    "brand_fit": {{ "score": 9, "comment": "평가" }},
-    "technical_quality": {{ "score": 8, "comment": "평가" }},
-    "marketing_effectiveness": {{ "score": 8, "comment": "평가" }},
-    "total_score": 8.0,
-    "passed": true
+    "story_coherence": {{ "score": 8, "comment": "간단한 평가" }},
+    "visual_consistency": {{ "score": 7, "comment": "간단한 평가" }},
+    "brand_fit": {{ "score": 9, "comment": "간단한 평가" }},
+    "technical_quality": {{ "score": 8, "comment": "간단한 평가" }},
+    "marketing_effectiveness": {{ "score": 8, "comment": "간단한 평가" }},
+    "total_score": 8.0
   }},
   "issues": [
     {{
@@ -876,29 +919,107 @@ class QualityValidatorAgent:
       "suggested_fix": "수정 제안"
     }}
   ],
-  "corrected_storyboard": [
-    // 문제가 있으면 수정된 전체 스토리보드
-    // 문제가 없으면 원본 그대로
-  ],
-  "summary": "검증 결과 요약 (2-3문장)"
+  "summary": "검증 결과 요약 (1문장)"
 }}
 
-**합격 기준:**
-- 총점 8.0점 이상
-- visual_consistency 7점 이상 (필수)
-
-문제가 있으면 corrected_storyboard에 수정 버전을 포함하세요.
+**중요**: corrected_storyboard는 반환하지 마세요. 평가와 issues만 반환하세요.
 다른 설명 없이 JSON만 반환하세요."""
 
         response = gemini_model.generate_content([prompt, image_part])
         result = parse_json_response(response.text)
 
         total_score = result.get("evaluation", {}).get("total_score", 0)
-        passed = result.get("evaluation", {}).get("passed", False)
+        visual_score = result.get("evaluation", {}).get("visual_consistency", {}).get("score", 0)
 
-        logger.info(f"[4단계] 품질 검증 완료: 점수={total_score}, 통과={passed}")
+        logger.info(f"[4단계] 품질 평가 완료: 총점={total_score}, 비주얼={visual_score}")
 
         return result
+
+    async def fix_issues(
+        self,
+        image_data: Dict[str, str],
+        storyboard: List[Dict[str, Any]],
+        issues: List[Dict[str, Any]],
+        product_analysis: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """2단계: 문제가 있는 컷만 수정 (실패 시에만 호출)"""
+
+        if not issues:
+            return storyboard
+
+        logger.info(f"[4단계] 스토리보드 수정 시작: {len(issues)}개 이슈")
+
+        gemini_model = VertexGenerativeModel(self.model)
+        image_part = image_data_to_vertex_part(image_data)
+
+        # 문제가 있는 컷 번호 추출
+        problem_cuts = set(issue.get("cut") for issue in issues if issue.get("cut"))
+
+        prompt = f"""당신은 스토리보드 수정 전문가입니다.
+아래 issues에 명시된 문제를 해결하여 수정된 스토리보드를 반환하세요.
+
+═══════════════════════════════════════
+📊 원본 스토리보드
+═══════════════════════════════════════
+
+{json.dumps(storyboard, ensure_ascii=False, indent=2)}
+
+═══════════════════════════════════════
+⚠️ 수정이 필요한 이슈
+═══════════════════════════════════════
+
+{json.dumps(issues, ensure_ascii=False, indent=2)}
+
+═══════════════════════════════════════
+🎨 제품 비주얼 (참고)
+═══════════════════════════════════════
+
+{json.dumps(product_analysis.get('visual_identity', {}), ensure_ascii=False, indent=2)}
+
+═══════════════════════════════════════
+📤 출력 형식
+═══════════════════════════════════════
+
+수정된 전체 스토리보드를 JSON 배열로 반환하세요.
+- 문제가 있는 컷({', '.join(str(c) for c in problem_cuts)})만 수정
+- 나머지 컷과 transition은 원본 그대로 유지
+- 다른 설명 없이 JSON 배열만 반환"""
+
+        response = gemini_model.generate_content([prompt, image_part])
+        result = parse_json_response(response.text)
+
+        # 결과가 리스트인지 확인
+        if isinstance(result, list):
+            corrected = result
+        elif isinstance(result, dict) and "storyboard" in result:
+            corrected = result["storyboard"]
+        else:
+            logger.warning("수정된 스토리보드 파싱 실패, 원본 사용")
+            return storyboard
+
+        logger.info(f"[4단계] 스토리보드 수정 완료: {len(corrected)}개 항목")
+        return corrected
+
+    async def validate(
+        self,
+        image_data: Dict[str, str],
+        storyboard: List[Dict[str, Any]],
+        product_analysis: Dict[str, Any],
+        brand_context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """기존 호환성 유지: evaluate + fix_issues 통합 호출"""
+        # 먼저 평가만 수행
+        eval_result = await self.evaluate(
+            image_data=image_data,
+            storyboard=storyboard,
+            product_analysis=product_analysis,
+            brand_context=brand_context
+        )
+
+        # 결과에 corrected_storyboard 추가 (빈 배열)
+        eval_result["corrected_storyboard"] = []
+
+        return eval_result
 
 
 # =============================================================================
@@ -997,7 +1118,7 @@ class VideoStoryboardOrchestrator:
             job.current_step = "3단계: 장면 연출 설계 중"
             db.commit()
 
-            storyboard = await self.scene_agent.design(
+            scene_result = await self.scene_agent.design(
                 image_data=image_data,
                 product_analysis=product_analysis,
                 story_plan=story_plan,
@@ -1006,8 +1127,12 @@ class VideoStoryboardOrchestrator:
                 duration_seconds=job.duration_seconds
             )
 
+            # 새 구조: {shared_visual_context: {...}, storyboard: [...]}
+            shared_visual_context = scene_result.get("shared_visual_context", {})
+            storyboard = scene_result.get("storyboard", scene_result if isinstance(scene_result, list) else [])
+
             # ─────────────────────────────────────
-            # 4단계: 품질 검증 (재시도 루프)
+            # 4단계: 품질 검증 (2단계 분리 구조)
             # ─────────────────────────────────────
             job.status = "validating_quality"
             validation_result = None
@@ -1018,7 +1143,8 @@ class VideoStoryboardOrchestrator:
                 job.generation_attempts = attempt
                 db.commit()
 
-                validation_result = await self.quality_agent.validate(
+                # 1단계: 평가만 수행 (빠름 - 스토리보드 재생성 없음)
+                validation_result = await self.quality_agent.evaluate(
                     image_data=image_data,
                     storyboard=storyboard,
                     product_analysis=product_analysis,
@@ -1027,21 +1153,26 @@ class VideoStoryboardOrchestrator:
 
                 evaluation = validation_result.get("evaluation", {})
                 total_score = evaluation.get("total_score", 0)
-                passed = evaluation.get("passed", False)
                 visual_score = evaluation.get("visual_consistency", {}).get("score", 0)
+                issues = validation_result.get("issues", [])
 
-                logger.info(f"검증 결과 (시도 {attempt}): 총점={total_score}, 비주얼={visual_score}, 통과={passed}")
+                logger.info(f"검증 결과 (시도 {attempt}): 총점={total_score}, 비주얼={visual_score}, 이슈={len(issues)}개")
 
-                # 통과 조건: 총점 8점 이상 AND 비주얼 일관성 7점 이상
-                if passed and total_score >= 8.0 and visual_score >= 7:
+                # 통과 조건: 점수 기반 판단
+                # - 총점 7.5점 이상 AND 비주얼 일관성 6.5점 이상
+                if total_score >= 7.5 and visual_score >= 6.5:
                     logger.info(f"✅ 품질 검증 통과!")
                     break
 
-                # 수정된 스토리보드가 있으면 적용
-                corrected = validation_result.get("corrected_storyboard", [])
-                if corrected:
-                    logger.info(f"🔧 스토리보드 자동 수정 적용")
-                    storyboard = corrected
+                # 2단계: 실패 시에만 문제 컷 수정 (issues 기반)
+                if issues and attempt < self.max_retries:
+                    logger.info(f"🔧 이슈 기반 스토리보드 수정 시작")
+                    storyboard = await self.quality_agent.fix_issues(
+                        image_data=image_data,
+                        storyboard=storyboard,
+                        issues=issues,
+                        product_analysis=product_analysis
+                    )
 
                 if attempt == self.max_retries:
                     logger.warning(f"⚠️ 최대 재시도 횟수 도달, 현재 스토리보드 사용")
@@ -1069,11 +1200,16 @@ class VideoStoryboardOrchestrator:
             logger.info(f"✅ Storyboard Generation 완료 (Job ID: {job.id})")
             logger.info(f"   - 컷 수: {len([s for s in storyboard if 'cut' in s])}")
             logger.info(f"   - 전환 수: {len([s for s in storyboard if 'transition' in s])}")
+            logger.info(f"   - 공통 배경: {shared_visual_context.get('primary_setting', 'N/A')}")
             logger.info(f"   - 재시도 횟수: {generation_attempts}")
             logger.info(f"   - 처리 시간: {processing_time:.1f}초")
             logger.info(f"═══════════════════════════════════════")
 
-            return storyboard
+            # shared_visual_context와 storyboard를 함께 반환 (DB 저장용)
+            return {
+                "shared_visual_context": shared_visual_context,
+                "storyboard": storyboard
+            }
 
         except Exception as e:
             # 오류 발생 시에도 처리 시간 저장

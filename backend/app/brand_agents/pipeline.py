@@ -162,7 +162,7 @@ class BrandAnalysisPipeline:
             logger.info("-" * 80)
 
             brand_profile = await self.synthesizer.synthesize(
-                user_id=user_id,
+                user_id=str(user_id),  # str 타입으로 변환 (BrandProfile.brand_id가 str 타입)
                 text_analysis=text_analysis,
                 visual_analysis=visual_analysis,
                 engagement_analysis=engagement_analysis,

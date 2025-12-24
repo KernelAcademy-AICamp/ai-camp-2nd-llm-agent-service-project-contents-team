@@ -44,6 +44,8 @@ class BrandProfileSynthesizer:
         """
         분석 결과를 통합하여 BrandProfile 생성
 
+        각 단계가 실패해도 기본값으로 계속 진행하여 부분 성공을 허용합니다.
+
         Args:
             user_id: 사용자 ID
             text_analysis: 텍스트 분석 결과
@@ -53,55 +55,116 @@ class BrandProfileSynthesizer:
             analyzed_platforms: 분석된 플랫폼 목록
 
         Returns:
-            BrandProfile 객체
+            BrandProfile 객체 (부분 실패 시에도 기본값으로 완성된 프로필 반환)
         """
-        try:
-            logger.info(f"🔮 [Brand Profile Synthesizer] 브랜드 프로필 통합 시작")
+        logger.info(f"🔮 [Brand Profile Synthesizer] 브랜드 프로필 통합 시작")
 
-            # ===== 1. Brand Identity 생성 =====
+        partial_failures = []  # 부분 실패 추적
+
+        # ===== 1. Brand Identity 생성 =====
+        try:
             brand_identity = await self._synthesize_identity(
                 text_analysis,
                 unified_contents
             )
+            logger.info("✅ Brand Identity 생성 완료")
+        except Exception as e:
+            logger.warning(f"⚠️ Brand Identity 생성 실패, 기본값 사용: {e}")
+            partial_failures.append("identity")
+            brand_identity = BrandIdentity(
+                brand_name=None,
+                business_type="service",
+                brand_personality="정의되지 않음",
+                brand_values=[],
+                target_audience="일반 대중",
+                emotional_tone="중립적"
+            )
 
-            # ===== 2. Tone of Voice 생성 =====
+        # ===== 2. Tone of Voice 생성 =====
+        try:
             tone_of_voice = self._synthesize_tone_of_voice(text_analysis)
+            logger.info("✅ Tone of Voice 생성 완료")
+        except Exception as e:
+            logger.warning(f"⚠️ Tone of Voice 생성 실패, 기본값 사용: {e}")
+            partial_failures.append("tone_of_voice")
+            tone_of_voice = ToneOfVoice(
+                formality=50,
+                warmth=50,
+                enthusiasm=50,
+                sentence_style="표준어체",
+                signature_phrases=[],
+                emoji_usage={"frequency": "없음", "preferred_emojis": []}
+            )
 
-            # ===== 3. Content Strategy 생성 =====
+        # ===== 3. Content Strategy 생성 =====
+        try:
             content_strategy = self._synthesize_content_strategy(text_analysis)
+            logger.info("✅ Content Strategy 생성 완료")
+        except Exception as e:
+            logger.warning(f"⚠️ Content Strategy 생성 실패, 기본값 사용: {e}")
+            partial_failures.append("content_strategy")
+            content_strategy = ContentStrategy(
+                primary_topics=[],
+                content_structure="정보 전달형",
+                call_to_action_style="표준형",
+                keyword_usage={},
+                posting_frequency=None
+            )
 
-            # ===== 4. Visual Style 생성 =====
+        # ===== 4. Visual Style 생성 =====
+        try:
             visual_style = self._synthesize_visual_style(visual_analysis)
+            logger.info("✅ Visual Style 생성 완료")
+        except Exception as e:
+            logger.warning(f"⚠️ Visual Style 생성 실패, 기본값 사용: {e}")
+            partial_failures.append("visual_style")
+            visual_style = VisualStyle(
+                color_palette=[],
+                image_style=None,
+                composition_style=None,
+                filter_preference=None
+            )
 
-            # ===== 5. Generation Prompts 생성 =====
+        # ===== 5. Generation Prompts 생성 =====
+        try:
             generation_prompts = await self._synthesize_generation_prompts(
                 brand_identity,
                 tone_of_voice,
                 content_strategy,
                 visual_style
             )
-
-            # ===== 6. BrandProfile 조립 =====
-            brand_profile = BrandProfile(
-                brand_id=user_id,
-                brand_name=brand_identity.brand_name,
-                identity=brand_identity,
-                tone_of_voice=tone_of_voice,
-                content_strategy=content_strategy,
-                visual_style=visual_style,
-                generation_prompts=generation_prompts,
-                analyzed_platforms=analyzed_platforms,
-                total_contents_analyzed=len(unified_contents),
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+            logger.info("✅ Generation Prompts 생성 완료")
+        except Exception as e:
+            logger.warning(f"⚠️ Generation Prompts 생성 실패, 기본값 사용: {e}")
+            partial_failures.append("generation_prompts")
+            generation_prompts = GenerationPrompts(
+                text_generation_prompt="표준 스타일로 작성하세요.",
+                image_generation_prompt="표준 이미지를 생성하세요.",
+                video_generation_prompt=None
             )
 
-            logger.info("✅ [Brand Profile Synthesizer] 브랜드 프로필 생성 완료")
-            return brand_profile
+        # ===== 6. BrandProfile 조립 =====
+        brand_profile = BrandProfile(
+            brand_id=user_id,
+            brand_name=brand_identity.brand_name,
+            identity=brand_identity,
+            tone_of_voice=tone_of_voice,
+            content_strategy=content_strategy,
+            visual_style=visual_style,
+            generation_prompts=generation_prompts,
+            analyzed_platforms=analyzed_platforms,
+            total_contents_analyzed=len(unified_contents),
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
 
-        except Exception as e:
-            logger.error(f"❌ [Brand Profile Synthesizer] 통합 실패: {e}")
-            raise Exception(f"브랜드 프로필 생성 실패: {str(e)}")
+        if partial_failures:
+            logger.warning(f"⚠️ [Brand Profile Synthesizer] 부분 실패 발생: {partial_failures}")
+            logger.info("✅ [Brand Profile Synthesizer] 브랜드 프로필 생성 완료 (일부 기본값 사용)")
+        else:
+            logger.info("✅ [Brand Profile Synthesizer] 브랜드 프로필 생성 완료 (모든 분석 성공)")
+
+        return brand_profile
 
     async def _synthesize_identity(
         self,

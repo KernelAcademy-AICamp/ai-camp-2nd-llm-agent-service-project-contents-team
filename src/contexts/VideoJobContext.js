@@ -99,6 +99,7 @@ export const VideoJobProvider = ({ children }) => {
             ...prev[jobId],
             status: jobData.status,
             currentStep: jobData.current_step,
+            progress: jobData.progress,
           },
         }));
       }

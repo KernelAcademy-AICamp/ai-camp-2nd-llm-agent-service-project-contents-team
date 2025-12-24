@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Union, Any
 from datetime import datetime
 from pathlib import Path
 import google.generativeai as genai
@@ -67,18 +67,37 @@ class VideoGenerationJobResponse(BaseModel):
     tier: str
     cut_count: int
     duration_seconds: int
-    storyboard: Optional[List[dict]]
+    storyboard: Optional[Union[List[dict], dict]]  # 기존: List[dict], 신규: {shared_visual_context, storyboard}
     generated_image_urls: Optional[List[dict]]
     generated_video_urls: Optional[List[dict]]
     final_video_url: Optional[str]
     status: str
     current_step: Optional[str]
     error_message: Optional[str]
+    progress: int  # 진행률 (0-100)
     created_at: datetime
     completed_at: Optional[datetime]
 
     class Config:
         from_attributes = True
+
+    @staticmethod
+    def calculate_progress(status: str) -> int:
+        """상태 기반 진행률 계산"""
+        progress_map = {
+            'pending': 5,
+            'analyzing_product': 15,
+            'planning_story': 25,
+            'designing_scenes': 35,
+            'validating_quality': 45,
+            'generating_storyboard': 55,
+            'generating_images': 65,
+            'generating_videos': 80,
+            'composing_video': 90,
+            'completed': 100,
+            'failed': 0,
+        }
+        return progress_map.get(status, 5)
 
 
 # ===== 티어 설정 =====
@@ -261,7 +280,28 @@ async def get_video_generation_job(
             detail="Video generation job not found"
         )
 
-    return job
+    # progress 계산해서 반환
+    return VideoGenerationJobResponse(
+        id=job.id,
+        session_id=job.session_id,
+        user_id=job.user_id,
+        product_name=job.product_name,
+        product_description=job.product_description,
+        uploaded_image_url=job.uploaded_image_url,
+        tier=job.tier,
+        cut_count=job.cut_count,
+        duration_seconds=job.duration_seconds,
+        storyboard=job.storyboard,
+        generated_image_urls=job.generated_image_urls,
+        generated_video_urls=job.generated_video_urls,
+        final_video_url=job.final_video_url,
+        status=job.status,
+        current_step=job.current_step,
+        error_message=job.error_message,
+        progress=VideoGenerationJobResponse.calculate_progress(job.status),
+        created_at=job.created_at,
+        completed_at=job.completed_at,
+    )
 
 
 @router.get("/jobs", response_model=List[VideoGenerationJobResponse])

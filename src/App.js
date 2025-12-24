@@ -3,8 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './contexts/AuthContext';
 import { ContentProvider } from './contexts/ContentContext';
 import { VideoJobProvider } from './contexts/VideoJobContext';
+import { BrandAnalysisProvider } from './contexts/BrandAnalysisContext';
 import Layout from './components/Layout';
 import VideoJobIndicator from './components/VideoJobIndicator';
+import BrandAnalysisIndicator from './components/BrandAnalysisIndicator';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/auth/Login';
 import OAuthCallback from './pages/auth/OAuthCallback';
@@ -36,6 +38,7 @@ function App() {
     <Router>
       <AuthProvider>
         <ContentProvider>
+        <BrandAnalysisProvider>
         <VideoJobProvider>
         <Routes>
           {/* 공개 라우트 */}
@@ -239,7 +242,9 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <VideoJobIndicator />
+        <BrandAnalysisIndicator />
         </VideoJobProvider>
+        </BrandAnalysisProvider>
         </ContentProvider>
       </AuthProvider>
     </Router>

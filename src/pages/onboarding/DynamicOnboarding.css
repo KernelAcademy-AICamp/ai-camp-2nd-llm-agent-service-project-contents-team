@@ -939,6 +939,33 @@
   line-height: 1.5;
 }
 
+/* 서비스 둘러보기 섹션 */
+.browse-service-section {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.browse-hint {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+}
+
+.btn-browse-service {
+  padding: var(--space-sm) var(--space-xl);
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+}
+
+.btn-browse-service:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 .analysis-complete .completion-icon {
   font-size: 72px;
   margin-bottom: var(--space-lg);

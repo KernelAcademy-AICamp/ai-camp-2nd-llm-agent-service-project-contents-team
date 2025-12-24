@@ -110,19 +110,27 @@ class MasterPlanningAgent:
             logger.info(f"Starting Master Planning Agent (4-Stage Pipeline) for job {job.id}")
 
             # 4단계 파이프라인 실행
-            storyboard = await self.orchestrator.generate_storyboard(
+            storyboard_result = await self.orchestrator.generate_storyboard(
                 job=job,
                 user=user,
                 brand_analysis=brand_analysis,
                 db=db
             )
 
-            # 스토리보드 저장
-            job.storyboard = storyboard
+            # 새 구조: {shared_visual_context: {...}, storyboard: [...]}
+            # DB에 전체 구조 저장 (shared_visual_context 포함)
+            job.storyboard = storyboard_result
             db.commit()
 
+            # storyboard 배열 추출 (하위 처리용)
+            storyboard = storyboard_result.get("storyboard", storyboard_result if isinstance(storyboard_result, list) else [])
+            shared_context = storyboard_result.get("shared_visual_context", {})
+
             logger.info(f"Storyboard generated for job {job.id}: {len([s for s in storyboard if 'cut' in s])} cuts")
-            return storyboard
+            if shared_context:
+                logger.info(f"Shared visual context: {shared_context.get('primary_setting', 'N/A')}")
+
+            return storyboard_result
 
         except Exception as e:
             logger.error(f"Error in Master Planning Agent for job {job.id}: {str(e)}")
@@ -968,22 +976,24 @@ class ImageGenerationAgent:
         from google.genai import types
         from google.api_core.exceptions import ResourceExhausted, TooManyRequests
 
-        # needs_text에 따라 모델 선택
+        # needs_text에 따라 모델 및 리전 선택
+        # gemini-3-pro-image-preview는 global 리전만 지원
         model_name = 'gemini-3-pro-image-preview' if needs_text else 'gemini-2.5-flash-image'
         model_display = "Gemini 3 Pro Image (텍스트 특화)" if needs_text else "Gemini 2.5 Flash Image (일반)"
+        model_location = "global" if needs_text else SELECTED_LOCATION
 
         max_retries = 5
         base_delay = 2  # 초기 대기 시간 (초)
 
         for attempt in range(max_retries):
             try:
-                logger.info(f"Vertex AI {model_display}로 이미지 생성 중 (9:16)... (시도 {attempt + 1}/{max_retries}, 프롬프트: {prompt[:50]}...)")
+                logger.info(f"Vertex AI {model_display}로 이미지 생성 중 (9:16, location={model_location})... (시도 {attempt + 1}/{max_retries}, 프롬프트: {prompt[:50]}...)")
 
                 # Google Gen AI Client 초기화 (Vertex AI 백엔드 사용)
                 client = genai.Client(
                     vertexai=True,
                     project=os.getenv("GOOGLE_CLOUD_PROJECT"),
-                    location=SELECTED_LOCATION  # 전역 변수에서 선택된 지역 사용
+                    location=model_location  # needs_text=True면 global, 아니면 기존 리전
                 )
 
                 # 이미지 생성 요청 (9:16 aspect ratio 지정)
@@ -1822,91 +1832,116 @@ class KlingVideoGenerationAgent:
             # 이미지를 cut 번호로 매핑
             image_by_cut = {img['cut']: img for img in valid_images}
 
-            # 각 전환 비디오 생성
+            # 전환 정보 준비 (from_cut, to_cut, 기타 정보 추출)
+            transition_tasks = []
             for idx, transition_data in enumerate(transitions, 1):
+                video_prompt = transition_data.get('video_prompt', '')
+                effect = transition_data.get('effect', 'smooth_transition')
+                duration = transition_data.get('duration', 5)
+                reason = transition_data.get('reason', '')
+
+                # 전환이 어느 컷 사이인지 추론
+                transition_index = None
+                for i, item in enumerate(storyboard):
+                    if 'transition' in item and item['transition'] == transition_data:
+                        transition_index = i
+                        break
+
+                if transition_index is None:
+                    logger.warning(f"Could not find transition in storyboard, skipping")
+                    continue
+
+                # 앞뒤 컷 찾기
+                from_cut = None
+                to_cut = None
+
+                for i in range(transition_index - 1, -1, -1):
+                    if 'cut' in storyboard[i]:
+                        from_cut = storyboard[i]['cut']
+                        break
+
+                for i in range(transition_index + 1, len(storyboard)):
+                    if 'cut' in storyboard[i]:
+                        to_cut = storyboard[i]['cut']
+                        break
+
+                if not from_cut or not to_cut:
+                    logger.warning(f"Could not determine from/to cuts, skipping transition")
+                    continue
+
+                if from_cut not in image_by_cut or to_cut not in image_by_cut:
+                    logger.warning(f"Images for transition {from_cut}-{to_cut} not found, skipping")
+                    continue
+
+                transition_name = f"{from_cut}-{to_cut}"
+                start_image_url = image_by_cut[from_cut]['url']
+
+                transition_tasks.append({
+                    "idx": idx,
+                    "transition_name": transition_name,
+                    "from_cut": from_cut,
+                    "to_cut": to_cut,
+                    "image_url": start_image_url,
+                    "video_prompt": video_prompt,
+                    "effect": effect,
+                    "duration": duration,
+                    "reason": reason
+                })
+
+            # 2개씩 배치로 병렬 처리 (fal.ai 동시 2개 제한)
+            batch_size = 2
+            total_tasks = len(transition_tasks)
+
+            async def generate_single_video(task_info):
+                """단일 전환 영상 생성"""
                 try:
-                    video_prompt = transition_data.get('video_prompt', '')
-                    effect = transition_data.get('effect', 'smooth_transition')
-                    duration = transition_data.get('duration', 5)
-                    reason = transition_data.get('reason', '')
-
-                    # 전환이 어느 컷 사이인지 추론
-                    transition_index = None
-                    for i, item in enumerate(storyboard):
-                        if 'transition' in item and item['transition'] == transition_data:
-                            transition_index = i
-                            break
-
-                    if transition_index is None:
-                        logger.warning(f"Could not find transition in storyboard, skipping")
-                        continue
-
-                    # 앞뒤 컷 찾기
-                    from_cut = None
-                    to_cut = None
-
-                    for i in range(transition_index - 1, -1, -1):
-                        if 'cut' in storyboard[i]:
-                            from_cut = storyboard[i]['cut']
-                            break
-
-                    for i in range(transition_index + 1, len(storyboard)):
-                        if 'cut' in storyboard[i]:
-                            to_cut = storyboard[i]['cut']
-                            break
-
-                    if not from_cut or not to_cut:
-                        logger.warning(f"Could not determine from/to cuts, skipping transition")
-                        continue
-
-                    if from_cut not in image_by_cut or to_cut not in image_by_cut:
-                        logger.warning(f"Images for transition {from_cut}-{to_cut} not found, skipping")
-                        continue
-
-                    transition_name = f"{from_cut}-{to_cut}"
-
-                    logger.info(f"Generating Kling 2.1 video {idx}/{len(transitions)}: {transition_name}")
-                    job.current_step = f"Generating Kling 2.1 transition {idx}/{len(transitions)}"
-                    db.commit()
-
-                    # 시작 이미지 URL (Kling은 first frame 기반)
-                    start_image_url = image_by_cut[from_cut]['url']
-
-                    # Kling API 호출 (fal.ai subscribe)
                     video_url = await self._generate_video_with_retry(
-                        image_url=start_image_url,
-                        prompt=video_prompt,
+                        image_url=task_info["image_url"],
+                        prompt=task_info["video_prompt"],
                         job=job,
-                        transition_name=transition_name
+                        transition_name=task_info["transition_name"]
                     )
 
-                    # 비용 계산: $0.25/5초, $0.50/10초
                     cost = 0.25 if self.duration == "5" else 0.50
 
-                    generated_videos.append({
-                        "transition": transition_name,
+                    return {
+                        "transition": task_info["transition_name"],
                         "url": video_url,
-                        "from_cut": from_cut,
-                        "to_cut": to_cut,
+                        "from_cut": task_info["from_cut"],
+                        "to_cut": task_info["to_cut"],
                         "method": "kling",
-                        "effect": effect,
+                        "effect": task_info["effect"],
                         "duration": int(self.duration),
-                        "reason": reason,
+                        "reason": task_info["reason"],
                         "cost": cost
-                    })
-
-                    logger.info(f"Kling 2.1 video generated: {transition_name} -> {video_url}")
-
+                    }
                 except Exception as e:
-                    logger.error(f"Error generating Kling 2.1 video: {str(e)}")
-                    if 'transition_name' in locals():
-                        generated_videos.append({
-                            "transition": transition_name,
-                            "url": None,
-                            "error": str(e),
-                            "method": "kling",
-                            "effect": transition_data.get('effect', '')
-                        })
+                    logger.error(f"Error generating Kling 2.1 video {task_info['transition_name']}: {str(e)}")
+                    return {
+                        "transition": task_info["transition_name"],
+                        "url": None,
+                        "error": str(e),
+                        "method": "kling",
+                        "effect": task_info["effect"]
+                    }
+
+            for batch_start in range(0, total_tasks, batch_size):
+                batch_end = min(batch_start + batch_size, total_tasks)
+                batch = transition_tasks[batch_start:batch_end]
+                batch_num = (batch_start // batch_size) + 1
+                total_batches = (total_tasks + batch_size - 1) // batch_size
+
+                logger.info(f"Processing Kling 2.1 batch {batch_num}/{total_batches}: {len(batch)} videos")
+                job.current_step = f"Generating Kling 2.1 transitions batch {batch_num}/{total_batches}"
+                db.commit()
+
+                # 배치 내 병렬 처리
+                batch_results = await asyncio.gather(*[
+                    generate_single_video(task) for task in batch
+                ])
+                generated_videos.extend(batch_results)
+
+                logger.info(f"Batch {batch_num}/{total_batches} completed")
 
             # 생성된 비디오 저장
             job.generated_video_urls = generated_videos
@@ -2528,7 +2563,10 @@ async def run_video_generation_pipeline(job_id: int, db: Session):
         # 1. Master Planning Agent 실행
         logger.info(f"Step 1/4: Running Master Planning Agent for job {job_id}")
         planning_agent = MasterPlanningAgent()
-        storyboard = await planning_agent.analyze_and_plan(job, user, brand_analysis, db)
+        storyboard_result = await planning_agent.analyze_and_plan(job, user, brand_analysis, db)
+
+        # 새 구조: {shared_visual_context: {...}, storyboard: [...]}
+        storyboard = storyboard_result.get("storyboard", storyboard_result if isinstance(storyboard_result, list) else [])
 
         # 2. Image Generation
         cuts = [item for item in storyboard if 'cut' in item]

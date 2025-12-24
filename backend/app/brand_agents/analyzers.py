@@ -123,14 +123,14 @@ class TextAnalyzerAgent:
 
 
 class VisualAnalyzerAgent:
-    """비주얼 분석 Agent"""
+    """비주얼 분석 Agent - Gemini 멀티모달 이미지 분석"""
 
     def __init__(self):
         self.vertex_client = get_vertex_client()
 
     async def analyze(self, contents: List[UnifiedContent]) -> Dict[str, Any]:
         """
-        비주얼 콘텐츠 분석
+        비주얼 콘텐츠 분석 (실제 이미지를 Gemini로 분석)
 
         Args:
             contents: 통합된 콘텐츠 리스트
@@ -153,62 +153,84 @@ class VisualAnalyzerAgent:
 
             logger.info(f"🎨 [Visual Analyzer] {len(contents)}개 콘텐츠 비주얼 분석 시작")
 
-            # 비주얼 콘텐츠 추출
-            visual_contents = [c for c in contents if c.media is not None]
+            # 이미지/비디오 URL 수집 (이미지와 비디오 썸네일 모두 분석)
+            image_urls = []
+            for content in contents:
+                if content.media and content.media.urls:
+                    # 이미지 또는 비디오 썸네일을 모두 수집
+                    if content.media.type in ('image', 'video'):
+                        image_urls.extend(content.media.urls)
 
-            if not visual_contents:
-                logger.info("ℹ️ [Visual Analyzer] 비주얼 콘텐츠가 없습니다 - 텍스트 기반 추론")
+            if not image_urls:
+                logger.info("ℹ️ [Visual Analyzer] 이미지 URL이 없습니다 - 텍스트 기반 추론")
                 return await self._analyze_from_text(contents)
 
-            # 비주얼 콘텐츠 요약
-            visual_summary = []
-            for content in visual_contents:
-                summary = f"""
-플랫폼: {content.platform}
-미디어 타입: {content.media.type}
-미디어 개수: {content.media.count}
-캡션/설명: {content.body_text[:200] if content.body_text else 'N/A'}
-"""
-                visual_summary.append(summary)
+            logger.info(f"🖼️ [Visual Analyzer] {len(image_urls)}개 이미지 발견 (최대 10개 분석)")
 
-            combined_summary = "\n---\n".join(visual_summary)
+            # Gemini 멀티모달로 실제 이미지 분석
+            prompt = """당신은 브랜드 비주얼 스타일 전문 분석가입니다.
 
-            # Gemini로 비주얼 분석 (텍스트 기반 추론)
-            prompt = f"""당신은 브랜드 비주얼 스타일 전문 분석가입니다.
+위 이미지들을 분석하여 브랜드의 시각적 스타일을 파악해주세요.
 
-아래 브랜드의 비주얼 콘텐츠 정보를 분석하여 시각적 스타일을 파악해주세요.
+다음 항목을 JSON 형식으로 분석해주세요:
 
-===== 비주얼 콘텐츠 정보 =====
-{combined_summary}
-===============================
-
-캡션과 설명을 바탕으로 다음 항목을 JSON 형식으로 추론해주세요:
-
-{{
+{
   "has_visual_content": true,
-  "primary_visual_type": "주요 비주얼 타입 (image/video)",
-  "color_palette": ["추론된 HEX 색상 코드"],
-  "image_style": "이미지 스타일 (예: 밝고 화사한, 미니멀, 빈티지)",
-  "composition_style": "구도 스타일 (예: 중앙 정렬, 그리드 레이아웃)",
-  "visual_themes": ["비주얼 테마 1", "비주얼 테마 2"]
-}}
+  "primary_visual_type": "image",
+  "color_palette": ["#HEX1", "#HEX2", "#HEX3", "#HEX4", "#HEX5"],
+  "image_style": "이미지 스타일 (예: 밝고 화사한, 미니멀, 빈티지, 고급스러운, 자연스러운)",
+  "composition_style": "구도 스타일 (예: 중앙 정렬, 대칭적, 그리드 레이아웃, 자유 구도)",
+  "visual_themes": ["비주얼 테마 1", "비주얼 테마 2", "비주얼 테마 3"],
+  "lighting_style": "조명 스타일 (예: 자연광, 스튜디오 조명, 따뜻한 조명)",
+  "photo_type": "사진 유형 (예: 제품 사진, 인물 사진, 풍경, 음식 사진, 라이프스타일)",
+  "overall_mood": "전체적인 분위기 (예: 따뜻하고 친근한, 세련되고 고급스러운, 활기차고 역동적인)"
+}
 
-**중요**: 반드시 위 JSON 형식으로만 응답하세요.
+**중요 지침**:
+1. color_palette는 반드시 실제 이미지에서 추출한 HEX 색상 코드로 5개 제공 (예: #FFE5CC)
+2. 모든 분석은 실제 이미지에 기반해야 합니다
+3. 반드시 위 JSON 형식으로만 응답하세요. 추가 설명은 포함하지 마세요.
 """
 
-            analysis_result = await self.vertex_client.generate_json(prompt, temperature=0.3)
-            logger.info("✅ [Visual Analyzer] 비주얼 분석 완료")
-            return analysis_result
+            try:
+                analysis_result = await self.vertex_client.analyze_images_with_prompt(
+                    image_urls=image_urls,
+                    prompt=prompt,
+                    temperature=0.3,
+                    timeout=180  # 이미지 분석은 더 긴 타임아웃
+                )
+                logger.info("✅ [Visual Analyzer] Gemini 멀티모달 이미지 분석 완료")
+
+                # 필수 필드 보장
+                result = {
+                    "has_visual_content": analysis_result.get("has_visual_content", True),
+                    "primary_visual_type": analysis_result.get("primary_visual_type", "image"),
+                    "color_palette": analysis_result.get("color_palette", ["#FFFFFF", "#000000"]),
+                    "image_style": analysis_result.get("image_style", "기본 스타일"),
+                    "composition_style": analysis_result.get("composition_style", "표준 레이아웃"),
+                    "visual_themes": analysis_result.get("visual_themes", []),
+                    "lighting_style": analysis_result.get("lighting_style"),
+                    "photo_type": analysis_result.get("photo_type"),
+                    "overall_mood": analysis_result.get("overall_mood")
+                }
+                return result
+
+            except Exception as e:
+                logger.warning(f"⚠️ [Visual Analyzer] 멀티모달 분석 실패, 텍스트 기반으로 폴백: {e}")
+                return await self._analyze_from_text(contents)
 
         except Exception as e:
             logger.error(f"❌ [Visual Analyzer] 분석 실패: {e}")
             return self._get_default_analysis()
 
     async def _analyze_from_text(self, contents: List[UnifiedContent]) -> Dict[str, Any]:
-        """텍스트 기반 비주얼 스타일 추론"""
+        """텍스트 기반 비주얼 스타일 추론 (이미지가 없을 때 폴백)"""
         # 비주얼 콘텐츠가 없는 경우 텍스트에서 추론
         texts = [c.body_text[:500] for c in contents if c.body_text]
         combined_text = "\n\n".join(texts)[:5000]
+
+        if not combined_text.strip():
+            return self._get_default_analysis()
 
         prompt = f"""아래 텍스트를 읽고 이 브랜드가 선호할 것 같은 비주얼 스타일을 추론해주세요.
 
@@ -218,7 +240,7 @@ JSON 형식으로 응답:
 {{
   "has_visual_content": false,
   "primary_visual_type": "none",
-  "color_palette": ["추천 색상 팔레트 HEX"],
+  "color_palette": ["추천 색상 팔레트 HEX (예: #FFE5CC)"],
   "image_style": "추론된 이미지 스타일",
   "composition_style": "추천 구도",
   "visual_themes": ["테마1", "테마2"]
@@ -227,7 +249,8 @@ JSON 형식으로 응답:
 
         try:
             return await self.vertex_client.generate_json(prompt, temperature=0.5)
-        except:
+        except Exception as e:
+            logger.warning(f"⚠️ [Visual Analyzer] 텍스트 기반 추론도 실패: {e}")
             return self._get_default_analysis()
 
     def _get_default_analysis(self) -> Dict[str, Any]:

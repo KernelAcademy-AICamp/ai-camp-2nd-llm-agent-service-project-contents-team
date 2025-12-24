@@ -1,0 +1,233 @@
+/* 진행 중인 브랜드 분석 인디케이터 (오른쪽 상단) */
+.brand-analysis-indicator {
+  position: fixed;
+  top: 80px; /* VideoJobIndicator 아래에 표시 */
+  right: 20px;
+  width: 280px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  z-index: 999;
+  animation: brandSlideDown 0.3s ease-out;
+  border-left: 4px solid #667eea;
+}
+
+@keyframes brandSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.brand-analysis-indicator__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.brand-analysis-indicator__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.brand-analysis-indicator__spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e9ecef;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.brand-analysis-indicator__title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+
+.brand-analysis-indicator__content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.brand-analysis-indicator__message {
+  font-size: 13px;
+  color: #666;
+}
+
+.brand-analysis-indicator__progress-bar {
+  height: 6px;
+  background: #e9ecef;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.brand-analysis-indicator__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.brand-analysis-indicator__progress-fill--animated {
+  width: 100%;
+  animation: progressPulse 2s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    #667eea 0%,
+    #764ba2 50%,
+    #667eea 100%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes progressPulse {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.brand-analysis-indicator__status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #888;
+}
+
+.brand-analysis-indicator__time {
+  font-weight: 600;
+  color: #667eea;
+}
+
+/* 완료/실패 토스트 알림 */
+.brand-analysis-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 320px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  padding: 16px;
+  z-index: 1001;
+  animation: brandSlideIn 0.3s ease-out;
+}
+
+@keyframes brandSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.brand-analysis-toast--success {
+  border-left: 4px solid #28a745;
+}
+
+.brand-analysis-toast--failed {
+  border-left: 4px solid #dc3545;
+}
+
+.brand-analysis-toast__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.brand-analysis-toast__icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.brand-analysis-toast__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brand-analysis-toast__text strong {
+  font-size: 14px;
+  color: #333;
+}
+
+.brand-analysis-toast__text span {
+  font-size: 13px;
+  color: #666;
+}
+
+.brand-analysis-toast__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.brand-analysis-toast__btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.brand-analysis-toast__btn--primary {
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  color: white;
+}
+
+.brand-analysis-toast__btn--primary:hover {
+  opacity: 0.9;
+}
+
+.brand-analysis-toast__btn--close {
+  background: #f1f3f4;
+  color: #666;
+}
+
+.brand-analysis-toast__btn--close:hover {
+  background: #e8eaeb;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .brand-analysis-indicator {
+    top: auto;
+    bottom: 80px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+  }
+
+  .brand-analysis-toast {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    bottom: 10px;
+  }
+}

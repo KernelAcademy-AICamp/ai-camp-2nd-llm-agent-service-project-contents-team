@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBrandAnalysis } from '../../contexts/BrandAnalysisContext';
 import api from '../../services/api';
 import PlatformConsentModal from '../../components/PlatformConsentModal';
 import './DynamicOnboarding.css';
@@ -44,6 +45,7 @@ const styleExamples = {
 function DynamicOnboarding() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { startAnalysis: startBrandAnalysis, progress: analysisProgress, step: analysisStep } = useBrandAnalysis();
   const [currentStep, setCurrentStep] = useState(0); // 0: SNS 질문, 1: 비즈니스 정보, 2: 스타일, 3: 완료
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -85,7 +87,6 @@ function DynamicOnboarding() {
   // 멀티 플랫폼 분석 상태
   const [multiPlatformAnalysisStatus, setMultiPlatformAnalysisStatus] = useState('idle'); // idle, analyzing, completed, failed
   const [multiPlatformAnalysisResult, setMultiPlatformAnalysisResult] = useState(null);
-  const [analysisProgress, setAnalysisProgress] = useState(0); // SNS 분석 진행률 (0-100)
 
   // YouTube 연동 상태
   const [youtubeConnection, setYoutubeConnection] = useState(null);
@@ -158,25 +159,6 @@ function DynamicOnboarding() {
       loadCustomQuestions();
     }
   }, [businessInfo.business_type]);
-
-  // SNS 분석 진행률 자동 증가
-  useEffect(() => {
-    if (multiPlatformAnalysisStatus === 'analyzing') {
-      const progressInterval = setInterval(() => {
-        setAnalysisProgress(prev => {
-          // 95%까지만 자동 증가 (완료 시 100%로 설정)
-          if (prev < 95) {
-            // 처음에는 빠르게, 나중에는 느리게 증가
-            const increment = prev < 30 ? 2 : prev < 60 ? 1 : 0.5;
-            return Math.min(prev + increment, 95);
-          }
-          return prev;
-        });
-      }, 800); // 0.8초마다 업데이트
-
-      return () => clearInterval(progressInterval);
-    }
-  }, [multiPlatformAnalysisStatus]);
 
   // YouTube/Instagram/Threads 연동 상태 확인
   useEffect(() => {
@@ -401,8 +383,10 @@ function DynamicOnboarding() {
     }
 
     setMultiPlatformAnalysisStatus('analyzing');
-    setAnalysisProgress(0); // 진행률 초기화
     setCurrentStep(2); // 분석 중 페이지로 이동
+
+    // BrandAnalysisContext에 분석 시작 알림 (백그라운드 폴링 시작, progress 초기화 포함)
+    startBrandAnalysis();
 
     try {
       // 분석 시작
@@ -421,36 +405,45 @@ function DynamicOnboarding() {
       const response = await api.post('/api/brand-analysis/multi-platform', requestData);
       console.log('멀티 플랫폼 분석 시작:', response.data);
 
-      // 분석 상태 폴링 (5초마다 체크)
+      // 백그라운드 폴링은 BrandAnalysisContext에서 처리
+      // 온보딩 페이지에서도 진행 상태를 표시하기 위한 폴링 (선택적)
       const pollInterval = setInterval(async () => {
         try {
           const statusResponse = await api.get('/api/brand-analysis/status');
           console.log('분석 상태:', statusResponse.data);
 
-          const { overall } = statusResponse.data;
+          const { analysis_status, analysis_error, overall } = statusResponse.data;
 
-          // overall 데이터가 있으면 분석 완료
-          if (overall && overall.brand_tone) {
+          // 분석 완료
+          if (analysis_status === 'completed') {
             clearInterval(pollInterval);
-            setAnalysisProgress(100); // 진행률 100% 완료
             setMultiPlatformAnalysisStatus('completed');
             setMultiPlatformAnalysisResult(statusResponse.data);
 
-            // ✅ businessInfo 업데이트: 백엔드에서 추출한 브랜드명, 업종, 타겟 반영
-            setBusinessInfo(prev => ({
-              ...prev,
-              brand_name: overall.brand_name || prev.brand_name,
-              business_type: overall.business_type || prev.business_type,
-              target_audience: {
-                ...prev.target_audience,
-                age_range: overall.target_audience || prev.target_audience.age_range
-              }
-            }));
+            // businessInfo 업데이트
+            if (overall) {
+              setBusinessInfo(prev => ({
+                ...prev,
+                brand_name: overall.brand_name || prev.brand_name,
+                business_type: overall.business_type || prev.business_type,
+                target_audience: {
+                  ...prev.target_audience,
+                  age_range: overall.target_audience || prev.target_audience.age_range
+                }
+              }));
+            }
 
             // 완료 페이지로 이동
             setTimeout(() => {
               setCurrentStep(3);
             }, 1000);
+          }
+          // 분석 실패
+          else if (analysis_status === 'failed') {
+            clearInterval(pollInterval);
+            setMultiPlatformAnalysisStatus('failed');
+            alert(`브랜드 분석에 실패했습니다: ${analysis_error || '알 수 없는 오류'}`);
+            setCurrentStep(1);
           }
         } catch (error) {
           console.error('분석 상태 확인 실패:', error);
@@ -463,7 +456,7 @@ function DynamicOnboarding() {
         if (multiPlatformAnalysisStatus === 'analyzing') {
           setMultiPlatformAnalysisStatus('failed');
           alert('분석 시간이 초과되었습니다. 다시 시도해주세요.');
-          setCurrentStep(1); // 다시 입력 페이지로
+          setCurrentStep(1);
         }
       }, 300000);
 
@@ -471,7 +464,7 @@ function DynamicOnboarding() {
       console.error('멀티 플랫폼 분석 실패:', error);
       setMultiPlatformAnalysisStatus('failed');
       alert('플랫폼 분석 요청에 실패했습니다: ' + (error.response?.data?.detail || error.message));
-      setCurrentStep(1); // 다시 입력 페이지로
+      setCurrentStep(1);
     }
   };
 
@@ -503,6 +496,9 @@ function DynamicOnboarding() {
     setManualAnalysisStatus('analyzing');
     setIsLoading(true);
 
+    // BrandAnalysisContext에 분석 시작 알림 (백그라운드 폴링 시작, progress 초기화 포함)
+    startBrandAnalysis();
+
     try {
       // FormData 생성
       const formData = new FormData();
@@ -531,31 +527,33 @@ function DynamicOnboarding() {
       });
       console.log('수동 콘텐츠 분석 시작:', response.data);
 
-      // 분석 상태 폴링 (5초마다 체크)
+      // 분석 상태 폴링 (5초마다 체크) - analysis_status 기준으로 통일
       const pollInterval = setInterval(async () => {
         try {
           const statusResponse = await api.get('/api/brand-analysis/status');
           console.log('분석 상태:', statusResponse.data);
 
-          const { overall } = statusResponse.data;
+          const { analysis_status, analysis_error, overall } = statusResponse.data;
 
-          // overall 데이터가 있으면 분석 완료
-          if (overall && overall.brand_tone) {
+          // 분석 완료 (analysis_status 기준으로 통일)
+          if (analysis_status === 'completed') {
             clearInterval(pollInterval);
             setManualAnalysisStatus('completed');
             setManualAnalysisResult(statusResponse.data);
             setIsLoading(false);
 
-            // ✅ AI 분석 결과를 businessInfo에 반영
-            setBusinessInfo(prev => ({
-              ...prev,
-              brand_name: overall.brand_name || prev.brand_name,
-              business_type: overall.business_type || prev.business_type,
-              target_audience: {
-                ...prev.target_audience,
-                age_range: overall.target_audience || prev.target_audience.age_range
-              }
-            }));
+            // AI 분석 결과를 businessInfo에 반영
+            if (overall) {
+              setBusinessInfo(prev => ({
+                ...prev,
+                brand_name: overall.brand_name || prev.brand_name,
+                business_type: overall.business_type || prev.business_type,
+                target_audience: {
+                  ...prev.target_audience,
+                  age_range: overall.target_audience || prev.target_audience.age_range
+                }
+              }));
+            }
 
             // 완료 페이지로 이동
             setShowSuccess(true);
@@ -563,6 +561,13 @@ function DynamicOnboarding() {
               setShowSuccess(false);
               setCurrentStep(3);
             }, 1000);
+          }
+          // 분석 실패 (analysis_status 기준으로 통일)
+          else if (analysis_status === 'failed') {
+            clearInterval(pollInterval);
+            setManualAnalysisStatus('failed');
+            setIsLoading(false);
+            alert(`브랜드 분석에 실패했습니다: ${analysis_error || '알 수 없는 오류'}`);
           }
         } catch (error) {
           console.error('분석 상태 확인 실패:', error);
@@ -1481,30 +1486,105 @@ function DynamicOnboarding() {
       {/* Step 2: 콘텐츠 스타일 (수동 입력 경로만) */}
       {currentStep === 2 && onboardingPath === 'manual_input' && (
         <div className="onboarding-step fade-in">
-          <h2>선호하는 콘텐츠 스타일</h2>
-
-          {/* 조건부 설명 */}
-          <p className="step-description">
-            {!hasIdentityInfo() ? (
-              <>
-                ⚠️ <strong>최소 1개 콘텐츠 타입</strong>에서 <strong>2개 이상의 샘플</strong>을 업로드해주세요.
+          {/* 분석 중일 때는 진행 상태 표시 */}
+          {manualAnalysisStatus === 'analyzing' ? (
+            <>
+              <h2>콘텐츠 분석 중입니다...</h2>
+              <p className="step-description">
+                업로드하신 샘플을 분석하고 있습니다.
                 <br />
-                <small className="text-warning">
-                  (Step 1에서 스타일/가치를 입력하지 않으셨기 때문에 샘플이 필수입니다)
-                </small>
-              </>
-            ) : (
-              <>
-                샘플을 제공하시면 더 정확한 콘텐츠를 만들 수 있어요
-                <br />
-                <small className="text-success">
-                  ✓ 스타일/가치 정보를 입력하셨으므로 샘플은 선택 사항입니다
-                </small>
-              </>
-            )}
-          </p>
+                잠시만 기다려주세요 (최대 5분 소요)
+              </p>
 
-          <div className="onboarding-form-section">
+              <div className="analysis-progress-container">
+                <div className="spinner-large"></div>
+
+                {/* 진행률 프로그래스바 */}
+                <div style={{ width: '100%', marginTop: '32px', marginBottom: '24px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)' }}>
+                      분석 진행률
+                    </span>
+                    <span style={{ fontSize: '16px', fontWeight: '700', color: '#D8BFD8' }}>
+                      {Math.round(analysisProgress)}%
+                    </span>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    height: '10px',
+                    backgroundColor: '#F8F8FF',
+                    borderRadius: '5px',
+                    overflow: 'hidden',
+                    boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)'
+                  }}>
+                    <div style={{
+                      width: `${analysisProgress}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #D8BFD8 0%, #E6E6FA 100%)',
+                      transition: 'width 0.5s ease',
+                      borderRadius: '5px'
+                    }}></div>
+                  </div>
+                </div>
+
+                <div className="progress-message">
+                  {analysisProgress < 20 && (
+                    <p>📤 업로드한 콘텐츠 처리 중...</p>
+                  )}
+                  {analysisProgress >= 20 && analysisProgress < 40 && (
+                    <p>📊 샘플 콘텐츠 분석 중...</p>
+                  )}
+                  {analysisProgress >= 40 && analysisProgress < 70 && (
+                    <p>🤖 AI가 브랜드 특성을 분석 중...</p>
+                  )}
+                  {analysisProgress >= 70 && analysisProgress < 90 && (
+                    <p>✨ 브랜드 프로필 생성 중...</p>
+                  )}
+                  {analysisProgress >= 90 && (
+                    <p>✅ 거의 완료되었습니다!</p>
+                  )}
+                </div>
+
+                {/* 서비스 둘러보기 버튼 */}
+                <div className="browse-service-section">
+                  <p className="browse-hint">
+                    분석이 완료되면 알림으로 알려드릴게요!
+                  </p>
+                  <button
+                    onClick={() => navigate('/')}
+                    className="btn-secondary btn-browse-service"
+                  >
+                    서비스 둘러보기
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2>선호하는 콘텐츠 스타일</h2>
+
+              {/* 조건부 설명 */}
+              <p className="step-description">
+                {!hasIdentityInfo() ? (
+                  <>
+                    ⚠️ <strong>최소 1개 콘텐츠 타입</strong>에서 <strong>2개 이상의 샘플</strong>을 업로드해주세요.
+                    <br />
+                    <small className="text-warning">
+                      (Step 1에서 스타일/가치를 입력하지 않으셨기 때문에 샘플이 필수입니다)
+                    </small>
+                  </>
+                ) : (
+                  <>
+                    샘플을 제공하시면 더 정확한 콘텐츠를 만들 수 있어요
+                    <br />
+                    <small className="text-success">
+                      ✓ 스타일/가치 정보를 입력하셨으므로 샘플은 선택 사항입니다
+                    </small>
+                  </>
+                )}
+              </p>
+
+              <div className="onboarding-form-section">
             {/* 글 스타일 */}
             <div className="style-card">
               <h3>
@@ -1714,7 +1794,9 @@ function DynamicOnboarding() {
                 {isLoading ? '분석 중...' : '분석 시작'}
               </button>
             </div>
-          </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1762,23 +1844,38 @@ function DynamicOnboarding() {
             )}
 
             {multiPlatformAnalysisStatus === 'analyzing' && (
-              <div className="progress-message">
-                {analysisProgress < 20 && (
-                  <p>🔍 플랫폼 콘텐츠 수집 중...</p>
-                )}
-                {analysisProgress >= 20 && analysisProgress < 40 && (
-                  <p>📊 수집된 콘텐츠 분석 중...</p>
-                )}
-                {analysisProgress >= 40 && analysisProgress < 70 && (
-                  <p>🤖 AI가 브랜드 특성을 분석 중...</p>
-                )}
-                {analysisProgress >= 70 && analysisProgress < 90 && (
-                  <p>✨ 브랜드 프로필 생성 중...</p>
-                )}
-                {analysisProgress >= 90 && (
-                  <p>✅ 거의 완료되었습니다!</p>
-                )}
-              </div>
+              <>
+                <div className="progress-message">
+                  {analysisProgress < 20 && (
+                    <p>🔍 플랫폼 콘텐츠 수집 중...</p>
+                  )}
+                  {analysisProgress >= 20 && analysisProgress < 40 && (
+                    <p>📊 수집된 콘텐츠 분석 중...</p>
+                  )}
+                  {analysisProgress >= 40 && analysisProgress < 70 && (
+                    <p>🤖 AI가 브랜드 특성을 분석 중...</p>
+                  )}
+                  {analysisProgress >= 70 && analysisProgress < 90 && (
+                    <p>✨ 브랜드 프로필 생성 중...</p>
+                  )}
+                  {analysisProgress >= 90 && (
+                    <p>✅ 거의 완료되었습니다!</p>
+                  )}
+                </div>
+
+                {/* 서비스 둘러보기 버튼 */}
+                <div className="browse-service-section">
+                  <p className="browse-hint">
+                    분석이 완료되면 알림으로 알려드릴게요!
+                  </p>
+                  <button
+                    onClick={() => navigate('/')}
+                    className="btn-secondary btn-browse-service"
+                  >
+                    서비스 둘러보기
+                  </button>
+                </div>
+              </>
             )}
 
             {multiPlatformAnalysisStatus === 'completed' && (

@@ -19,9 +19,9 @@ const PLATFORMS = [
 ];
 
 const VIDEO_DURATION_OPTIONS = [
-  { id: 'short', label: 'Short', duration: '15초', cuts: 3, description: '빠른 임팩트', credits: 10 },
-  { id: 'standard', label: 'Standard', duration: '30초', cuts: 5, description: '균형잡힌 구성', credits: 20 },
-  { id: 'premium', label: 'Premium', duration: '60초', cuts: 8, description: '상세한 스토리', credits: 35 },
+  { id: 'short', label: 'Short', duration: '15초', cuts: 4, description: '빠른 임팩트', credits: 10 },
+  { id: 'standard', label: 'Standard', duration: '25초', cuts: 6, description: '균형잡힌 구성', credits: 20 },
+  { id: 'premium', label: 'Premium', duration: '40초', cuts: 8, description: '상세한 스토리', credits: 35 },
 ];
 
 // 크레딧 비용 상수

@@ -252,6 +252,50 @@
   transform: translateY(-1px);
 }
 
+/* Analyzing Placeholder */
+.analyzing-placeholder {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, #f8f9ff 100%);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-color);
+}
+
+.analyzing-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e9ecef;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.analyzing-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analyzing-text span {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: #667eea;
+}
+
+.analyzing-text small {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
 /* Profile Info Grid */
 .profile-info-grid {
   display: grid;
