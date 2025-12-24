@@ -6,6 +6,8 @@ import api from '../../services/api';
 import PlatformConsentModal from '../../components/PlatformConsentModal';
 import './DynamicOnboarding.css';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 // 스타일별 콘텐츠 예시
 const styleExamples = {
   '따뜻한': {
@@ -211,7 +213,8 @@ function DynamicOnboarding() {
       }
 
       // YouTube OAuth 연동 페이지로 이동 (user_id 전달)
-      window.location.href = `http://localhost:8000/api/youtube/connect?user_id=${user.id}`;
+      window.location.href = `${API_URL}/api/youtube/connect?user_id=${user.id}`;
+      
     } catch (error) {
       console.error('YouTube 연동 실패:', error);
       alert('YouTube 연동에 실패했습니다.');
@@ -245,7 +248,7 @@ function DynamicOnboarding() {
       }
 
       // Instagram OAuth 연동 페이지로 이동 (user_id 전달)
-      window.location.href = `http://localhost:8000/api/instagram/connect?user_id=${user.id}`;
+      window.location.href = `${API_URL}/api/instagram/connect?user_id=${user.id}`;
     } catch (error) {
       console.error('Instagram 연동 실패:', error);
       alert('Instagram 연동에 실패했습니다.');
@@ -279,7 +282,7 @@ function DynamicOnboarding() {
       }
 
       // Threads OAuth 연동 페이지로 이동 (user_id 전달)
-      window.location.href = `http://localhost:8000/api/threads/connect?user_id=${user.id}`;
+      window.location.href = `${API_URL}/api/threads/connect?user_id=${user.id}`;
     } catch (error) {
       console.error('Threads 연동 실패:', error);
       alert('Threads 연동에 실패했습니다.');
