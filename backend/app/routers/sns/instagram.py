@@ -223,10 +223,14 @@ async def instagram_callback(
 
     except Exception as e:
         import traceback
-        logger.error(f"Instagram OAuth error: {e}")
+        import urllib.parse
+        error_msg = str(e)
+        logger.error(f"Instagram OAuth error: {error_msg}")
         logger.error(f"Traceback: {traceback.format_exc()}")
+        # 에러 메시지를 URL에 포함 (디버깅용)
+        encoded_error = urllib.parse.quote(error_msg[:200])
         return RedirectResponse(
-            url=f"{FRONTEND_URL}/settings?error=instagram_oauth_failed"
+            url=f"{FRONTEND_URL}/settings?error=instagram_oauth_failed&detail={encoded_error}"
         )
 
 

@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import RedirectResponse
@@ -14,8 +15,8 @@ router = APIRouter(
     tags=["oauth"]
 )
 
-# 프론트엔드 URL (프로덕션 배포 시 환경 변수로 설정 권장)
-FRONTEND_URL = "http://localhost:3000"
+# 프론트엔드 URL
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
 
 async def get_or_create_user(
@@ -76,7 +77,7 @@ async def get_or_create_user(
 @router.get('/google/login')
 async def google_login(request: Request):
     """Google OAuth 로그인 시작"""
-    redirect_uri = request.url_for('google_callback')
+    redirect_uri = os.getenv('GOOGLE_REDIRECT_URI', str(request.url_for('google_callback')))
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 

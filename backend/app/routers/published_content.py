@@ -1007,6 +1007,35 @@ async def get_content_stats(
     }
 
 
+@router.get("/by-session/{session_id}")
+async def get_content_by_session(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    세션 ID로 기존 발행 콘텐츠 조회 (draft 상태만)
+    - 생성내역에서 편집하기 클릭 시 중복 체크용
+    - 이미 편집 중인 콘텐츠가 있으면 해당 콘텐츠 ID 반환
+    """
+    content = db.query(PublishedContent).filter(
+        PublishedContent.session_id == session_id,
+        PublishedContent.user_id == current_user.id,
+        PublishedContent.status == "draft"
+    ).first()
+
+    if content:
+        return {
+            "exists": True,
+            "content_id": content.id,
+            "platform": content.platform,
+            "title": content.title,
+            "created_at": content.created_at.isoformat() if content.created_at else None
+        }
+
+    return {"exists": False}
+
+
 @router.get("/{content_id}", response_model=PublishedContentResponse)
 async def get_published_content(
     content_id: int,
@@ -1492,9 +1521,9 @@ async def upload_image(
     db: Session = Depends(get_db)
 ):
     """
-    이미지 업로드 (Cloudinary)
+    이미지 업로드 (Supabase Storage)
     - Instagram/SNS 발행용 이미지 업로드
-    - 반환: image_url (Cloudinary URL - 공개 접근 가능)
+    - 반환: image_url (공개 접근 가능 URL)
     """
     # 파일 타입 검증
     allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
@@ -1514,31 +1543,51 @@ async def upload_image(
         )
 
     try:
-        # GCS 클라이언트 초기화 (lazy initialization)
-        init_gcs()
+        # Supabase 클라이언트 가져오기
+        client = _get_supabase_client()
+        if not client:
+            raise Exception("Supabase 클라이언트가 초기화되지 않았습니다. 환경변수를 확인해주세요.")
 
-        if not gcs_bucket:
-            raise Exception("Google Cloud Storage가 초기화되지 않았습니다. 환경변수를 확인해주세요.")
-
-        # 파일명 생성: publish/{user_id}/{uuid}.{ext}
+        # 파일명 생성
         ext = file.filename.split('.')[-1].lower() if file.filename and '.' in file.filename else 'jpg'
         if ext not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
             ext = 'jpg'
-        blob_name = f"publish/{current_user.id}/{uuid.uuid4().hex}.{ext}"
 
-        # GCS에 업로드
-        blob = gcs_bucket.blob(blob_name)
-        blob.upload_from_string(content, content_type=file.content_type)
+        # content-type 결정
+        content_type_map = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'webp': 'image/webp'
+        }
+        content_type = content_type_map.get(ext, 'image/jpeg')
 
-        # 공개 URL 생성 (버킷이 공개 설정된 경우)
-        blob.make_public()
-        image_url = blob.public_url
+        # 파일 경로: publish/{user_id}/{uuid}.{ext}
+        file_path = f"publish/{current_user.id}/{uuid.uuid4().hex}.{ext}"
+        bucket_name = "cardnews"  # 기존 cardnews 버킷 활용
 
-        logger.info(f"이미지 업로드 완료 (GCS): user_id={current_user.id}, url={image_url}")
+        # 기존 파일 삭제 시도 (있으면)
+        try:
+            client.storage.from_(bucket_name).remove([file_path])
+        except Exception:
+            pass
+
+        # Supabase Storage에 업로드
+        client.storage.from_(bucket_name).upload(
+            file_path,
+            content,
+            {"content-type": content_type}
+        )
+
+        # 공개 URL 생성
+        image_url = client.storage.from_(bucket_name).get_public_url(file_path)
+
+        logger.info(f"이미지 업로드 완료 (Supabase): user_id={current_user.id}, url={image_url[:80]}...")
 
         return {
             "image_url": image_url,
-            "public_id": blob_name,
+            "public_id": file_path,
             "width": None,
             "height": None,
             "format": ext,

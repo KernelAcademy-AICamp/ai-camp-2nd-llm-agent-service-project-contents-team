@@ -1186,3 +1186,82 @@
     justify-content: center;
   }
 }
+
+/* ========================================
+   SNS PLATFORM SELECT MODAL
+   ======================================== */
+
+.sns-select-modal {
+  max-width: 400px;
+}
+
+.sns-select-desc {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.sns-platform-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.sns-platform-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-lg);
+  background: var(--bg-secondary);
+  border: var(--border-medium) solid var(--border-color);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sns-platform-btn:hover:not(:disabled) {
+  border-color: var(--primary-color);
+  background: var(--bg-tertiary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.sns-platform-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sns-platform-btn .platform-icon {
+  font-size: 2rem;
+}
+
+.sns-platform-btn .platform-name {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sns-platform-btn .platform-desc {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.sns-platform-btn.instagram:hover:not(:disabled) {
+  border-color: #E1306C;
+}
+
+.sns-platform-btn.facebook:hover:not(:disabled) {
+  border-color: #1877F2;
+}
+
+@media (max-width: 480px) {
+  .sns-platform-buttons {
+    gap: var(--space-sm);
+  }
+  
+  .sns-platform-btn {
+    padding: var(--space-md);
+  }
+}

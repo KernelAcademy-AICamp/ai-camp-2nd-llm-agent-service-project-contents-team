@@ -13,7 +13,7 @@ from ..database import get_db
 from ..models import User, TemplateTab, Template
 from ..auth import get_current_user
 
-router = APIRouter(prefix="/templates", tags=["templates"])
+router = APIRouter(prefix="/api/templates", tags=["templates"])
 
 
 # ============================================
