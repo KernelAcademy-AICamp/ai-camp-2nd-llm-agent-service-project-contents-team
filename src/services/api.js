@@ -27,9 +27,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // 이미 로그인 페이지에 있거나, refresh-token 요청인 경우 리다이렉트 방지
+      const isLoginPage = window.location.pathname === '/login';
+      const isRefreshRequest = error.config?.url?.includes('refresh-token');
+
+      if (!isLoginPage && !isRefreshRequest) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
