@@ -264,6 +264,112 @@ class InstagramService:
             params=params
         )
 
+    # ===== Instagram Reels 게시 =====
+
+    async def create_reels_container(
+        self,
+        instagram_user_id: str,
+        video_url: str,
+        caption: str = None,
+        share_to_feed: bool = True
+    ) -> Optional[Dict]:
+        """
+        Instagram Reels 컨테이너 생성 (게시 1단계)
+        video_url: 공개적으로 접근 가능한 비디오 URL
+        """
+        params = {
+            'media_type': 'REELS',
+            'video_url': video_url,
+            'share_to_feed': 'true' if share_to_feed else 'false'
+        }
+
+        if caption:
+            params['caption'] = caption
+
+        logger.info(f"Creating Reels container for {instagram_user_id} with video: {video_url[:50]}...")
+        return await self._make_request(
+            'POST',
+            f'{instagram_user_id}/media',
+            params=params
+        )
+
+    async def check_container_status(
+        self,
+        container_id: str
+    ) -> Optional[Dict]:
+        """
+        미디어 컨테이너 상태 확인
+        비디오 처리가 완료될 때까지 폴링 필요
+        """
+        return await self._make_request(
+            'GET',
+            container_id,
+            params={'fields': 'status_code,status'}
+        )
+
+    async def publish_reels(
+        self,
+        instagram_user_id: str,
+        video_url: str,
+        caption: str = None,
+        share_to_feed: bool = True,
+        max_retries: int = 30,
+        retry_interval: int = 5
+    ) -> Optional[Dict]:
+        """
+        Instagram Reels 게시 (전체 프로세스)
+        1. 컨테이너 생성
+        2. 처리 완료 대기
+        3. 게시
+        """
+        import asyncio
+
+        # 1. 컨테이너 생성
+        container = await self.create_reels_container(
+            instagram_user_id,
+            video_url,
+            caption,
+            share_to_feed
+        )
+
+        if not container or 'id' not in container:
+            logger.error(f"Failed to create Reels container: {container}")
+            return None
+
+        container_id = container['id']
+        logger.info(f"Reels container created: {container_id}")
+
+        # 2. 처리 완료 대기 (폴링)
+        for i in range(max_retries):
+            status = await self.check_container_status(container_id)
+            logger.info(f"Container status check {i+1}/{max_retries}: {status}")
+
+            if status:
+                status_code = status.get('status_code')
+                if status_code == 'FINISHED':
+                    logger.info("Video processing finished, publishing...")
+                    break
+                elif status_code == 'ERROR':
+                    logger.error(f"Video processing failed: {status}")
+                    return None
+                elif status_code == 'IN_PROGRESS':
+                    logger.info(f"Video still processing... waiting {retry_interval}s")
+                    await asyncio.sleep(retry_interval)
+                else:
+                    logger.warning(f"Unknown status: {status_code}")
+                    await asyncio.sleep(retry_interval)
+            else:
+                await asyncio.sleep(retry_interval)
+        else:
+            logger.error("Video processing timed out")
+            return None
+
+        # 3. 게시
+        result = await self.publish_media(instagram_user_id, container_id)
+        if result:
+            logger.info(f"Reels published successfully: {result}")
+        return result
+
 
 async def sync_instagram_posts(
     service: InstagramService,

@@ -496,3 +496,78 @@ async def refresh_account_info(
         db.commit()
 
     return {"message": "Account info refreshed successfully"}
+
+
+# ===== Reels 비디오 업로드 =====
+
+class ReelsUploadRequest(BaseModel):
+    video_url: str
+    caption: Optional[str] = ""
+    share_to_feed: Optional[bool] = True
+
+
+@router.post('/reels/upload-from-url')
+async def upload_reels_from_url(
+    request: ReelsUploadRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """
+    URL에서 비디오를 가져와 Instagram Reels로 업로드
+    비디오 URL은 공개적으로 접근 가능해야 함
+    """
+    connection = db.query(models.InstagramConnection).filter(
+        models.InstagramConnection.user_id == current_user.id
+    ).first()
+
+    if not connection:
+        raise HTTPException(
+            status_code=404,
+            detail="Instagram not connected. Please connect your Instagram account first."
+        )
+
+    if not connection.instagram_account_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Instagram account not selected. Please select an Instagram account."
+        )
+
+    if not connection.page_access_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Page access token not found. Please reconnect your Instagram account."
+        )
+
+    ig_service = InstagramService(connection.page_access_token)
+
+    try:
+        result = await ig_service.publish_reels(
+            instagram_user_id=connection.instagram_account_id,
+            video_url=request.video_url,
+            caption=request.caption,
+            share_to_feed=request.share_to_feed
+        )
+
+        if not result:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to upload Reels. The video may be invalid or processing failed."
+            )
+
+        media_id = result.get('id')
+
+        return {
+            "message": "Reels uploaded successfully",
+            "media_id": media_id,
+            "instagram_url": f"https://www.instagram.com/reel/{media_id}/" if media_id else None
+        }
+
+    except Exception as e:
+        logger.error(f"Reels upload error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload Reels: {str(e)}"
+        )
+
+    finally:
+        await ig_service.close()

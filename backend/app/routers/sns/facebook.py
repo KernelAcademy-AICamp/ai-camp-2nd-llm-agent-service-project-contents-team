@@ -653,3 +653,81 @@ async def refresh_page_info(
         db.commit()
 
     return {"message": "Page info refreshed successfully"}
+
+
+# ===== 비디오 업로드 =====
+
+class VideoUploadRequest(BaseModel):
+    video_url: str
+    title: Optional[str] = ""
+    description: Optional[str] = ""
+
+
+@router.post('/videos/upload-from-url')
+async def upload_video_from_url(
+    request: VideoUploadRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """
+    URL에서 비디오를 가져와 Facebook 페이지에 업로드
+    비디오 URL은 공개적으로 접근 가능해야 함
+    """
+    connection = db.query(models.FacebookConnection).filter(
+        models.FacebookConnection.user_id == current_user.id
+    ).first()
+
+    if not connection:
+        raise HTTPException(
+            status_code=404,
+            detail="Facebook not connected. Please connect your Facebook page first."
+        )
+
+    if not connection.page_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No Facebook page selected. Please select a page in settings."
+        )
+
+    if not connection.page_access_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Page access token not found. Please reconnect your Facebook page."
+        )
+
+    fb_service = FacebookService(
+        connection.user_access_token,
+        connection.page_access_token
+    )
+
+    try:
+        result = await fb_service.create_video_post(
+            page_id=connection.page_id,
+            video_url=request.video_url,
+            title=request.title,
+            description=request.description
+        )
+
+        if not result:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to upload video. The video URL may be invalid or inaccessible."
+            )
+
+        video_id = result.get('id')
+
+        return {
+            "message": "Video uploaded successfully",
+            "video_id": video_id,
+            "facebook_url": f"https://www.facebook.com/{video_id}" if video_id else None
+        }
+
+    except Exception as e:
+        logger.error(f"Facebook video upload error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upload video: {str(e)}"
+        )
+
+    finally:
+        await fb_service.close()

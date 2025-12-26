@@ -1338,6 +1338,48 @@
   box-shadow: var(--shadow-lg);
 }
 
+.btn-instagram-publish {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
+  background: linear-gradient(45deg, #405DE6, #5851DB, #833AB4, #C13584, #E1306C, #FD1D1D);
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-instagram-publish:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-facebook-publish {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
+  background: #1877F2;
+  color: white;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-facebook-publish:hover {
+  background: #166FE5;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
 .btn-download-video {
   display: flex;
   align-items: center;
@@ -1420,12 +1462,142 @@
   background: #CC0000 !important;
 }
 
+/* Instagram Modal */
+.instagram-modal {
+  max-width: 500px;
+}
+
+.instagram-account-info {
+  background: linear-gradient(45deg, rgba(64, 93, 230, 0.1), rgba(225, 48, 108, 0.1));
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+  font-size: var(--text-sm);
+}
+
+.instagram-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.instagram-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.instagram-form .form-group label {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.instagram-form .form-group textarea {
+  padding: var(--space-sm) var(--space-md);
+  border: var(--border-medium) solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  transition: all var(--transition-fast);
+  resize: vertical;
+  min-height: 100px;
+}
+
+.instagram-form .form-group textarea:focus {
+  outline: none;
+  border-color: #E1306C;
+  box-shadow: 0 0 0 3px rgba(225, 48, 108, 0.1);
+}
+
+.instagram-form .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+}
+
+.instagram-form .checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.btn-instagram {
+  background: linear-gradient(45deg, #405DE6, #833AB4, #C13584, #E1306C) !important;
+}
+
+.btn-instagram:hover:not(:disabled) {
+  opacity: 0.9 !important;
+}
+
+/* Facebook Modal */
+.facebook-modal {
+  max-width: 500px;
+}
+
+.facebook-page-info {
+  background: rgba(24, 119, 242, 0.1);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+  font-size: var(--text-sm);
+}
+
+.facebook-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.facebook-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.facebook-form .form-group label {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.facebook-form .form-group input,
+.facebook-form .form-group textarea {
+  padding: var(--space-sm) var(--space-md);
+  border: var(--border-medium) solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  transition: all var(--transition-fast);
+}
+
+.facebook-form .form-group input:focus,
+.facebook-form .form-group textarea:focus {
+  outline: none;
+  border-color: #1877F2;
+  box-shadow: 0 0 0 3px rgba(24, 119, 242, 0.1);
+}
+
+.facebook-form .form-group textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.btn-facebook {
+  background: #1877F2 !important;
+}
+
+.btn-facebook:hover:not(:disabled) {
+  background: #166FE5 !important;
+}
+
 @media (max-width: 480px) {
   .video-publish-buttons {
     flex-direction: column;
   }
-  
+
   .btn-youtube-publish,
+  .btn-instagram-publish,
+  .btn-facebook-publish,
   .btn-download-video {
     width: 100%;
     justify-content: center;

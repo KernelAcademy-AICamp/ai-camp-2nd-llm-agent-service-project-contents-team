@@ -272,6 +272,14 @@ export const facebookAPI = {
     const response = await api.get(`/api/facebook/insights?period=${period}&date_preset=${datePreset}`);
     return response.data;
   },
+
+  // URL에서 비디오 업로드
+  uploadVideoFromUrl: async (data) => {
+    const response = await api.post('/api/facebook/videos/upload-from-url', data, {
+      timeout: 600000, // 10분 타임아웃
+    });
+    return response.data;
+  },
 };
 
 // ==========================================
@@ -323,6 +331,14 @@ export const instagramAPI = {
   // 계정 인사이트
   getInsights: async (period = 'day') => {
     const response = await api.get(`/api/instagram/insights?period=${period}`);
+    return response.data;
+  },
+
+  // URL에서 Reels 업로드
+  uploadReelsFromUrl: async (data) => {
+    const response = await api.post('/api/instagram/reels/upload-from-url', data, {
+      timeout: 600000, // 10분 타임아웃 (비디오 처리 대기 포함)
+    });
     return response.data;
   },
 };

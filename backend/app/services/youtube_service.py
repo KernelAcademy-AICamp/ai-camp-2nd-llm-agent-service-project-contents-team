@@ -178,7 +178,8 @@ class YouTubeService:
         description: str = "",
         tags: List[str] = None,
         category_id: str = "22",  # 기본: People & Blogs
-        privacy_status: str = "private"  # private, public, unlisted
+        privacy_status: str = "private",  # private, public, unlisted
+        retry_on_401: bool = True
     ) -> Optional[Dict]:
         """
         동영상 업로드 (Resumable Upload)
@@ -205,7 +206,7 @@ class YouTubeService:
             "part": "snippet,status"
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=600.0) as client:
             # 1. 업로드 세션 시작
             init_response = await client.post(
                 init_url,
@@ -218,8 +219,20 @@ class YouTubeService:
                 json=metadata
             )
 
+            # 토큰 만료 시 갱신 후 재시도
+            if init_response.status_code == 401 and retry_on_401:
+                logger.info("Access token expired, attempting refresh...")
+                new_token = await self._refresh_access_token()
+                if new_token:
+                    return await self.upload_video(
+                        video_file_path, title, description, tags,
+                        category_id, privacy_status, retry_on_401=False
+                    )
+                logger.error("Token refresh failed")
+                return None
+
             if init_response.status_code != 200:
-                logger.error(f"Upload init failed: {init_response.text}")
+                logger.error(f"Upload init failed: {init_response.status_code} - {init_response.text}")
                 return None
 
             upload_url = init_response.headers.get("Location")
@@ -227,9 +240,13 @@ class YouTubeService:
                 logger.error("No upload URL received")
                 return None
 
+            logger.info(f"Upload URL received, starting file upload...")
+
             # 2. 실제 파일 업로드
             with open(video_file_path, "rb") as video_file:
                 video_data = video_file.read()
+
+            logger.info(f"Video file size: {len(video_data)} bytes")
 
             upload_response = await client.put(
                 upload_url,
@@ -237,14 +254,14 @@ class YouTubeService:
                     "Authorization": f"Bearer {self.access_token}",
                     "Content-Type": "video/*"
                 },
-                content=video_data,
-                timeout=600.0  # 10분 타임아웃
+                content=video_data
             )
 
             if upload_response.status_code in [200, 201]:
+                logger.info("Video upload successful!")
                 return upload_response.json()
 
-            logger.error(f"Upload failed: {upload_response.text}")
+            logger.error(f"Upload failed: {upload_response.status_code} - {upload_response.text}")
             return None
 
     async def update_video(

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiCopy, FiSend, FiCheck, FiEdit3, FiSave, FiClock, FiX, FiUpload, FiImage, FiTrash2, FiYoutube } from 'react-icons/fi';
+import { FiArrowLeft, FiCopy, FiSend, FiCheck, FiEdit3, FiSave, FiClock, FiX, FiUpload, FiImage, FiTrash2, FiYoutube, FiInstagram, FiFacebook } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
-import { publishedContentAPI, youtubeAPI } from '../../services/api';
+import { publishedContentAPI, youtubeAPI, instagramAPI, facebookAPI } from '../../services/api';
 import './ContentEditor.css';
 
 // 플랫폼 설정
@@ -99,6 +99,26 @@ function ContentEditor() {
     privacyStatus: 'private'
   });
   const [youtubePublishResult, setYoutubePublishResult] = useState(null);
+
+  // Instagram Reels 발행 상태
+  const [showInstagramReelsModal, setShowInstagramReelsModal] = useState(false);
+  const [instagramStatus, setInstagramStatus] = useState(null);
+  const [isPublishingInstagram, setIsPublishingInstagram] = useState(false);
+  const [instagramForm, setInstagramForm] = useState({
+    caption: '',
+    shareToFeed: true
+  });
+  const [instagramPublishResult, setInstagramPublishResult] = useState(null);
+
+  // Facebook 비디오 발행 상태
+  const [showFacebookVideoModal, setShowFacebookVideoModal] = useState(false);
+  const [facebookStatus, setFacebookStatus] = useState(null);
+  const [isPublishingFacebook, setIsPublishingFacebook] = useState(false);
+  const [facebookForm, setFacebookForm] = useState({
+    title: '',
+    description: ''
+  });
+  const [facebookPublishResult, setFacebookPublishResult] = useState(null);
 
   // 초기 데이터 설정
   useEffect(() => {
@@ -648,7 +668,8 @@ function ContentEditor() {
       const status = await youtubeAPI.getStatus();
       setYoutubeStatus(status);
 
-      if (!status.connected) {
+      // YouTube API는 연동된 경우 객체를 반환하고, 미연동 시 null 반환
+      if (!status || !status.channel_id) {
         alert('YouTube 계정이 연동되어 있지 않습니다. 설정에서 YouTube를 연동해주세요.');
         return;
       }
@@ -712,6 +733,132 @@ function ContentEditor() {
       });
     } finally {
       setIsPublishingYouTube(false);
+    }
+  };
+
+  // Instagram Reels 모달 열기
+  const openInstagramReelsModal = async () => {
+    try {
+      const status = await instagramAPI.getStatus();
+      setInstagramStatus(status);
+
+      if (!status || !status.instagram_account_id) {
+        alert('Instagram 계정이 연동되어 있지 않습니다. 설정에서 Instagram을 연동해주세요.');
+        return;
+      }
+
+      // 기본값 설정
+      setInstagramForm({
+        caption: topic || result?.video?.productName || '',
+        shareToFeed: true
+      });
+      setInstagramPublishResult(null);
+      setShowInstagramReelsModal(true);
+    } catch (error) {
+      console.error('Instagram 상태 확인 실패:', error);
+      alert('Instagram 연동 상태를 확인할 수 없습니다.');
+    }
+  };
+
+  // Instagram Reels 발행 핸들러
+  const handlePublishInstagramReels = async () => {
+    const videoUrl = result?.video?.url;
+    if (!videoUrl) {
+      alert('발행할 영상이 없습니다.');
+      return;
+    }
+
+    setIsPublishingInstagram(true);
+    setInstagramPublishResult(null);
+
+    try {
+      const response = await instagramAPI.uploadReelsFromUrl({
+        video_url: videoUrl,
+        caption: instagramForm.caption,
+        share_to_feed: instagramForm.shareToFeed
+      });
+
+      setInstagramPublishResult({
+        success: true,
+        message: 'Instagram Reels에 업로드 완료!',
+        instagramUrl: response.instagram_url
+      });
+
+      // 새 탭에서 Instagram 열기
+      if (response.instagram_url) {
+        window.open(response.instagram_url, '_blank');
+      }
+    } catch (error) {
+      console.error('Instagram Reels 업로드 실패:', error);
+      setInstagramPublishResult({
+        success: false,
+        message: error.response?.data?.detail || error.message || 'Instagram Reels 업로드에 실패했습니다.'
+      });
+    } finally {
+      setIsPublishingInstagram(false);
+    }
+  };
+
+  // Facebook 비디오 모달 열기
+  const openFacebookVideoModal = async () => {
+    try {
+      const status = await facebookAPI.getStatus();
+      setFacebookStatus(status);
+
+      if (!status || !status.page_id) {
+        alert('Facebook 페이지가 연동되어 있지 않습니다. 설정에서 Facebook을 연동해주세요.');
+        return;
+      }
+
+      // 기본값 설정
+      setFacebookForm({
+        title: topic || result?.video?.productName || '새 영상',
+        description: ''
+      });
+      setFacebookPublishResult(null);
+      setShowFacebookVideoModal(true);
+    } catch (error) {
+      console.error('Facebook 상태 확인 실패:', error);
+      alert('Facebook 연동 상태를 확인할 수 없습니다.');
+    }
+  };
+
+  // Facebook 비디오 발행 핸들러
+  const handlePublishFacebookVideo = async () => {
+    const videoUrl = result?.video?.url;
+    if (!videoUrl) {
+      alert('발행할 영상이 없습니다.');
+      return;
+    }
+
+    setIsPublishingFacebook(true);
+    setFacebookPublishResult(null);
+
+    try {
+      const response = await facebookAPI.uploadVideoFromUrl({
+        video_url: videoUrl,
+        title: facebookForm.title,
+        description: facebookForm.description
+      });
+
+      setFacebookPublishResult({
+        success: true,
+        message: 'Facebook에 비디오 업로드 완료!',
+        facebookUrl: response.facebook_url
+      });
+
+      // 새 탭에서 Facebook 열기
+      if (response.facebook_url) {
+        window.open(response.facebook_url, '_blank');
+      }
+    } catch (error) {
+      console.error('Facebook 비디오 업로드 실패:', error);
+      setFacebookPublishResult({
+        success: false,
+        message: error.response?.data?.detail || error.message || 'Facebook 비디오 업로드에 실패했습니다.'
+      });
+    } finally {
+      setIsPublishingFacebook(false);
     }
   };
 
@@ -1092,6 +1239,18 @@ function ContentEditor() {
                 >
                   <FiYoutube /> YouTube 발행
                 </button>
+                <button
+                  className="btn-instagram-publish"
+                  onClick={openInstagramReelsModal}
+                >
+                  <FiInstagram /> Instagram Reels
+                </button>
+                <button
+                  className="btn-facebook-publish"
+                  onClick={openFacebookVideoModal}
+                >
+                  <FiFacebook /> Facebook
+                </button>
                 <a
                   href={result.video.url}
                   download={`${result.video.productName || 'video'}.mp4`}
@@ -1105,6 +1264,18 @@ function ContentEditor() {
                 <div className={`publish-result-message ${youtubePublishResult.success ? 'success' : 'error'}`}>
                   {youtubePublishResult.success ? <FiCheck /> : null}
                   {youtubePublishResult.message}
+                </div>
+              )}
+              {instagramPublishResult && (
+                <div className={`publish-result-message ${instagramPublishResult.success ? 'success' : 'error'}`}>
+                  {instagramPublishResult.success ? <FiCheck /> : null}
+                  {instagramPublishResult.message}
+                </div>
+              )}
+              {facebookPublishResult && (
+                <div className={`publish-result-message ${facebookPublishResult.success ? 'success' : 'error'}`}>
+                  {facebookPublishResult.success ? <FiCheck /> : null}
+                  {facebookPublishResult.message}
                 </div>
               )}
             </div>
@@ -1401,6 +1572,139 @@ function ContentEditor() {
                   disabled={isPublishingYouTube || !youtubeForm.title.trim()}
                 >
                   {isPublishingYouTube ? '업로드 중...' : '업로드'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Instagram Reels 발행 모달 */}
+      {showInstagramReelsModal && (
+        <div className="schedule-modal-overlay" onClick={() => setShowInstagramReelsModal(false)}>
+          <div className="schedule-modal instagram-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="schedule-modal-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiInstagram color="#E4405F" /> Instagram Reels 발행
+              </h3>
+              <button className="btn-close" onClick={() => setShowInstagramReelsModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="schedule-modal-body">
+              {instagramStatus?.instagram_username && (
+                <div className="instagram-account-info">
+                  <strong>계정:</strong> @{instagramStatus.instagram_username}
+                </div>
+              )}
+
+              <div className="instagram-form">
+                <div className="form-group">
+                  <label>캡션</label>
+                  <textarea
+                    value={instagramForm.caption}
+                    onChange={(e) => setInstagramForm(prev => ({ ...prev, caption: e.target.value }))}
+                    placeholder="Reels와 함께 표시될 캡션을 입력하세요"
+                    rows={4}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={instagramForm.shareToFeed}
+                      onChange={(e) => setInstagramForm(prev => ({ ...prev, shareToFeed: e.target.checked }))}
+                    />
+                    피드에도 공유하기
+                  </label>
+                </div>
+              </div>
+
+              {instagramPublishResult && (
+                <div className={`publish-result-message ${instagramPublishResult.success ? 'success' : 'error'}`}>
+                  {instagramPublishResult.success ? <FiCheck /> : null}
+                  {instagramPublishResult.message}
+                </div>
+              )}
+            </div>
+            <div className="schedule-modal-footer">
+              <button className="btn-cancel" onClick={() => setShowInstagramReelsModal(false)}>
+                {instagramPublishResult?.success ? '닫기' : '취소'}
+              </button>
+              {!instagramPublishResult?.success && (
+                <button
+                  className="btn-confirm btn-instagram"
+                  onClick={handlePublishInstagramReels}
+                  disabled={isPublishingInstagram}
+                >
+                  {isPublishingInstagram ? '업로드 중...' : '업로드'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Facebook 비디오 발행 모달 */}
+      {showFacebookVideoModal && (
+        <div className="schedule-modal-overlay" onClick={() => setShowFacebookVideoModal(false)}>
+          <div className="schedule-modal facebook-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="schedule-modal-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiFacebook color="#1877F2" /> Facebook 비디오 발행
+              </h3>
+              <button className="btn-close" onClick={() => setShowFacebookVideoModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="schedule-modal-body">
+              {facebookStatus?.page_name && (
+                <div className="facebook-page-info">
+                  <strong>페이지:</strong> {facebookStatus.page_name}
+                </div>
+              )}
+
+              <div className="facebook-form">
+                <div className="form-group">
+                  <label>제목</label>
+                  <input
+                    type="text"
+                    value={facebookForm.title}
+                    onChange={(e) => setFacebookForm(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="비디오 제목을 입력하세요"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>설명</label>
+                  <textarea
+                    value={facebookForm.description}
+                    onChange={(e) => setFacebookForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="비디오 설명을 입력하세요"
+                    rows={4}
+                  />
+                </div>
+              </div>
+
+              {facebookPublishResult && (
+                <div className={`publish-result-message ${facebookPublishResult.success ? 'success' : 'error'}`}>
+                  {facebookPublishResult.success ? <FiCheck /> : null}
+                  {facebookPublishResult.message}
+                </div>
+              )}
+            </div>
+            <div className="schedule-modal-footer">
+              <button className="btn-cancel" onClick={() => setShowFacebookVideoModal(false)}>
+                {facebookPublishResult?.success ? '닫기' : '취소'}
+              </button>
+              {!facebookPublishResult?.success && (
+                <button
+                  className="btn-confirm btn-facebook"
+                  onClick={handlePublishFacebookVideo}
+                  disabled={isPublishingFacebook}
+                >
+                  {isPublishingFacebook ? '업로드 중...' : '업로드'}
                 </button>
               )}
             </div>

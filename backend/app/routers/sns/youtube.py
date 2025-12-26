@@ -465,22 +465,31 @@ async def upload_video_from_url(
 ):
     """URL에서 동영상 다운로드 후 YouTube에 업로드"""
     import httpx
+    import traceback
+
+    logger.info(f"YouTube upload-from-url request: title={request.title}, url={request.video_url[:50]}...")
 
     connection = db.query(models.YouTubeConnection).filter(
         models.YouTubeConnection.user_id == current_user.id
     ).first()
 
     if not connection:
+        logger.error("YouTube connection not found")
         raise HTTPException(status_code=404, detail="YouTube connection not found. Please connect your YouTube channel first.")
+
+    logger.info(f"YouTube connection found: channel_id={connection.channel_id}")
 
     # URL에서 동영상 다운로드
     try:
+        logger.info("Downloading video from URL...")
         async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.get(request.video_url)
             response.raise_for_status()
             video_content = response.content
+        logger.info(f"Video downloaded: {len(video_content)} bytes")
     except Exception as e:
         logger.error(f"Failed to download video from URL: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=f"Failed to download video: {str(e)}")
 
     # 임시 파일로 저장
@@ -488,8 +497,11 @@ async def upload_video_from_url(
         tmp.write(video_content)
         tmp_path = tmp.name
 
+    logger.info(f"Video saved to temp file: {tmp_path}")
+
     try:
         service = YouTubeService(connection.access_token, connection.refresh_token)
+        logger.info("Starting YouTube upload...")
 
         result = await service.upload_video(
             video_file_path=tmp_path,
@@ -501,11 +513,13 @@ async def upload_video_from_url(
         )
 
         if not result:
-            raise HTTPException(status_code=500, detail="Video upload to YouTube failed")
+            logger.error("YouTube upload returned None - upload failed")
+            raise HTTPException(status_code=500, detail="Video upload to YouTube failed. Check server logs for details.")
 
         # DB에 저장
         video_id = result["id"]
         snippet = result.get("snippet", {})
+        logger.info(f"Video uploaded successfully: video_id={video_id}")
 
         new_video = models.YouTubeVideo(
             connection_id=connection.id,
@@ -529,9 +543,18 @@ async def upload_video_from_url(
             "title": request.title
         }
 
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during YouTube upload: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"YouTube upload error: {str(e)}")
+
     finally:
         # 임시 파일 삭제
-        os.unlink(tmp_path)
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+            logger.info("Temp file deleted")
 
 
 @router.put('/videos/{video_id}')

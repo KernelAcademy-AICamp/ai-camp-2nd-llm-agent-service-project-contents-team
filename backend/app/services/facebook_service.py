@@ -304,6 +304,126 @@ class FacebookService:
         )
         return result is not None and result.get('success', False)
 
+    # ===== 비디오 게시 =====
+
+    async def create_video_post(
+        self,
+        page_id: str,
+        video_url: str,
+        title: str = None,
+        description: str = None
+    ) -> Optional[Dict]:
+        """
+        페이지에 비디오 게시물 작성 (URL에서 업로드)
+        video_url: 공개적으로 접근 가능한 비디오 URL
+        """
+        data = {'file_url': video_url}
+
+        if title:
+            data['title'] = title
+
+        if description:
+            data['description'] = description
+
+        logger.info(f"Creating video post for page {page_id} with video: {video_url[:50]}...")
+        return await self._make_request(
+            'POST',
+            f'{page_id}/videos',
+            data=data,
+            use_page_token=True
+        )
+
+    async def upload_video_resumable(
+        self,
+        page_id: str,
+        video_url: str,
+        title: str = None,
+        description: str = None
+    ) -> Optional[Dict]:
+        """
+        Resumable Video Upload API를 사용한 비디오 업로드
+        큰 파일에 더 적합
+        """
+        import httpx
+
+        # 1. 비디오 다운로드
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                response = await client.get(video_url)
+                response.raise_for_status()
+                video_data = response.content
+                file_size = len(video_data)
+        except Exception as e:
+            logger.error(f"Failed to download video: {e}")
+            return None
+
+        # 2. 업로드 세션 시작
+        start_params = {
+            'upload_phase': 'start',
+            'file_size': file_size,
+            'access_token': self.page_access_token
+        }
+
+        start_url = f"{GRAPH_API_BASE_URL}/{page_id}/videos"
+        try:
+            start_response = await self.client.post(start_url, params=start_params)
+            if start_response.status_code != 200:
+                logger.error(f"Failed to start upload session: {start_response.text}")
+                return None
+
+            start_data = start_response.json()
+            upload_session_id = start_data.get('upload_session_id')
+            video_id = start_data.get('video_id')
+        except Exception as e:
+            logger.error(f"Upload session start failed: {e}")
+            return None
+
+        # 3. 비디오 데이터 전송
+        transfer_params = {
+            'upload_phase': 'transfer',
+            'upload_session_id': upload_session_id,
+            'start_offset': 0,
+            'access_token': self.page_access_token
+        }
+
+        try:
+            transfer_response = await self.client.post(
+                start_url,
+                params=transfer_params,
+                files={'video_file_chunk': ('video.mp4', video_data, 'video/mp4')}
+            )
+            if transfer_response.status_code != 200:
+                logger.error(f"Failed to transfer video: {transfer_response.text}")
+                return None
+        except Exception as e:
+            logger.error(f"Video transfer failed: {e}")
+            return None
+
+        # 4. 업로드 완료
+        finish_params = {
+            'upload_phase': 'finish',
+            'upload_session_id': upload_session_id,
+            'access_token': self.page_access_token
+        }
+
+        if title:
+            finish_params['title'] = title
+        if description:
+            finish_params['description'] = description
+
+        try:
+            finish_response = await self.client.post(start_url, params=finish_params)
+            if finish_response.status_code == 200:
+                result = finish_response.json()
+                result['video_id'] = video_id
+                return result
+            else:
+                logger.error(f"Failed to finish upload: {finish_response.text}")
+                return None
+        except Exception as e:
+            logger.error(f"Upload finish failed: {e}")
+            return None
+
     async def create_multi_photo_post(
         self,
         page_id: str,
