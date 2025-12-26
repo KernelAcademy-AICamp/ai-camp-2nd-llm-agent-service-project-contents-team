@@ -55,11 +55,13 @@ import {
 
 // API 및 스타일
 import { creditsAPI } from '../../../services/api';
+import { useVideoJob } from '../../../contexts/VideoJobContext';
 import CreditChargeModal from '../../../components/credits/CreditChargeModal';
 import '../ContentCreatorSimple.css';
 
 function ContentCreator() {
   const navigate = useNavigate();
+  const { addJob } = useVideoJob();
 
   // 공통 훅에서 상태와 핸들러 가져오기
   const {
@@ -984,6 +986,37 @@ function ContentCreator() {
                       <p style={{ fontSize: '15px', fontWeight: '500', color: '#111827' }}>
                         {progress || 'AI가 영상을 생성하고 있습니다...'}
                       </p>
+                    </div>
+
+                    {/* 다른 기능 둘러보기 버튼 */}
+                    <div style={{ textAlign: 'center', marginTop: '32px' }}>
+                      <p style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '12px' }}>
+                        영상 생성은 백그라운드에서 계속 진행됩니다
+                      </p>
+                      <button
+                        onClick={() => {
+                          // VideoJobContext에 작업 등록 후 홈으로 이동
+                          if (result.videoJobId) {
+                            addJob(result.videoJobId, topic || '숏폼 영상');
+                          }
+                          navigate('/');
+                        }}
+                        style={{
+                          padding: '12px 24px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#374151',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: '500',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#e5e7eb'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = '#f3f4f6'}
+                      >
+                        다른 기능 둘러보기
+                      </button>
                     </div>
                   </div>
                 </div>

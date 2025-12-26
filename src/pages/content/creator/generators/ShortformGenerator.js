@@ -131,10 +131,21 @@ export const parseVideoProgress = (currentStep) => {
   let currentPhase = 0;
   let progressPercent = 0;
 
-  if (currentStep.includes('Analyzing') || currentStep.includes('storyboard')) {
+  // 1단계: 스토리보드 생성 (4 Agents 포함)
+  if (currentStep.includes('1단계') || currentStep.includes('제품 분석') || currentStep.includes('로딩')) {
     currentPhase = 0;
-    progressPercent = currentStep.includes('storyboard') ? 20 : 10;
-  } else if (currentStep.includes('Generating image')) {
+    progressPercent = 5;
+  } else if (currentStep.includes('2단계') || currentStep.includes('스토리 기획')) {
+    currentPhase = 0;
+    progressPercent = 10;
+  } else if (currentStep.includes('3단계') || currentStep.includes('장면 연출')) {
+    currentPhase = 0;
+    progressPercent = 15;
+  } else if (currentStep.includes('4단계') || currentStep.includes('품질 검증')) {
+    currentPhase = 0;
+    progressPercent = 20;
+  } else if (currentStep.includes('Generating image') || currentStep.includes('이미지')) {
+    // 2단계: 이미지 생성
     currentPhase = 1;
     const match = currentStep.match(/(\d+)\/(\d+)/);
     if (match) {
@@ -144,7 +155,8 @@ export const parseVideoProgress = (currentStep) => {
     } else {
       progressPercent = 30;
     }
-  } else if (currentStep.includes('transition')) {
+  } else if (currentStep.includes('transition') || currentStep.includes('Kling') || currentStep.includes('Veo')) {
+    // 3단계: 전환 비디오 생성
     currentPhase = 2;
     const match = currentStep.match(/(\d+)\/(\d+)/);
     if (match) {
@@ -155,6 +167,7 @@ export const parseVideoProgress = (currentStep) => {
       progressPercent = 55;
     }
   } else if (currentStep.includes('Composing') || currentStep.includes('Concatenating') || currentStep.includes('Rendering') || currentStep.includes('Uploading')) {
+    // 4단계: 최종 합성
     currentPhase = 3;
     if (currentStep.includes('Composing')) progressPercent = 85;
     else if (currentStep.includes('Concatenating')) progressPercent = 90;
