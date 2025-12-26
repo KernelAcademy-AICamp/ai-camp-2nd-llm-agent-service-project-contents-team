@@ -6,11 +6,18 @@ Supabase Storage 헬퍼 서비스
 """
 
 import os
+import time
 from typing import Optional
 from supabase import create_client, Client
+from httpx import Timeout
 from ..logger import get_logger
 
 logger = get_logger(__name__)
+
+# 업로드 설정
+UPLOAD_TIMEOUT = 60  # 60초 타임아웃
+MAX_RETRIES = 3  # 최대 3회 재시도
+RETRY_DELAY = 2  # 재시도 간 대기 시간 (초)
 
 
 class SupabaseStorageService:
@@ -41,8 +48,14 @@ class SupabaseStorageService:
                 "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in environment variables"
             )
 
-        self.client: Client = create_client(supabase_url, service_role_key)
-        logger.info(f"SupabaseStorageService initialized with URL: {supabase_url}")
+        # 타임아웃 설정 (60초)
+        timeout = Timeout(UPLOAD_TIMEOUT, connect=10.0)
+        self.client: Client = create_client(
+            supabase_url,
+            service_role_key,
+            options={"timeout": timeout}
+        )
+        logger.info(f"SupabaseStorageService initialized with URL: {supabase_url} (timeout: {UPLOAD_TIMEOUT}s)")
 
     def upload_file(
         self,
@@ -53,6 +66,7 @@ class SupabaseStorageService:
     ) -> str:
         """
         파일을 Supabase Storage에 업로드하고 Public URL 반환
+        타임아웃 시 자동 재시도 (최대 3회)
 
         Args:
             bucket: 버킷 이름 (예: "ai-video-products")
@@ -66,33 +80,51 @@ class SupabaseStorageService:
         Raises:
             Exception: 업로드 실패 시
         """
-        try:
-            logger.info(f"Uploading file to Supabase: {bucket}/{file_path}")
+        last_error = None
 
-            # 파일 업로드
-            options = {}
-            if content_type:
-                options["content-type"] = content_type
+        for attempt in range(MAX_RETRIES):
+            try:
+                if attempt > 0:
+                    logger.info(f"🔄 재시도 {attempt + 1}/{MAX_RETRIES}: {bucket}/{file_path}")
+                else:
+                    logger.info(f"Uploading file to Supabase: {bucket}/{file_path}")
 
-            # upsert=True: 같은 경로에 파일이 있으면 덮어쓰기
-            response = self.client.storage.from_(bucket).upload(
-                path=file_path,
-                file=file_data,
-                file_options={
-                    "content-type": content_type or "application/octet-stream",
-                    "upsert": "true"  # 덮어쓰기 허용
-                }
-            )
+                # upsert=True: 같은 경로에 파일이 있으면 덮어쓰기
+                response = self.client.storage.from_(bucket).upload(
+                    path=file_path,
+                    file=file_data,
+                    file_options={
+                        "content-type": content_type or "application/octet-stream",
+                        "upsert": "true"  # 덮어쓰기 허용
+                    }
+                )
 
-            # Public URL 생성
-            public_url = self.get_public_url(bucket, file_path)
+                # Public URL 생성
+                public_url = self.get_public_url(bucket, file_path)
 
-            logger.info(f"✅ File uploaded successfully: {public_url}")
-            return public_url
+                logger.info(f"✅ File uploaded successfully: {public_url}")
+                return public_url
 
-        except Exception as e:
-            logger.error(f"❌ Failed to upload file to {bucket}/{file_path}: {str(e)}")
-            raise Exception(f"Supabase upload failed: {str(e)}")
+            except Exception as e:
+                last_error = e
+                error_msg = str(e)
+                logger.warning(f"⚠️ 업로드 실패 (시도 {attempt + 1}/{MAX_RETRIES}): {error_msg}")
+
+                # 타임아웃 관련 에러면 재시도
+                if "timeout" in error_msg.lower() or "timed out" in error_msg.lower():
+                    if attempt < MAX_RETRIES - 1:
+                        logger.info(f"⏳ {RETRY_DELAY}초 후 재시도...")
+                        time.sleep(RETRY_DELAY)
+                        continue
+
+                # 다른 에러도 재시도
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(RETRY_DELAY)
+                    continue
+
+        # 모든 재시도 실패
+        logger.error(f"❌ Failed to upload file to {bucket}/{file_path} after {MAX_RETRIES} attempts: {str(last_error)}")
+        raise Exception(f"Supabase upload failed after {MAX_RETRIES} retries: {str(last_error)}")
 
     def get_public_url(self, bucket: str, file_path: str) -> str:
         """
