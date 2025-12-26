@@ -321,7 +321,8 @@ function ContentCreator() {
 
       // 이미지 생성
       if (contentType === 'image' || contentType === 'both') {
-        if (imageFormat === 'cardnews') {
+        // 'both' 모드에서는 항상 AI 이미지 생성 (카드뉴스는 이미지 전용 모드에서만)
+        if (contentType === 'image' && imageFormat === 'cardnews') {
           // 카드뉴스 미리보기 생성
           try {
             const preview = await generateCardnewsPreview({
