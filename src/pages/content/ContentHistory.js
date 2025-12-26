@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiCopy, FiTrash2, FiArrowLeft, FiEdit3, FiDownload } from 'react-icons/fi';
+import { FiCopy, FiTrash2, FiArrowLeft, FiEdit3, FiDownload, FiSend } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import { contentSessionAPI, generatedVideoAPI, publishedContentAPI } from '../../services/api';
@@ -296,6 +296,25 @@ function ContentHistory() {
     });
   };
 
+  // 비디오 편집 페이지로 이동 (YouTube 발행용)
+  const handleGoToVideoEditor = (item) => {
+    navigate('/editor', {
+      state: {
+        result: {
+          video: {
+            url: item.final_video_url,
+            productName: item.product_name,
+            tier: item.tier,
+            duration: item.duration_seconds,
+          },
+        },
+        topic: item.product_name,
+        sessionId: item.session_id,
+        isVideo: true,
+      },
+    });
+  };
+
   // 필터링된 히스토리
   const filteredHistory = history.filter(item => {
     if (filterType === 'all') return true;
@@ -422,6 +441,13 @@ function ContentHistory() {
                       <div className="history-detail-title-row">
                         <h3>{selectedHistoryItem.product_name}</h3>
                         <div className="history-detail-actions">
+                          <button
+                            className="btn-icon btn-icon-edit"
+                            onClick={() => handleGoToVideoEditor(selectedHistoryItem)}
+                            title="편집 & 발행"
+                          >
+                            <FiSend />
+                          </button>
                           <button
                             className="btn-icon btn-icon-download"
                             onClick={() => handleDownloadVideo(selectedHistoryItem.final_video_url, selectedHistoryItem.product_name)}

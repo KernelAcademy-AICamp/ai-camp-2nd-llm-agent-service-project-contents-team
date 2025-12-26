@@ -133,9 +133,12 @@ class MasterPlanningAgent:
             return storyboard_result
 
         except Exception as e:
-            logger.error(f"Error in Master Planning Agent for job {job.id}: {str(e)}")
+            import traceback
+            error_detail = str(e) if str(e) else repr(e)
+            logger.error(f"Error in Master Planning Agent for job {job.id}: {error_detail}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             job.status = "failed"
-            job.error_message = f"Planning failed: {str(e)}"
+            job.error_message = f"Planning failed: {error_detail}"
             db.commit()
             raise
 
@@ -2589,8 +2592,11 @@ async def run_video_generation_pipeline(job_id: int, db: Session):
         logger.info(f"Video generation pipeline completed for job {job_id}: {final_video_url}")
 
     except Exception as e:
-        logger.error(f"Error in video generation pipeline for job {job_id}: {str(e)}")
+        import traceback
+        error_detail = str(e) if str(e) else repr(e)
+        logger.error(f"Error in video generation pipeline for job {job_id}: {error_detail}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         if job:
             job.status = "failed"
-            job.error_message = str(e)
+            job.error_message = error_detail
             db.commit()

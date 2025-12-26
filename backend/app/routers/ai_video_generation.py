@@ -249,10 +249,33 @@ async def create_video_generation_job(
         background_tasks.add_task(run_pipeline_in_background, job.id)
         logger.info(f"Added background task for job {job.id}")
 
-        return job
+        # VideoGenerationJobResponse로 변환하여 반환 (progress 필드 포함)
+        return VideoGenerationJobResponse(
+            id=job.id,
+            session_id=job.session_id,
+            user_id=job.user_id,
+            product_name=job.product_name,
+            product_description=job.product_description,
+            uploaded_image_url=job.uploaded_image_url,
+            tier=job.tier,
+            cut_count=job.cut_count,
+            duration_seconds=job.duration_seconds,
+            storyboard=job.storyboard,
+            generated_image_urls=job.generated_image_urls,
+            generated_video_urls=job.generated_video_urls,
+            final_video_url=job.final_video_url,
+            status=job.status,
+            current_step=job.current_step,
+            error_message=job.error_message,
+            progress=VideoGenerationJobResponse.calculate_progress(job.status),
+            created_at=job.created_at,
+            completed_at=job.completed_at,
+        )
 
     except Exception as e:
+        import traceback
         logger.error(f"Error creating video generation job: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -3,8 +3,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 import os
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
+
+
+# 폴링 엔드포인트 로그 필터링 (로그 과다 방지)
+class PollingEndpointFilter(logging.Filter):
+    """자주 호출되는 폴링 엔드포인트의 INFO 로그를 필터링"""
+    def filter(self, record):
+        message = record.getMessage()
+        # ai-video/jobs 폴링 로그 필터링
+        if '/api/ai-video/jobs/' in message and 'GET' in message and '200' in message:
+            return False
+        return True
+
+# uvicorn 액세스 로그에 필터 적용
+logging.getLogger("uvicorn.access").addFilter(PollingEndpointFilter())
 from .routers import auth, oauth, image, generated_videos, cardnews, onboarding, ai_recommendations, user, chat, brand_analysis, ai_video_generation, ai_content, published_content, dashboard, credits, templates
 from .routers.sns import blog, youtube, facebook, instagram, x, threads, tiktok, wordpress
 from .database import engine, Base
@@ -126,6 +141,7 @@ app.add_middleware(
     allow_credentials=False,  # credentials를 사용하지 않으므로 False
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # 응답 헤더 노출
 )
 
 # 라우터 등록

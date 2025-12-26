@@ -1,7 +1,8 @@
 // 콘텐츠 생성기 통합 페이지
 
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiCopy, FiArrowRight, FiEdit3, FiChevronLeft, FiChevronRight, FiPlus, FiTrash2, FiMove } from 'react-icons/fi';
+import { FiCopy, FiArrowRight, FiEdit3, FiChevronLeft, FiChevronRight, FiPlus, FiTrash2, FiMove, FiYoutube, FiX } from 'react-icons/fi';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
@@ -48,21 +49,30 @@ import {
 } from './generators/CardnewsGenerator';
 import {
   startShortformGeneration,
-  startPolling,
   deductShortformCredits,
-  parseVideoProgress,
   VIDEO_PHASES
 } from './generators/ShortformGenerator';
 
 // API 및 스타일
-import { creditsAPI } from '../../../services/api';
+import { creditsAPI, youtubeAPI } from '../../../services/api';
 import { useVideoJob } from '../../../contexts/VideoJobContext';
 import CreditChargeModal from '../../../components/credits/CreditChargeModal';
 import '../ContentCreatorSimple.css';
 
 function ContentCreator() {
   const navigate = useNavigate();
-  const { addJob } = useVideoJob();
+  const { addJob, activeJobs, completedJob, removeJob } = useVideoJob();
+
+  // YouTube 발행 상태
+  const [isYouTubeModalOpen, setIsYouTubeModalOpen] = useState(false);
+  const [youtubeStatus, setYoutubeStatus] = useState(null);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishForm, setPublishForm] = useState({
+    title: '',
+    description: '',
+    tags: '',
+    privacyStatus: 'private'
+  });
 
   // 공통 훅에서 상태와 핸들러 가져오기
   const {
@@ -121,6 +131,49 @@ function ContentCreator() {
     handleReset,
   } = useContentCreator();
 
+  // VideoJobContext의 상태를 생성 화면에 동기화
+  const videoJobId = result?.videoJobId;
+  const activeJob = videoJobId ? activeJobs[String(videoJobId)] : null;
+  const activeJobStep = activeJob?.currentStep;
+  const activeJobProgress = activeJob?.progress;  // 백엔드에서 계산한 progress 값
+  const completedJobId = completedJob?.id;
+  const completedJobFailed = completedJob?.failed;
+  const completedJobError = completedJob?.error;
+  const completedJobVideoUrl = completedJob?.finalVideoUrl;
+
+  useEffect(() => {
+    if (!videoJobId) return;
+
+    const jobId = String(videoJobId);
+
+    // 진행 중인 작업 상태 동기화
+    if (activeJobStep) {
+      setProgress(activeJobStep);
+    }
+
+    // 완료된 작업 처리
+    if (completedJobId && String(completedJobId) === jobId) {
+      if (completedJobFailed) {
+        setResult(prev => ({
+          ...prev,
+          videoStatus: 'failed',
+          videoError: completedJobError
+        }));
+        setProgress(`영상 생성 실패: ${completedJobError}`);
+      } else {
+        setResult(prev => ({
+          ...prev,
+          videoStatus: 'completed',
+          videoUrl: completedJobVideoUrl
+        }));
+        setProgress('숏폼 영상 생성 완료!');
+      }
+      // 작업 제거
+      removeJob(jobId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoJobId, activeJobStep, completedJobId, completedJobFailed, completedJobError, completedJobVideoUrl]);
+
   // 카드뉴스 핸들러 생성
   const handlePageEditFn = createPageEditHandler(cardnewsPreview, setCardnewsPreview);
   const handleAddPageFn = createAddPageHandler(cardnewsPreview, setCardnewsPreview, setEditingPageIndex);
@@ -132,6 +185,66 @@ function ContentCreator() {
     setCardnewsPreview(null);
     setIsPreviewMode(false);
     setEditingPageIndex(null);
+  };
+
+  // YouTube 발행 모달 열기
+  const handleOpenYouTubeModal = async () => {
+    try {
+      const status = await youtubeAPI.getStatus();
+      setYoutubeStatus(status);
+
+      if (!status.connected) {
+        alert('YouTube 계정이 연동되어 있지 않습니다. 설정에서 YouTube를 연동해주세요.');
+        return;
+      }
+
+      // 기본값 설정
+      setPublishForm({
+        title: topic || '새 영상',
+        description: result?.text?.blog?.content?.slice(0, 500) || '',
+        tags: '',
+        privacyStatus: 'private'
+      });
+      setIsYouTubeModalOpen(true);
+    } catch (error) {
+      console.error('YouTube 상태 확인 실패:', error);
+      alert('YouTube 연동 상태를 확인할 수 없습니다.');
+    }
+  };
+
+  // YouTube 발행 실행
+  const handlePublishToYouTube = async () => {
+    if (!result?.videoUrl) return;
+
+    setIsPublishing(true);
+    try {
+      const tagsArray = publishForm.tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+
+      const response = await youtubeAPI.uploadVideoFromUrl({
+        video_url: result.videoUrl,
+        title: publishForm.title,
+        description: publishForm.description,
+        tags: tagsArray,
+        category_id: '22', // People & Blogs
+        privacy_status: publishForm.privacyStatus
+      });
+
+      alert(`YouTube에 성공적으로 업로드되었습니다!\n영상 ID: ${response.video_id}`);
+      setIsYouTubeModalOpen(false);
+
+      // 새 탭에서 YouTube 영상 열기
+      if (response.video_url) {
+        window.open(response.video_url, '_blank');
+      }
+    } catch (error) {
+      console.error('YouTube 업로드 실패:', error);
+      alert(`YouTube 업로드 실패: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   // 미리보기 확정 및 이미지 생성
@@ -268,16 +381,12 @@ function ContentCreator() {
             setCreditBalance
           });
 
-          // 즉시 결과 화면으로 전환하고 폴링 시작
+          // VideoJobContext에 작업 등록 (폴링은 Context에서 통합 관리)
+          addJob(shortformResult.jobId, topic || '숏폼 영상');
+
+          // 즉시 결과 화면으로 전환
           setProgress('AI가 숏폼 영상을 생성하고 있습니다...');
           setResult({ ...generatedResult });
-
-          startPolling({
-            jobId: shortformResult.jobId,
-            generatedResult,
-            setProgress,
-            setResult
-          });
         } catch (videoError) {
           console.error('숏폼 영상 생성 실패:', videoError);
           const errorMsg = videoError.response?.data?.detail || videoError.message || '알 수 없는 오류';
@@ -905,9 +1014,34 @@ function ContentCreator() {
                     <source src={result.videoUrl} type="video/mp4" />
                     브라우저가 비디오를 지원하지 않습니다.
                   </video>
-                  <a href={result.videoUrl} download className="btn-download" style={{ marginTop: '16px', display: 'inline-block' }}>
-                    비디오 다운로드
-                  </a>
+                  <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <a href={result.videoUrl} download className="btn-download">
+                      비디오 다운로드
+                    </a>
+                    <button
+                      onClick={handleOpenYouTubeModal}
+                      className="btn-youtube-publish"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '10px 20px',
+                        backgroundColor: '#FF0000',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseOver={(e) => e.target.style.backgroundColor = '#CC0000'}
+                      onMouseOut={(e) => e.target.style.backgroundColor = '#FF0000'}
+                    >
+                      <FiYoutube size={18} />
+                      YouTube 발행
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -915,7 +1049,14 @@ function ContentCreator() {
 
           {/* 비디오 생성 중 */}
           {result.videoStatus === 'processing' && (() => {
-            const { currentPhase, progressPercent } = parseVideoProgress(progress || '');
+            // 백엔드에서 계산한 progress 값 사용 (팝업과 동기화)
+            const progressPercent = activeJobProgress || 5;
+            // 현재 단계 계산 (progress 기반)
+            let currentPhase = 0;
+            if (progressPercent >= 55) currentPhase = 3;  // 최종 합성
+            else if (progressPercent >= 50) currentPhase = 2;  // 전환 비디오 생성
+            else if (progressPercent >= 25) currentPhase = 1;  // 이미지 생성
+            else currentPhase = 0;  // 스토리보드 생성
 
             return (
               <div className="creator-result-card result-video-section">
@@ -1142,6 +1283,181 @@ function ContentCreator() {
 
       {/* 이미지 팝업 */}
       <ImagePopup imageUrl={popupImage} onClose={() => setPopupImage(null)} />
+
+      {/* YouTube 발행 모달 */}
+      {isYouTubeModalOpen && (
+        <div className="modal-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="modal-content" style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '24px',
+            width: '90%',
+            maxWidth: '500px',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiYoutube color="#FF0000" size={24} />
+                YouTube 발행
+              </h2>
+              <button
+                onClick={() => setIsYouTubeModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '4px'
+                }}
+              >
+                <FiX size={24} />
+              </button>
+            </div>
+
+            {youtubeStatus?.channel_title && (
+              <div style={{
+                backgroundColor: '#f0f9ff',
+                padding: '12px',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                fontSize: '14px'
+              }}>
+                <strong>채널:</strong> {youtubeStatus.channel_title}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>제목 *</label>
+                <input
+                  type="text"
+                  value={publishForm.title}
+                  onChange={(e) => setPublishForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="영상 제목을 입력하세요"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>설명</label>
+                <textarea
+                  value={publishForm.description}
+                  onChange={(e) => setPublishForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="영상 설명을 입력하세요"
+                  rows={4}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    resize: 'vertical',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>태그 (쉼표로 구분)</label>
+                <input
+                  type="text"
+                  value={publishForm.tags}
+                  onChange={(e) => setPublishForm(prev => ({ ...prev, tags: e.target.value }))}
+                  placeholder="예: 일상, vlog, 여행"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>공개 설정</label>
+                <select
+                  value={publishForm.privacyStatus}
+                  onChange={(e) => setPublishForm(prev => ({ ...prev, privacyStatus: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="private">비공개</option>
+                  <option value="unlisted">일부 공개</option>
+                  <option value="public">전체 공개</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setIsYouTubeModalOpen(false)}
+                style={{
+                  padding: '10px 20px',
+                  border: '1px solid #ddd',
+                  borderRadius: '8px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={handlePublishToYouTube}
+                disabled={isPublishing || !publishForm.title.trim()}
+                style={{
+                  padding: '10px 20px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  backgroundColor: isPublishing ? '#ccc' : '#FF0000',
+                  color: 'white',
+                  cursor: isPublishing ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                {isPublishing ? (
+                  <>업로드 중...</>
+                ) : (
+                  <>
+                    <FiYoutube size={16} />
+                    업로드
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 크레딧 충전 모달 */}
       <CreditChargeModal

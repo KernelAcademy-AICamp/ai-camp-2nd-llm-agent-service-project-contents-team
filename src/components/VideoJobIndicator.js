@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useVideoJob } from '../contexts/VideoJobContext';
 import './VideoJobIndicator.css';
 
@@ -10,12 +10,16 @@ import './VideoJobIndicator.css';
  */
 const VideoJobIndicator = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     activeJobCount,
     firstActiveJob,
     completedJob,
     clearCompletedNotification,
   } = useVideoJob();
+
+  // /create 페이지에서는 진행 중 인디케이터 숨김
+  const isOnCreatePage = location.pathname === '/create';
 
   // 완료 알림 토스트 닫기
   const handleCloseToast = () => {
@@ -46,11 +50,31 @@ const VideoJobIndicator = () => {
     return statusMap[status] || status;
   };
 
+  // 진행 중인 작업 클릭 시 생성 화면으로 이동
+  const handleIndicatorClick = () => {
+    if (firstActiveJob) {
+      navigate('/create', {
+        state: {
+          resumeJobId: firstActiveJob.id,
+          productName: firstActiveJob.productName,
+          status: firstActiveJob.status,
+          currentStep: firstActiveJob.currentStep,
+          progress: firstActiveJob.progress,
+        }
+      });
+    }
+  };
+
   return (
     <>
-      {/* 진행 중인 작업 인디케이터 (오른쪽 상단) */}
-      {activeJobCount > 0 && firstActiveJob && (
-        <div className="video-job-indicator">
+      {/* 진행 중인 작업 인디케이터 (오른쪽 상단) - /create 페이지에서는 숨김 */}
+      {activeJobCount > 0 && firstActiveJob && !isOnCreatePage && (
+        <div
+          className="video-job-indicator"
+          onClick={handleIndicatorClick}
+          style={{ cursor: 'pointer' }}
+          title="클릭하여 생성 화면으로 이동"
+        >
           <div className="video-job-indicator__header">
             <span className="video-job-indicator__icon">🎬</span>
             <span className="video-job-indicator__title">

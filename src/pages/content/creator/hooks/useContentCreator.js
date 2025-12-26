@@ -101,6 +101,25 @@ export const useContentCreator = () => {
     }
   }, [location.state]);
 
+  // 백그라운드 작업 재진입 (VideoJobIndicator에서 클릭 시)
+  useEffect(() => {
+    if (location.state?.resumeJobId) {
+      const { resumeJobId, productName, status, currentStep, progress: jobProgress } = location.state;
+
+      // 숏폼 영상 생성 중 상태로 설정
+      setContentType('shortform');
+      setTopic(productName || '숏폼 영상');
+      setProgress(currentStep || 'AI가 영상을 생성하고 있습니다...');
+      setResult({
+        videoJobId: resumeJobId,
+        videoStatus: status === 'completed' ? 'completed' : 'processing',
+      });
+
+      // URL state 정리
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
   // 디자인 템플릿 목록 조회
   useEffect(() => {
     const fetchDesignTemplates = async () => {

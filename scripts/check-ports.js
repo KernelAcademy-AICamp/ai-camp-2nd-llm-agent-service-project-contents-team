@@ -56,9 +56,18 @@ function killProcess(pid) {
       // Windows: 프로세스 트리 전체를 종료
       execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
     } else {
-      execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
+      // Mac/Linux: -9 (SIGKILL) 신호로 강제 종료
+      try {
+        execSync(`kill -9 ${pid} 2>/dev/null`, { stdio: 'ignore' });
+      } catch (e) {
+        // 이미 종료된 프로세스일 수 있음
+      }
     }
-    return true;
+    // 잠시 대기 후 확인
+    try {
+      execSync('sleep 0.5', { stdio: 'ignore' });
+    } catch (e) {}
+    return !isProcessRunning(pid);
   } catch (error) {
     // 프로세스가 이미 종료되었을 수 있음 - 재확인
     return !isProcessRunning(pid);
@@ -150,40 +159,55 @@ async function main() {
       }
     }
 
-    // 실패한 프로세스 재시도
-    if (failedPids.length > 0) {
-      log('\n🔄 Python 프로세스를 강제 종료하는 중...\n', 'cyan');
+    // 잠시 대기 후 포트 확인
+    log('\n⏳ 포트 정리 완료 대기 중...\n', 'cyan');
+    try {
+      execSync('sleep 1', { stdio: 'ignore' });
+    } catch (e) {}
 
-      if (isWindows) {
-        // Windows에서 python.exe와 node.exe 프로세스 종료
-        killProcessesByName('python.exe');
-        killProcessesByName('python3.exe');
-
-        // 잠시 대기
-        execSync('timeout /t 2 /nobreak', { stdio: 'ignore' });
+    // 실패한 프로세스 재시도 또는 남은 프로세스 확인
+    for (const { port } of portsInUse) {
+      const remainingPids = getProcessesOnPort(port);
+      if (remainingPids.length === 0) {
+        log(`✅ 포트 ${port} 정리 완료`, 'green');
       } else {
-        killProcessesByName('python');
-        killProcessesByName('python3');
-        killProcessesByName('node');
-      }
+        log(`⚠️  포트 ${port} 여전히 사용 중 (PID: ${remainingPids.join(', ')}), 재시도 중...`, 'yellow');
 
-      // 포트가 실제로 비었는지 확인
-      for (const { port } of failedPids) {
-        const remainingPids = getProcessesOnPort(port);
-        if (remainingPids.length === 0) {
+        // 남은 PID 강제 종료 시도
+        for (const pid of remainingPids) {
+          try {
+            if (!isWindows) {
+              execSync(`kill -9 ${pid} 2>/dev/null`, { stdio: 'ignore' });
+            }
+          } catch (e) {}
+        }
+
+        // 한번 더 대기 후 확인
+        try {
+          execSync('sleep 1', { stdio: 'ignore' });
+        } catch (e) {}
+
+        const finalCheck = getProcessesOnPort(port);
+        if (finalCheck.length === 0) {
           log(`✅ 포트 ${port} 정리 완료`, 'green');
         } else {
-          log(`❌ 포트 ${port} 여전히 사용 중 (PID: ${remainingPids.join(', ')})`, 'red');
+          log(`❌ 포트 ${port} 여전히 사용 중 (PID: ${finalCheck.join(', ')})`, 'red');
           allKilled = false;
         }
       }
     }
 
-    if (allKilled || failedPids.length === 0) {
+    if (allKilled) {
       log('\n✨ 모든 포트가 정리되었습니다. 서버를 시작합니다...\n', 'green');
     } else {
       log('\n⚠️  일부 포트 정리에 실패했습니다. 수동으로 종료 후 다시 시도해주세요.\n', 'yellow');
-      log('💡 Tip: 작업 관리자를 열어서 python.exe 프로세스를 직접 종료해보세요.\n', 'cyan');
+      if (isWindows) {
+        log('💡 Tip: 작업 관리자를 열어서 python.exe 프로세스를 직접 종료해보세요.\n', 'cyan');
+      } else {
+        log('💡 Tip: 터미널에서 다음 명령어로 프로세스를 종료할 수 있습니다:\n', 'cyan');
+        log('   lsof -i :3000 -t | xargs kill -9', 'cyan');
+        log('   lsof -i :8000 -t | xargs kill -9\n', 'cyan');
+      }
       process.exit(1);
     }
   } else {

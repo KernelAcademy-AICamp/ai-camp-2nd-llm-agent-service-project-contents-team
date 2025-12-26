@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiCopy, FiSend, FiCheck, FiEdit3, FiSave, FiClock, FiX, FiUpload, FiImage, FiTrash2 } from 'react-icons/fi';
+import { FiArrowLeft, FiCopy, FiSend, FiCheck, FiEdit3, FiSave, FiClock, FiX, FiUpload, FiImage, FiTrash2, FiYoutube } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
-import { publishedContentAPI } from '../../services/api';
+import { publishedContentAPI, youtubeAPI } from '../../services/api';
 import './ContentEditor.css';
 
 // 플랫폼 설정
@@ -41,7 +41,7 @@ const PLATFORM_CONFIG = {
 function ContentEditor() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { result, topic, sessionId } = location.state || {};
+  const { result, topic, sessionId, isVideo } = location.state || {};
 
   // 편집 상태
   const [editedContent, setEditedContent] = useState({});
@@ -87,6 +87,18 @@ function ContentEditor() {
   // 카드뉴스 저장 상태 (자동 저장 비활성화로 현재 미사용)
   // const [cardnewsContentId, setCardnewsContentId] = useState(null);
   // const [isCardnewsSaved, setIsCardnewsSaved] = useState(false);
+
+  // YouTube 발행 상태
+  const [showYouTubeModal, setShowYouTubeModal] = useState(false);
+  const [youtubeStatus, setYoutubeStatus] = useState(null);
+  const [isPublishingYouTube, setIsPublishingYouTube] = useState(false);
+  const [youtubeForm, setYoutubeForm] = useState({
+    title: '',
+    description: '',
+    tags: '',
+    privacyStatus: 'private'
+  });
+  const [youtubePublishResult, setYoutubePublishResult] = useState(null);
 
   // 초기 데이터 설정
   useEffect(() => {
@@ -630,6 +642,79 @@ function ContentEditor() {
     }
   };
 
+  // YouTube 발행 모달 열기
+  const openYouTubeModal = async () => {
+    try {
+      const status = await youtubeAPI.getStatus();
+      setYoutubeStatus(status);
+
+      if (!status.connected) {
+        alert('YouTube 계정이 연동되어 있지 않습니다. 설정에서 YouTube를 연동해주세요.');
+        return;
+      }
+
+      // 기본값 설정
+      setYoutubeForm({
+        title: topic || result?.video?.productName || '새 영상',
+        description: '',
+        tags: '',
+        privacyStatus: 'private'
+      });
+      setYoutubePublishResult(null);
+      setShowYouTubeModal(true);
+    } catch (error) {
+      console.error('YouTube 상태 확인 실패:', error);
+      alert('YouTube 연동 상태를 확인할 수 없습니다.');
+    }
+  };
+
+  // YouTube 발행 핸들러
+  const handlePublishYouTube = async () => {
+    const videoUrl = result?.video?.url;
+    if (!videoUrl) {
+      alert('발행할 영상이 없습니다.');
+      return;
+    }
+
+    setIsPublishingYouTube(true);
+    setYoutubePublishResult(null);
+
+    try {
+      const tagsArray = youtubeForm.tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(tag => tag.length > 0);
+
+      const response = await youtubeAPI.uploadVideoFromUrl({
+        video_url: videoUrl,
+        title: youtubeForm.title,
+        description: youtubeForm.description,
+        tags: tagsArray,
+        category_id: '22', // People & Blogs
+        privacy_status: youtubeForm.privacyStatus
+      });
+
+      setYoutubePublishResult({
+        success: true,
+        message: `YouTube에 업로드 완료! 영상 ID: ${response.video_id}`,
+        videoUrl: response.video_url
+      });
+
+      // 새 탭에서 YouTube 영상 열기
+      if (response.video_url) {
+        window.open(response.video_url, '_blank');
+      }
+    } catch (error) {
+      console.error('YouTube 업로드 실패:', error);
+      setYoutubePublishResult({
+        success: false,
+        message: error.response?.data?.detail || error.message || 'YouTube 업로드에 실패했습니다.'
+      });
+    } finally {
+      setIsPublishingYouTube(false);
+    }
+  };
+
   if (!result) return null;
 
   const currentData = editedContent[activePlatform];
@@ -959,7 +1044,7 @@ function ContentEditor() {
           )}
 
           {/* 카드뉴스 이미지만 있는 경우 (텍스트 콘텐츠 없이) */}
-          {!currentData && result?.images?.length > 0 && (
+          {!currentData && result?.images?.length > 0 && !isVideo && (
             <div className="editor-cardnews-only">
               <div className="cardnews-header">
                 <h3>카드뉴스 이미지 ({result.images.length}장)</h3>
@@ -975,6 +1060,53 @@ function ContentEditor() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* 비디오 편집 & YouTube 발행 */}
+          {isVideo && result?.video && (
+            <div className="editor-video-section">
+              <div className="video-editor-header">
+                <h3>숏폼 영상 발행</h3>
+                <div className="video-meta">
+                  <span className="info-badge">🎬 {result.video.tier}</span>
+                  <span className="info-badge">{result.video.duration}초</span>
+                </div>
+              </div>
+
+              <div className="video-player-wrapper">
+                <video
+                  controls
+                  src={result.video.url}
+                  className="editor-video-player"
+                >
+                  <source src={result.video.url} type="video/mp4" />
+                  브라우저가 비디오 재생을 지원하지 않습니다.
+                </video>
+              </div>
+
+              <div className="video-publish-buttons">
+                <button
+                  className="btn-youtube-publish"
+                  onClick={openYouTubeModal}
+                >
+                  <FiYoutube /> YouTube 발행
+                </button>
+                <a
+                  href={result.video.url}
+                  download={`${result.video.productName || 'video'}.mp4`}
+                  className="btn-download-video"
+                >
+                  다운로드
+                </a>
+              </div>
+
+              {youtubePublishResult && (
+                <div className={`publish-result-message ${youtubePublishResult.success ? 'success' : 'error'}`}>
+                  {youtubePublishResult.success ? <FiCheck /> : null}
+                  {youtubePublishResult.message}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1183,6 +1315,94 @@ function ContentEditor() {
               <button className="btn-cancel" onClick={() => setShowSnsSelectModal(false)}>
                 취소
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* YouTube 발행 모달 */}
+      {showYouTubeModal && (
+        <div className="schedule-modal-overlay" onClick={() => setShowYouTubeModal(false)}>
+          <div className="schedule-modal youtube-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="schedule-modal-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <FiYoutube color="#FF0000" /> YouTube 발행
+              </h3>
+              <button className="btn-close" onClick={() => setShowYouTubeModal(false)}>
+                <FiX />
+              </button>
+            </div>
+            <div className="schedule-modal-body">
+              {youtubeStatus?.channel_title && (
+                <div className="youtube-channel-info">
+                  <strong>채널:</strong> {youtubeStatus.channel_title}
+                </div>
+              )}
+
+              <div className="youtube-form">
+                <div className="form-group">
+                  <label>제목 *</label>
+                  <input
+                    type="text"
+                    value={youtubeForm.title}
+                    onChange={(e) => setYoutubeForm(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="영상 제목을 입력하세요"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>설명</label>
+                  <textarea
+                    value={youtubeForm.description}
+                    onChange={(e) => setYoutubeForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="영상 설명을 입력하세요"
+                    rows={4}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>태그 (쉼표로 구분)</label>
+                  <input
+                    type="text"
+                    value={youtubeForm.tags}
+                    onChange={(e) => setYoutubeForm(prev => ({ ...prev, tags: e.target.value }))}
+                    placeholder="예: 일상, vlog, 여행"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>공개 설정</label>
+                  <select
+                    value={youtubeForm.privacyStatus}
+                    onChange={(e) => setYoutubeForm(prev => ({ ...prev, privacyStatus: e.target.value }))}
+                  >
+                    <option value="private">비공개</option>
+                    <option value="unlisted">일부 공개</option>
+                    <option value="public">전체 공개</option>
+                  </select>
+                </div>
+              </div>
+
+              {youtubePublishResult && (
+                <div className={`publish-result-message ${youtubePublishResult.success ? 'success' : 'error'}`}>
+                  {youtubePublishResult.success ? <FiCheck /> : null}
+                  {youtubePublishResult.message}
+                </div>
+              )}
+            </div>
+            <div className="schedule-modal-footer">
+              <button className="btn-cancel" onClick={() => setShowYouTubeModal(false)}>
+                {youtubePublishResult?.success ? '닫기' : '취소'}
+              </button>
+              {!youtubePublishResult?.success && (
+                <button
+                  className="btn-confirm btn-youtube"
+                  onClick={handlePublishYouTube}
+                  disabled={isPublishingYouTube || !youtubeForm.title.trim()}
+                >
+                  {isPublishingYouTube ? '업로드 중...' : '업로드'}
+                </button>
+              )}
             </div>
           </div>
         </div>

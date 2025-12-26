@@ -1218,5 +1218,8 @@ class VideoStoryboardOrchestrator:
             job.generation_attempts = generation_attempts
             db.commit()
 
-            logger.error(f"❌ Storyboard Generation 실패: {str(e)}")
+            import traceback
+            error_detail = str(e) if str(e) else repr(e)
+            logger.error(f"❌ Storyboard Generation 실패: {error_detail}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             raise

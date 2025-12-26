@@ -448,6 +448,92 @@ async def upload_video(
         os.unlink(tmp_path)
 
 
+class VideoUploadFromUrlRequest(BaseModel):
+    video_url: str
+    title: str
+    description: str = ""
+    tags: List[str] = []
+    category_id: str = "22"  # People & Blogs
+    privacy_status: str = "private"
+
+
+@router.post('/videos/upload-from-url')
+async def upload_video_from_url(
+    request: VideoUploadFromUrlRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """URL에서 동영상 다운로드 후 YouTube에 업로드"""
+    import httpx
+
+    connection = db.query(models.YouTubeConnection).filter(
+        models.YouTubeConnection.user_id == current_user.id
+    ).first()
+
+    if not connection:
+        raise HTTPException(status_code=404, detail="YouTube connection not found. Please connect your YouTube channel first.")
+
+    # URL에서 동영상 다운로드
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.get(request.video_url)
+            response.raise_for_status()
+            video_content = response.content
+    except Exception as e:
+        logger.error(f"Failed to download video from URL: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to download video: {str(e)}")
+
+    # 임시 파일로 저장
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+        tmp.write(video_content)
+        tmp_path = tmp.name
+
+    try:
+        service = YouTubeService(connection.access_token, connection.refresh_token)
+
+        result = await service.upload_video(
+            video_file_path=tmp_path,
+            title=request.title,
+            description=request.description,
+            tags=request.tags,
+            category_id=request.category_id,
+            privacy_status=request.privacy_status
+        )
+
+        if not result:
+            raise HTTPException(status_code=500, detail="Video upload to YouTube failed")
+
+        # DB에 저장
+        video_id = result["id"]
+        snippet = result.get("snippet", {})
+
+        new_video = models.YouTubeVideo(
+            connection_id=connection.id,
+            user_id=current_user.id,
+            video_id=video_id,
+            title=snippet.get("title", request.title),
+            description=snippet.get("description", request.description),
+            thumbnail_url=snippet.get("thumbnails", {}).get("high", {}).get("url"),
+            privacy_status=request.privacy_status,
+            tags=request.tags,
+            category_id=request.category_id,
+            published_at=datetime.utcnow()
+        )
+        db.add(new_video)
+        db.commit()
+
+        return {
+            "message": "Video uploaded successfully",
+            "video_id": video_id,
+            "video_url": f"https://www.youtube.com/watch?v={video_id}",
+            "title": request.title
+        }
+
+    finally:
+        # 임시 파일 삭제
+        os.unlink(tmp_path)
+
+
 @router.put('/videos/{video_id}')
 async def update_video(
     video_id: str,

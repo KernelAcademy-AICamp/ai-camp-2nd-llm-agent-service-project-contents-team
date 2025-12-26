@@ -27,7 +27,7 @@
     "prestart": "node scripts/check-ports.js",
     "start": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
     "start:frontend": "react-scripts start",
-    "start:backend": "cd backend && python3 -m uvicorn app.main:app --reload --port 8000",
+    "start:backend": "cd backend && source venv/bin/activate && python -m uvicorn app.main:app --reload --port 8000",
     "start:dev": "concurrently \"npm run start:frontend\" \"npm run start:backend\"",
     "setup:backend": "cd backend && bash setup.sh",
     "build": "react-scripts build",

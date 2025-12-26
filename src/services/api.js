@@ -193,6 +193,14 @@ export const youtubeAPI = {
     const response = await api.get('/api/youtube/analytics/summary');
     return response.data;
   },
+
+  // URL에서 동영상 업로드
+  uploadVideoFromUrl: async (data) => {
+    const response = await api.post('/api/youtube/videos/upload-from-url', data, {
+      timeout: 600000, // 10분 타임아웃
+    });
+    return response.data;
+  },
 };
 
 // ==========================================
