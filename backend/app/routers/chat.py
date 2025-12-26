@@ -5,7 +5,8 @@ from typing import List, Optional
 import os
 from pathlib import Path
 from datetime import datetime, timezone
-import google.generativeai as genai
+import vertexai
+from vertexai.generative_models import GenerativeModel, Content, Part
 from ..logger import get_logger
 from ..database import get_db
 from .. import models, auth
@@ -17,10 +18,19 @@ router = APIRouter(
     tags=["chat"]
 )
 
-# Gemini 설정
-GEMINI_API_KEY = os.getenv('REACT_APP_GEMINI_API_KEY')
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+# Vertex AI 설정 (lazy initialization)
+_vertex_initialized = False
+
+def initialize_vertex_ai():
+    global _vertex_initialized
+    if not _vertex_initialized:
+        project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
+        if project_id:
+            vertexai.init(project=project_id, location="us-central1")
+            _vertex_initialized = True
+            logger.info(f"Vertex AI initialized: project={project_id}")
+        return project_id
+    return os.getenv('GOOGLE_CLOUD_PROJECT')
 
 # 시스템 프롬프트 로드
 def load_system_prompt() -> str:
@@ -261,10 +271,11 @@ async def chat(
     세션이 없으면 새로 생성
     """
     try:
-        if not GEMINI_API_KEY:
+        project_id = initialize_vertex_ai()
+        if not project_id:
             raise HTTPException(
                 status_code=500,
-                detail="Gemini API 키가 설정되지 않았습니다."
+                detail="Google Cloud Project가 설정되지 않았습니다."
             )
 
         logger.info(f"채팅 요청 수신 (user_id: {current_user.id}): {request.message[:50]}...")
@@ -304,7 +315,7 @@ async def chat(
             session_id=session.id,
             role="user",
             content=request.message,
-            model="gemini-2.0-flash-exp"
+            model="gemini-2.0-flash"
         )
         db.add(user_message)
         # 세션의 updated_at 변경사항도 함께 커밋
@@ -318,19 +329,17 @@ async def chat(
 
         logger.debug(f"개인화된 시스템 프롬프트 생성 완료 ({len(personalized_prompt)} 글자)")
 
-        # Gemini 모델 초기화 (개인화된 시스템 프롬프트 포함)
-        model = genai.GenerativeModel(
-            'gemini-2.0-flash-exp',
+        # Vertex AI 모델 초기화
+        model = GenerativeModel(
+            'gemini-2.0-flash',
             system_instruction=personalized_prompt
         )
 
-        # 대화 히스토리를 Gemini 형식으로 변환
+        # 대화 히스토리를 Vertex AI 형식으로 변환
         chat_history = []
         for msg in request.history:
-            chat_history.append({
-                'role': 'user' if msg.role == 'user' else 'model',
-                'parts': [msg.content]
-            })
+            role = 'user' if msg.role == 'user' else 'model'
+            chat_history.append(Content(role=role, parts=[Part.from_text(msg.content)]))
 
         # 채팅 세션 시작 (히스토리 포함)
         chat = model.start_chat(history=chat_history)
@@ -346,7 +355,7 @@ async def chat(
             session_id=session.id,
             role="assistant",
             content=response.text,
-            model="gemini-2.0-flash-exp"
+            model="gemini-2.0-flash"
         )
         db.add(ai_message)
         db.commit()
