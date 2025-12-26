@@ -31,6 +31,11 @@ export const generateTextContent = async ({
     (progress) => onProgress?.(progress.message)
   );
 
+  // 디버그: 생성 결과 확인
+  console.log('[TextGenerator] selectedPlatforms:', selectedPlatforms);
+  console.log('[TextGenerator] agenticResult:', agenticResult);
+  console.log('[TextGenerator] agenticResult.blog:', agenticResult?.blog);
+
   return {
     agenticResult,
     text: {

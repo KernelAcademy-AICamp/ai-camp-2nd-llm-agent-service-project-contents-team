@@ -413,6 +413,11 @@ function ContentCreator() {
         }, imageUrls, platforms, 'default', contentType, imageCount);
       }
 
+      // 디버그: 최종 결과 확인
+      console.log('[ContentCreator] generatedResult:', generatedResult);
+      console.log('[ContentCreator] generatedResult.text:', generatedResult.text);
+      console.log('[ContentCreator] generatedResult.text?.blog:', generatedResult.text?.blog);
+
       setResult(generatedResult);
       setProgress('');
     } catch (error) {
