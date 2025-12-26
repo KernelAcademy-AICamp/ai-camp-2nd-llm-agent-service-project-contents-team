@@ -282,11 +282,43 @@ const safeJsonParse = (jsonStr, silent = false) => {
               truncated = fixIncompleteArray(truncated);
               return JSON.parse(truncated);
             } catch (e6) {
-              if (!silent) {
-                console.error('모든 JSON 파싱 시도 실패:', e6.message);
-                console.error('원본 JSON (처음 500자):', jsonPart.substring(0, 500));
+              // 7차 시도: 마지막 완전한 키-값 쌍까지만 사용
+              try {
+                let partial = jsonPart;
+                partial = partial.replace(/[\x00-\x1F\x7F]/g, ' ');
+
+                // 마지막 완전한 속성 찾기 (": "... 형태)
+                // 완전한 문자열 값을 가진 마지막 속성 위치 찾기
+                const completeValuePattern = /"[^"]*"\s*:\s*"[^"]*"/g;
+                let lastCompleteMatch = null;
+                let match;
+                while ((match = completeValuePattern.exec(partial)) !== null) {
+                  lastCompleteMatch = match;
+                }
+
+                if (lastCompleteMatch) {
+                  const endPos = lastCompleteMatch.index + lastCompleteMatch[0].length;
+                  partial = partial.substring(0, endPos);
+
+                  // 열린 중괄호/대괄호 닫기
+                  const openBraces = (partial.match(/\{/g) || []).length;
+                  const closeBraces = (partial.match(/\}/g) || []).length;
+                  const openBrackets = (partial.match(/\[/g) || []).length;
+                  const closeBrackets = (partial.match(/\]/g) || []).length;
+
+                  for (let i = 0; i < openBrackets - closeBrackets; i++) partial += ']';
+                  for (let i = 0; i < openBraces - closeBraces; i++) partial += '}';
+
+                  return JSON.parse(partial);
+                }
+                throw new Error('완전한 속성을 찾을 수 없음');
+              } catch (e7) {
+                if (!silent) {
+                  console.error('모든 JSON 파싱 시도 실패:', e7.message);
+                  console.error('원본 JSON (처음 500자):', jsonPart.substring(0, 500));
+                }
+                throw e7;
               }
-              throw e6;
             }
           }
         }
@@ -793,7 +825,12 @@ ${JSON.stringify(outputFormat, null, 2)}
 // ============================================
 export const generateAgenticContent = async ({ textInput, images = [], styleTone = '', selectedPlatforms = ['blog', 'sns', 'x', 'threads'], userContext = null }, onProgress) => {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      generationConfig: {
+        maxOutputTokens: 8192,  // 출력 토큰 제한 늘리기
+      }
+    });
     const criticAgent = new CriticAgent();
     const writerAgent = new WriterAgent();
     const MAX_ATTEMPTS = 3; // 80점 이상이 될 때까지 최대 3회 시도
