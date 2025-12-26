@@ -49,6 +49,7 @@ import {
 import {
   startShortformGeneration,
   startPolling,
+  deductShortformCredits,
   parseVideoProgress,
   VIDEO_PHASES
 } from './generators/ShortformGenerator';
@@ -260,6 +261,12 @@ function ContentCreator() {
 
           generatedResult.videoJobId = shortformResult.jobId;
           generatedResult.videoStatus = shortformResult.videoStatus;
+
+          // 크레딧 차감
+          await deductShortformCredits({
+            videoDuration,
+            setCreditBalance
+          });
 
           // 즉시 결과 화면으로 전환하고 폴링 시작
           setProgress('AI가 숏폼 영상을 생성하고 있습니다...');
